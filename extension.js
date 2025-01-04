@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const parser = require('./parsers/parser');
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -12,9 +13,21 @@ function activate(context) {
 	statusBarItem.show();
 
 	// command
-	console.log('DrawMeDatabase est activé!');
+	console.log('DrawMeDatabase is now active');
 	const disposable = vscode.commands.registerCommand('DMDB.Draw', () => {
-		vscode.window.showInformationMessage('Bienvenue sur DrawMeDatabase!');
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (workspaceFolders && workspaceFolders.length > 0) {
+			const projectPath = workspaceFolders[0].uri.fsPath;
+
+			// framework detection
+			const framework = parser.detectFramework(projectPath);
+			if (framework === 'Unknown') {
+				vscode.window.showErrorMessage('Unknown framework, unable to draw database');
+				return;
+			} else {
+				vscode.window.showInformationMessage(`Framework detected: ${framework}, starting to draw database...`);
+			}
+		}
 	});
 
 	context.subscriptions.push(disposable, statusBarItem);
