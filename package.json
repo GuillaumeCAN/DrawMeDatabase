@@ -1,5 +1,5 @@
 {
-  "name": "DMDB",
+  "name": "draw-me-database",
   "displayName": "DrawMeDatabase",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
   "version": "0.0.1",
@@ -9,12 +9,12 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": ["*"],
   "main": "./extension.js",
   "contributes": {
     "commands": [{
-      "command": "DMDB.helloWorld",
-      "title": "Hello World"
+      "command": "DMDB.Draw",
+      "title": "DrawMeDatabase: Draw"
     }]
   },
   "scripts": {
