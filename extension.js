@@ -35,7 +35,7 @@ function activate(context) {
 			const jsonTable = frameworkParser.Parser(projectPath);
 
 			// display webview with JSON data ("json" is the default viewer method)
-			showWebview(context, jsonTable, "json");
+			showWebview(context, jsonTable, "mermaid");
 
 		} else {
 			vscode.window.showErrorMessage('No workspace opened, unable to draw database');
