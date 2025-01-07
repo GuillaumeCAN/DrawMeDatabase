@@ -1,5 +1,3 @@
-![logo_128](https://github.com/user-attachments/assets/d9a25d50-f9f7-45f7-9e4c-3415ebbf1980)
-
 **v1.0.0**
 
 ## About DrawMeDatabase

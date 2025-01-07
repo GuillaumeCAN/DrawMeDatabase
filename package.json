@@ -1,10 +1,16 @@
 {
   "name": "draw-me-database",
   "displayName": "DrawMeDatabase",
+  "publisher": "GuillaumeCancalon",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "icon": "images/logo_128.png", 
   "engines": {
     "vscode": "^1.96.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GuillaumeCAN/DrawMeDatabase"
   },
   "categories": [
     "Other"
