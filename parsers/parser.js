@@ -17,7 +17,7 @@ module.exports.detectFramework = function(projectPath){
         }
     }
 
-    // Symfony detection
+    /* // Symfony detection
     if (hasFiles(projectPath, ['bin/console', 'composer.json'])) {
         const composerPath = path.join(projectPath, 'composer.json');
         const composerData = JSON.parse(fs.readFileSync(composerPath, 'utf8'));
@@ -42,7 +42,7 @@ module.exports.detectFramework = function(projectPath){
                 return 'django';
             }
         }
-    }
+    } */
 
     return 'Unknown';
 };
