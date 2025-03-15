@@ -22,7 +22,7 @@ const getBasePath = (projectPath) => {
 module.exports.detectFramework = function(projectPath) {
   const basePath = getBasePath(projectPath);
 
-  // Détection Laravel
+  // Laravel Detection
   if (hasFiles(basePath, ['artisan', 'composer.json'])) {
     const composerPath = path.join(basePath, 'composer.json');
     const composerData = JSON.parse(fs.readFileSync(composerPath, 'utf8'));
@@ -31,7 +31,7 @@ module.exports.detectFramework = function(projectPath) {
     }
   }
 
-  // Détection Symfony
+  // Symfony Detection
   if (hasFiles(basePath, ['bin/console', 'composer.json'])) {
     const composerPath = path.join(basePath, 'composer.json');
     const composerData = JSON.parse(fs.readFileSync(composerPath, 'utf8'));
@@ -40,6 +40,7 @@ module.exports.detectFramework = function(projectPath) {
     }
   }
 
+  /*
   // Détection Django
   if (hasFiles(basePath, ['manage.py'])) {
     const requirementsPath = path.join(basePath, 'requirements.txt');
@@ -57,7 +58,7 @@ module.exports.detectFramework = function(projectPath) {
       }
     }
   }
-
+  */
 
   console.log("Base path used for detection:", basePath);
   return 'Unknown';
