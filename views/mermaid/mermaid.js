@@ -1,64 +1,59 @@
-function groupTablesByRelations(data) {
-    const groups = [];
-    const tableMap = new Map();
+//
+// Copyright (c) 2025 Guillaume Cancalon - All rights reserved
+//
+// This file is part of DrawMeDatabase, and is released under the "GNU GENERAL PUBLIC LICENSE".
+// Please see the LICENSE file that should have been included as part of this package.
+//
 
-    data.forEach(table => {
-        tableMap.set(table.table, table);
-    });
-
-    data.forEach(table => {
-        let group = groups.find(g => g.includes(table.table));
-        if (!group) {
-            group = [];
-            groups.push(group);
-        }
-        group.push(table.table);
-
-        table.relations.forEach(relation => {
-            if (!group.includes(relation.on)) {
-                group.push(relation.on);
-            }
-        });
-    });
-
-    return groups.map(group => group.map(tableName => tableMap.get(tableName)));
-}
-
-function generateMermaidDiagram(data) {
+function generateMermaidER(data) {
     let mermaidStr = 'erDiagram\n';
 
+    const tableDefs = new Map();
+    const relationsSet = new Set();
+
     data.forEach(table => {
-        mermaidStr += `  ${table.table} {\n`;
-
+      if (!tableDefs.has(table.table)) {
+        let def = `  ${table.table} {\n`;
         table.columns.forEach(column => {
-            mermaidStr += `    ${column.name} ${column.type}\n`;
+          def += `    ${column.name} ${column.type}\n`;
         });
+        def += `  }\n`;
+        tableDefs.set(table.table, def);
+      }
 
-        mermaidStr += '  }\n';
+      table.relations.forEach(relation => {
+        const relLine = `  ${relation.on} ||--o| ${table.table} : "${relation.foreignKey} references ${relation.references}"`;
+        relationsSet.add(relLine);
+      });
+    });
 
-        // relations
-        table.relations.forEach(relation => {
-            mermaidStr += `  ${relation.on} ||--o| ${table.table}: "${relation.foreignKey} references ${relation.references}"\n`;
-        });
+    tableDefs.forEach(def => {
+      mermaidStr += def;
+    });
+
+    relationsSet.forEach(rel => {
+      mermaidStr += rel + "\n";
     });
 
     return mermaidStr;
-}
+  }
 
-const groupedTables = groupTablesByRelations(jsonData);
+  function renderMermaidDiagram() {
+    const container = document.getElementById("mermaid-diagram");
+    if (!container) {
+      console.error("The container with ID 'mermaid-diagram' is not found.");
+      return;
+    }
+    // generating mermaid code
+    const mermaidCode = generateMermaidER(jsonData);
+    container.innerHTML = `<div class="mermaid">${mermaidCode}</div>`;
 
-// Sort groups by the total number of columns in descending order
-groupedTables.sort((a, b) => {
-    const aColumns = a.reduce((sum, table) => sum + table.columns.length, 0);
-    const bColumns = b.reduce((sum, table) => sum + table.columns.length, 0);
-    return bColumns - aColumns;
-});
+    if (typeof mermaid !== "undefined" && mermaid.init) {
+      mermaid.init(undefined, container);
+    } else {
+      console.error("The Mermaid library is not loaded.");
+    }
+  }
 
-let mermaidCode = '';
-
-groupedTables.forEach(group => {
-    mermaidCode += `<div class="mermaid">${generateMermaidDiagram(group)}</div>\n`;
-});
-
-document.getElementById("mermaid-diagram").innerHTML = mermaidCode;
-mermaid.init();
+  // wait for the DOM to be fully loaded
+  document.addEventListener("DOMContentLoaded", renderMermaidDiagram);

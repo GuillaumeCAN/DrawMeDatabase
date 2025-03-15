@@ -2,8 +2,6 @@
 
 All notable changes to the "DMDB" extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
 ## [v1.0.0] - 2025-01-07
 
 - Initial release
@@ -17,3 +15,17 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Known issues
 - Many to Many relations are not supported and relations tables appear as empty tables.
 - Diagrams with the relationships do not go all the way to the top.
+
+## [v1.1.0] - 2025-03-15
+
+### Added
+- Symfony parser from entities
+- Symfony framework now supported
+- Setting to change the framework directory
+
+### Fixed
+- Mermaid viewer no longer duplicates tables
+- Diagrams with the relationships now go all the way to the top
+
+### Known issues
+- No issues known at this time, feel free to report any!
