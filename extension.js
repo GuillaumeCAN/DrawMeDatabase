@@ -1,81 +1,97 @@
+//
+// Copyright (c) 2025 Guillaume Cancalon - All rights reserved
+//
+// This file is part of DrawMeDatabase, and is released under the "GNU GENERAL PUBLIC LICENSE".
+// Please see the LICENSE file that should have been included as part of this package.
+//
+
 const vscode = require('vscode');
-const parser = require('./parsers/parser');
 const path = require('path');
 const fs = require('fs');
-
-/**
- * @param {vscode.ExtensionContext} context
- */
+const parser = require('./parsers/parser');
 
 function activate(context) {
-	// status bar item
-	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-	statusBarItem.text = "$(database) DrawMeDatabase";
-	statusBarItem.command = "DMDB.Draw";
-	statusBarItem.show();
+    // Status bar item
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+    statusBarItem.text = "$(database) DrawMeDatabase";
+    statusBarItem.command = 'DMDB.parseSchema';
+    statusBarItem.tooltip = 'Draw the database schema';
+    statusBarItem.show();
 
-	// command
-	console.log('DrawMeDatabase is now active');
-	const disposable = vscode.commands.registerCommand('DMDB.Draw', () => {
-		const workspaceFolders = vscode.workspace.workspaceFolders;
-		if (workspaceFolders && workspaceFolders.length > 0) {
-			const projectPath = workspaceFolders[0].uri.fsPath;
+    // Command to parse the schema
+    const parseCommand = vscode.commands.registerCommand('DMDB.parseSchema', async () => {
+        let projectPath = vscode.workspace.getConfiguration().get('DMDB.frameworkPath');
 
-			// framework detection
-			const framework = parser.detectFramework(projectPath);
-			if (framework === 'Unknown') {
-				vscode.window.showErrorMessage('Unknown framework, unable to draw database');
-				return;
-			} else {
-				vscode.window.setStatusBarMessage(`Framework detected: ${framework}, starting to draw database...`, 3000);
-			}
+        if (!projectPath) {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders && workspaceFolders.length > 0) {
+                projectPath = workspaceFolders[0].uri.fsPath;
+            }
+        }
 
-			// parse database and get JSON data
-			const frameworkParser = require(`./parsers/${framework}`);
-			const jsonTable = frameworkParser.Parser(projectPath);
+        if (!projectPath) {
+            vscode.window.showErrorMessage("No project opened in the current workspace. Unable to draw the schema.");
+            return;
+        }
 
-			// display webview with JSON data ("json" is the default viewer method)
-			showWebview(context, jsonTable, "mermaid");
+        // Framework detection
+        const framework = parser.detectFramework(projectPath);
+        console.log(`Framework : ${framework}`);
 
-		} else {
-			vscode.window.showErrorMessage('No workspace opened, unable to draw database');
-		}
-	});
+        if (framework === 'Unknown') {
+            vscode.window.showErrorMessage("Unknown framework. Unable to draw the schema.");
+            return;
+        }
 
-	context.subscriptions.push(disposable, statusBarItem);
+        // Parsing
+        const frameworkParser = require(`./parsers/${framework}`);
+        const jsonTable = frameworkParser.Parser(projectPath);
+
+        if (!jsonTable) {
+            vscode.window.showErrorMessage("An error occured while parsing the schema.");
+            return;
+        }
+
+        // Webview
+        showWebview(context, jsonTable, "mermaid");
+    });
+
+    context.subscriptions.push(parseCommand);
 }
 
-function showWebview(context, jsonTable, method){
-	// create webview panel
-	const panel = vscode.window.createWebviewPanel(
-		method+'View',
-		method+' viewer',
-		vscode.ViewColumn.One,
-		{
-			enableScripts: true
-		}
-	);
+function showWebview(context, jsonTable, method) {
+    const panel = vscode.window.createWebviewPanel(
+        method + 'View',
+        'DrawMeDatabase',
+        vscode.ViewColumn.One,
+        { enableScripts: true }
+    );
 
-	// set webview content
-	const htmlContent = getHtmlContent(context, jsonTable, method);
-	panel.webview.html = htmlContent;
+    const htmlContent = getHtmlContent(context, jsonTable, method);
+    panel.webview.html = htmlContent;
+
+    panel.webview.onDidReceiveMessage(
+        message => {
+            if (message.command === 'changeViewer') {
+                const newHtmlContent = getHtmlContent(context, jsonTable, message.viewer);
+                panel.webview.html = newHtmlContent;
+            }
+        },
+        undefined,
+        context.subscriptions
+    );
 }
 
-// get the correct HTML & CSS content viewer
-function getHtmlContent(context, jsonTable, method){
-	// Path to the HTML file
+function getHtmlContent(context, jsonTable, method) {
     const htmlPath = path.join(context.extensionPath, 'views', method, 'template.html');
     let html = fs.readFileSync(htmlPath, 'utf-8');
 
-    // Path to the CSS
     const cssPath = path.join(context.extensionPath, 'views', 'theme.css');
     let css = fs.readFileSync(cssPath, 'utf-8');
 
-    // Path to the JS
-    const jsPath = path.join(context.extensionPath, 'views', method, method+'.js');
+    const jsPath = path.join(context.extensionPath, 'views', method, method + '.js');
     let js = fs.readFileSync(jsPath, 'utf-8');
 
-    // Inject JSON data into the HTML
     const jsonScript = `<script>const jsonData = ${JSON.stringify(jsonTable, null, 2)};</script>`;
     html = html.replace('JSON_DATA', jsonScript);
     html = html.replace('/* CSS_STYLES */', css);
@@ -85,7 +101,8 @@ function getHtmlContent(context, jsonTable, method){
 }
 
 function deactivate() {}
+
 module.exports = {
-	activate,
-	deactivate
-}
+    activate,
+    deactivate,
+};
