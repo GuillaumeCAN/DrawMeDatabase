@@ -1,9 +1,16 @@
+//
+// Copyright (c) 2025 Guillaume Cancalon - All rights reserved
+//
+// This file is part of DrawMeDatabase, and is released under the "GNU GENERAL PUBLIC LICENSE".
+// Please see the LICENSE file that should have been included as part of this package.
+//
+
 const fs = require('fs');
 const vscode = require('vscode');
 
 module.exports.Parser = function(projectPath) {
     if (!fs.existsSync(projectPath + '/database/migrations')) {
-        vscode.window.showErrorMessage("Le dossier par défaut n'existe pas.");
+        vscode.window.showErrorMessage("Default folder does not exist.");
         return null;
     }
 
@@ -12,7 +19,7 @@ module.exports.Parser = function(projectPath) {
     
     // If no PHP files are found, show an error message
     if (phpFiles.length === 0) {
-        vscode.window.showErrorMessage("Aucun fichier PHP trouvé dans le dossier par défaut.");
+        vscode.window.showErrorMessage("No PHP files found in the default folder.");
         return null;
     }
 

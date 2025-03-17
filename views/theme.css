@@ -1,29 +1,42 @@
 body {
     font-family: Arial, sans-serif;
     margin: 20px;
-}
-
-.header {
+  }
+  .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
-}
-
-.header h1 {
+  }
+  .header h1 {
     font-size: 18px;
     margin: 0;
-}
-
-pre {
+  }
+  .header button {
+    background-color: #007acc;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .header button:hover {
+    background-color: #005f99;
+  }
+  .credit p{
+    font-size: 12px;
+    color: #777;
+  }
+  pre {
     background-color: #313131;
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 5px;
     overflow-x: auto;
-}
-
-.toast {
+  }
+  /* Toast styles */
+  .toast {
     position: fixed;
     bottom: 20px;
     right: 20px;
@@ -35,14 +48,30 @@ pre {
     opacity: 0;
     transform: translateY(20px);
     transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.toast.show {
+  }
+  .toast.show {
     opacity: 1;
     transform: translateY(0);
-}
-
-#copy-btn {
+  }
+  
+  select#viewerSelect {
+    background-color: #444;
+    color: white;
+    border: 1px solid #555;
+    padding: 5px;
+    border-radius: 3px;
+    font-size: 14px;
+    outline: none;
+  }
+  select#viewerSelect option {
+    background-color: #444;
+    color: white;
+  }
+  select#viewerSelect:focus {
+    border-color: #007acc;
+  }
+  
+  #copy-btn {
     margin: 10px;
     background-color: #444;
     color: white;
@@ -52,10 +81,10 @@ pre {
     cursor: pointer;
     font-size: 14px;
     transition: background-color 0.3s ease, transform 0.3s ease;
-    float: right; /* Ajouté pour aligner le bouton à droite */
-}
+    float: right;
+  }
   
-#copy-btn:hover {
+  #copy-btn:hover {
     background-color: #555;
     transform: scale(1.05);
-}
+  }

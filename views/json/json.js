@@ -2,9 +2,9 @@
 document.getElementById('copy-btn').addEventListener('click', () => {
     const jsonText = JSON.stringify(jsonData, null, 2);
     navigator.clipboard.writeText(jsonText).then(() => {
-      showToast("Code JSON copié avec succès !");
+      showToast("JSON code successfully copied!");
     }).catch(err => {
-      console.error("Erreur lors de la copie :", err);
+      console.error("Error while copying : ", err);
     });
 });
 
