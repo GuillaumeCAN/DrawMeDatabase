@@ -1,4 +1,4 @@
-**v1.0.0**
+**v1.1.1**
 
 ## About DrawMeDatabase
 
@@ -30,12 +30,8 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 ## Changelog
 
-Latest release : **v1.0.0**
+Latest release : **v1.1.1**
+For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.
 
-- Added Laravel migrations parser
-
-- Mermaid Viewer
-
-- Json Viewer
 
 
