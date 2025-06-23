@@ -32,6 +32,3 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 Latest release : **v1.1.1**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.
-
-
-
