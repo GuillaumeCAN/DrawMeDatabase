@@ -1,4 +1,4 @@
-**v1.1.0**
+**v1.1.1**
 
 ## About DrawMeDatabase
 
@@ -16,7 +16,7 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 - Laravel (based on migrations)
 
-- Symfony (based on Entities)
+- *Symfony - Coming Soon*
 
 **Multiple Viewer:**
 
@@ -30,16 +30,5 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 ## Changelog
 
-Latest release : **v1.1.0**
-
-- Added Symfony Parser (Symfony framework now supported)
-
-- Fixed mermaid viewer (no longer duplicates tables)
-
-- Diagrams with the relationships now go all the way to the top
-
-- Setting to change the framework directory's path
-
-## Report an issue
-
-Feel free to report any issue at : **guillaume@cancalon.fr**
+Latest release : **v1.1.1**
+For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

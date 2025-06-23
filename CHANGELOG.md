@@ -29,3 +29,17 @@ All notable changes to the "DMDB" extension will be documented in this file.
 
 ### Known issues
 - No issues known at this time, feel free to report any!
+
+
+## [v1.1.1] - 2025-06-23
+
+### Added
+- Json viewer now supports commited changes
+
+### Fixed
+- Mermaid viewer now correctly handles tables with no relationships
+- Symfony parser now correctly handles fields with Timestamp type (e.g., `created_at`, `updated_at`)
+- Increased font size in Mermaid viewer for better readability
+
+### Known issues
+- No issues known at this time, feel free to report any!

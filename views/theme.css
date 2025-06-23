@@ -35,6 +35,14 @@ body {
     border-radius: 5px;
     overflow-x: auto;
   }
+
+  .credit{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-left: 20px;
+    color: #a5a5a5;
+  }
   /* Toast styles */
   .toast {
     position: fixed;
