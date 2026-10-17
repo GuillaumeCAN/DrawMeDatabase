@@ -102,8 +102,18 @@ function createVscode(state) {
 
     return {
         Uri,
+        Range: class Range {
+            constructor(startLine, startCharacter, endLine, endCharacter) {
+                Object.assign(this, { startLine, startCharacter, endLine, endCharacter });
+            }
+        },
+        RelativePattern: class RelativePattern {
+            constructor(base, pattern) {
+                Object.assign(this, { base, pattern });
+            }
+        },
         StatusBarAlignment: { Left: 1, Right: 2 },
-        ViewColumn: { One: 1 },
+        ViewColumn: { One: 1, Beside: -2 },
         ConfigurationTarget: { Global: 1, Workspace: 2 },
         window: {
             get activeTextEditor() {
@@ -127,6 +137,10 @@ function createVscode(state) {
                 state.panels.push(panel);
                 return panel;
             },
+            showTextDocument(uri, options) {
+                state.opened.push({ path: uri.fsPath, options });
+                return Promise.resolve();
+            },
             registerWebviewPanelSerializer(viewType, serializer) {
                 state.serializers.set(viewType, serializer);
                 return { dispose: () => state.serializers.delete(viewType) };
@@ -149,6 +163,22 @@ function createVscode(state) {
                 },
             }),
             onDidChangeConfiguration: onConfiguration,
+            createFileSystemWatcher(pattern) {
+                const events = { change: emitter(), create: emitter(), delete: emitter() };
+                const watcher = {
+                    pattern,
+                    disposed: false,
+                    onDidChange: events.change,
+                    onDidCreate: events.create,
+                    onDidDelete: events.delete,
+                    fire: (kind) => events[kind].fire(Uri.file(path.join(pattern.base.fsPath, 'x.php'))),
+                    dispose() {
+                        watcher.disposed = true;
+                    },
+                };
+                state.watchers.push(watcher);
+                return watcher;
+            },
             fs: {
                 writeFile: (uri, data) => {
                     state.written.push({ path: uri.fsPath, data: Buffer.from(data) });
@@ -222,6 +252,8 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] })) {
         written: [],
         clipboard: [],
         executed: [],
+        opened: [],
+        watchers: [],
     };
     const parser = {
         parse: (basePath) => {
@@ -412,6 +444,9 @@ test('the settings come from the configuration, the toolbar changes them globall
         { type: 'settings', layout: 'dagre', direction: 'TB' },
         { type: 'settings', layout: 'elk', direction: 'LR' },
     ]);
+
+    // The frameworkPath change scheduled a refresh: deactivation cancels it
+    ext.context.subscriptions.forEach(item => item.dispose());
 });
 
 test('an export is written where the user chooses, then can be opened', async () => {
@@ -495,6 +530,93 @@ test('the drawing reported by the page is exported, its errors are written to th
     panel.postFromPage({ type: 'rendered', ok: false, error: 'Mermaid could not draw the diagram: boom' });
     assert.equal(api.lastRender.ok, false);
     assert.ok(ext.state.output.includes('Diagram error: Mermaid could not draw the diagram: boom'));
+});
+
+const SOURCED = [
+    { ...TABLES[0], source: { file: 'database/migrations/2024_01_01_000000_create_users_table.php', line: 14 } },
+    { ...TABLES[1], source: { file: '../../outside.php', line: 3 } },
+];
+
+test('a click on a table opens its source file beside the diagram, inside the project only', async () => {
+    const ext = activate(() => ({ tables: SOURCED, warnings: [] }));
+    const dir = folder('open', LARAVEL);
+    ext.openFolders(dir);
+    ext.run();
+    const panel = ext.state.panels[0];
+
+    panel.postFromPage({ type: 'open', table: 'users' });
+    await flush();
+    assert.equal(ext.state.opened.length, 1);
+    assert.equal(ext.state.opened[0].path, path.join(dir, 'database', 'migrations', '2024_01_01_000000_create_users_table.php'));
+    assert.equal(ext.state.opened[0].options.viewColumn, -2);
+    assert.equal(ext.state.opened[0].options.selection.startLine, 13);
+
+    // A source outside the project, an unknown table, or a name that is not a string: nothing opens
+    for (const table of ['posts', 'comments', ['users'], undefined]) {
+        panel.postFromPage({ type: 'open', table });
+    }
+    await flush();
+    assert.equal(ext.state.opened.length, 1);
+});
+
+const settle = (ms = 600) => new Promise(resolve => setTimeout(resolve, ms));
+
+test('auto-refresh: a change of the migrations redraws the open diagram, quietly', async () => {
+    let result = () => ({ tables: TABLES, warnings: ['w'] });
+    const ext = activate(() => result());
+    const dir = folder('auto', LARAVEL);
+    ext.openFolders(dir);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.equal(ext.state.watchers.length, 1);
+    const watcher = ext.state.watchers[0];
+    assert.equal(watcher.pattern.base.fsPath, path.join(dir, 'database', 'migrations'));
+    assert.equal(watcher.pattern.pattern, '*.php');
+    const warningsShown = ext.state.warnings.length;
+
+    // Several changes in a row: one refresh, without warning popup nor bringing the panel to the front
+    watcher.fire('change');
+    watcher.fire('create');
+    watcher.fire('delete');
+    await settle();
+    assert.equal(ext.state.parsed.length, 2, JSON.stringify(ext.state.parsed));
+    assert.equal(panel.sent('schema').length, 2);
+    assert.equal(panel.reveals, 0);
+    assert.equal(ext.state.warnings.length, warningsShown);
+    assert.equal(ext.state.watchers.length, 1, 'the same folder keeps its watcher');
+
+    // A broken migration while editing: the panel stays open with the previous schema
+    result = () => {
+        throw new ParserError('No PHP migration files found.');
+    };
+    watcher.fire('change');
+    await settle();
+    assert.equal(panel.disposed, false);
+    assert.deepEqual(ext.state.errors, []);
+    assert.match(panel.sent('toast').pop().text, /^The schema could not be read/);
+
+    // Closing the panel stops watching
+    panel.dispose();
+    assert.equal(watcher.disposed, true);
+});
+
+test('auto-refresh can be turned off; a new frameworkPath redraws the diagram', async () => {
+    const ext = activate();
+    const dir = folder('auto-off', LARAVEL);
+    ext.openFolders(dir);
+    ext.state.settings[''] = { 'DrawMeDatabase.autoRefresh': false };
+    ext.run();
+    assert.equal(ext.state.watchers.length, 0);
+
+    ext.state.settings[''] = {};
+    ext.vscode.changeConfiguration('DrawMeDatabase.autoRefresh');
+    assert.equal(ext.state.watchers.length, 1);
+
+    ext.vscode.changeConfiguration('DrawMeDatabase.frameworkPath');
+    await settle();
+    assert.equal(ext.state.parsed.length, 2);
+    ext.context.subscriptions.forEach(item => item.dispose());
 });
 
 test('DMDB.refresh draws the schema like DMDB.parseSchema', () => {

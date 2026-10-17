@@ -114,3 +114,12 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - The JSON viewer is colored like code
 - The commands are now `DrawMeDatabase: Draw Database Schema` and `DrawMeDatabase: Refresh Diagram`
 - Errors of the diagram are written in the **DrawMeDatabase** output panel
+
+## [v1.3.0] - 2026-10-18
+
+### Added
+- **Click on a table to open its code**: the migration that creates it (Laravel) or its entity class (Symfony) opens beside the diagram, at the right line. The tooltip of each table shows the file and the line
+- **Search**: the "Filter tables" box of the toolbar (`Ctrl+F` / `Cmd+F`) keeps the tables whose name or one of whose columns contains the text, highlighted, with the tables they are linked to. `Escape` clears it. The JSON viewer and the exports follow the search
+- **Automatic refresh**: the open diagram is drawn again when a migration or an entity is saved, created or deleted, and when `DrawMeDatabase.frameworkPath` changes. It does not bring the panel to the front, and keeps the previous diagram while the code cannot be read. The new `DrawMeDatabase.autoRefresh` setting turns it off
+- The JSON output has the `source` (file and line) of each table, described with the rest of the format in `docs/pivot-format.md`
+

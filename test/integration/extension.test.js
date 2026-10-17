@@ -9,6 +9,8 @@
 // .vscode/settings.json points DrawMeDatabase.frameworkPath to the Laravel app in backend/.
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const vscode = require('vscode');
 
 const EXTENSION_ID = 'GuillaumeCancalon.draw-me-database';
@@ -97,5 +99,38 @@ suite('DrawMeDatabase extension', () => {
         const tables = await vscode.commands.executeCommand('DMDB.parseSchema');
         assert.equal(tables.length, 2);
         assert.equal(await settledTabCount(), 1);
+    });
+
+    test('a new migration refreshes the open diagram (DrawMeDatabase.autoRefresh)', async function () {
+        this.timeout(60000);
+        const extension = vscode.extensions.getExtension(EXTENSION_ID);
+        const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        const file = path.join(workspace, 'backend', 'database', 'migrations', '2024_01_03_000000_create_tags_table.php');
+        try {
+            fs.writeFileSync(file, [
+                '<?php',
+                '',
+                'use Illuminate\\Database\\Migrations\\Migration;',
+                'use Illuminate\\Database\\Schema\\Blueprint;',
+                'use Illuminate\\Support\\Facades\\Schema;',
+                '',
+                'return new class extends Migration',
+                '{',
+                '    public function up(): void',
+                '    {',
+                "        Schema::create('tags', function (Blueprint $table) {",
+                '            $table->id();',
+                '        });',
+                '    }',
+                '};',
+                '',
+            ].join('\n'));
+            const added = await rendered(extension, render => render.ok && render.entities === 3);
+            assert.equal(added && added.entities, 3, `after the new migration: ${JSON.stringify(added)}`);
+        } finally {
+            fs.rmSync(file, { force: true });
+        }
+        const removed = await rendered(extension, render => render.ok && render.entities === 2);
+        assert.equal(removed && removed.entities, 2, `after its deletion: ${JSON.stringify(removed)}`);
     });
 });

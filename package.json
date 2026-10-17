@@ -3,7 +3,7 @@
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "icon": "images/logo_128.png",
   "engines": {
     "vscode": "^1.96.0"
@@ -76,6 +76,11 @@
           ],
           "default": "TB",
           "markdownDescription": "Direction of the diagram, from the referenced tables to the tables that reference them. Also available in the toolbar of the diagram."
+        },
+        "DrawMeDatabase.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Refresh the open diagram when a migration (Laravel) or an entity (Symfony) is saved, created or deleted."
         }
       }
     },

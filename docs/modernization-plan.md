@@ -21,7 +21,7 @@ Progress (October 18, 2026):
 | 0 | 1.1.2 merged into `main`; tag and publication pending (Open VSX setup in [publishing.md](publishing.md)) |
 | 1 | Done: CI, Dependabot and tag-driven releases (PR #7) |
 | 2 | Done in 1.2.0: Mermaid 12.2.0 full build, ELK by default |
-| 3 | a, b, c done in 1.2.0 (single-page webview, zoom/pan, export, plus PNG export); d, e, f planned for 1.3.0 |
+| 3 | a, b, c done in 1.2.0 (single-page webview, zoom/pan, export, plus PNG export); d, e, f done in 1.3.0 (click → file, auto-refresh, search) |
 | 4 | In reserve (decision 4) |
 | 5 | Out of scope (decision 3) |
 
@@ -33,7 +33,7 @@ Effort is given in days of focused work, tests and docs included.
 
 - Commit `fix/stabilize-1.1.2`, open the PR to `main`, merge, tag `v1.1.2`.
 - Publish 1.1.2 to the Marketplace while the current PAT still works (or by manual upload, see workstream 1).
-- Small debt found while reading the code: `parsers/laravel.js` (`toPivot`) refers to a `CONTRACT.md` that does not exist in the repository. Either write that document describing the pivot format (useful for workstreams 3 and 4), or fix the comment.
+- Small debt found while reading the code: `parsers/laravel.js` (`toPivot`) refers to a `CONTRACT.md` that does not exist in the repository. Either write that document describing the pivot format (useful for workstreams 3 and 4), or fix the comment. *Done in 1.3.0: [pivot-format.md](pivot-format.md).*
 
 ## 3. Workstream 1: CI and publishing (2–3 d, deadline December 1, 2026)
 

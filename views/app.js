@@ -21,6 +21,7 @@
         view: saved.view || null,
         // The workspace folder of the schema, drawn again when VS Code restores the panel
         folder: typeof saved.folder === 'string' ? saved.folder : null,
+        query: typeof saved.query === 'string' ? saved.query : '',
     };
 
     let schema = null;
@@ -39,6 +40,8 @@
         toast: $('toast'),
         diagramView: $('diagram-view'),
         jsonView: $('json-view'),
+        search: $('search'),
+        searchCount: $('search-count'),
     };
 
     let saveTimer;
@@ -59,6 +62,9 @@
         // Errors go to the DrawMeDatabase output; the integration test checks the drawing
         onRendered(result) {
             vscode.postMessage({ type: 'rendered', ...result });
+        },
+        onOpenTable(table) {
+            vscode.postMessage({ type: 'open', table });
         },
     });
     const json = window.DrawMeDatabaseJson.create($('json-output'));
@@ -107,6 +113,62 @@
         });
     });
 
+    // Search: the matching tables and their neighbours (diagram), the matching tables (JSON)
+
+    let filtered = null;
+
+    function filterSchema() {
+        filtered = window.DrawMeDatabaseSearch.filterTables(schema ? schema.tables : [], state.query);
+        const count = filtered.matches.length;
+        elements.searchCount.textContent = !state.query.trim() || !schema
+            ? ''
+            : count === 0 ? 'No match' : `${count} of ${schema.tables.length}`;
+    }
+
+    // The tables on screen: all of them, or the result of the search
+    const shownTables = () => (filtered ? filtered.tables : schema ? schema.tables : []);
+    const searching = () => Boolean(state.query.trim());
+
+    function draw(view) {
+        if (!schema) {
+            return;
+        }
+        filterSchema();
+        const matches = new Set(filtered.matches);
+        json.render(searching() ? schema.tables.filter(table => matches.has(table.table)) : schema.tables);
+        if (searching() && filtered.matches.length === 0) {
+            diagram.showMessage(`No table or column matches "${state.query.trim()}".`);
+            return;
+        }
+        diagram.render(shownTables(), { ...settings, highlight: searching() ? filtered.matches : null }, view);
+        drawn = true;
+    }
+
+    let searchTimer;
+    elements.search.value = state.query;
+    elements.search.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            state.query = elements.search.value;
+            persist();
+            draw('fit');
+        }, 250);
+    });
+    elements.search.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && elements.search.value) {
+            event.stopPropagation();
+            elements.search.value = '';
+            elements.search.dispatchEvent(new Event('input'));
+        }
+    });
+    document.addEventListener('keydown', event => {
+        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'f') {
+            event.preventDefault();
+            elements.search.focus();
+            elements.search.select();
+        }
+    });
+
     // Toolbar
 
     function showSettings() {
@@ -153,7 +215,8 @@
 
     // Export menu
 
-    const diagramSource = () => window.DrawMeDatabaseMermaid.generateMermaidER(schema.tables, { direction: settings.direction });
+    // What is on screen: the search result when there is one
+    const diagramSource = () => window.DrawMeDatabaseMermaid.generateMermaidER(shownTables(), { direction: settings.direction });
 
     const EXPORTS = {
         diagram: [
@@ -259,17 +322,15 @@
                 state.folder = typeof schema.project.folder === 'string' ? schema.project.folder : null;
                 persist();
                 showSummary();
-                json.render(schema.tables);
                 // The saved view on the first drawing (reload of the window), then the same place
-                diagram.render(schema.tables, settings, drawn ? 'keep' : state.view);
-                drawn = true;
+                draw(drawn ? 'keep' : state.view);
                 break;
             case 'settings': {
                 const changed = message.layout !== settings.layout || message.direction !== settings.direction;
                 settings = { layout: message.layout === 'elk' ? 'elk' : 'dagre', direction: message.direction === 'LR' ? 'LR' : 'TB' };
                 showSettings();
                 if (schema && changed && drawn) {
-                    diagram.render(schema.tables, settings, 'fit');
+                    draw('fit');
                 }
                 break;
             }
@@ -281,6 +342,7 @@
                 break;
             case 'empty':
                 schema = null;
+                filtered = null;
                 showSummary();
                 diagram.showMessage(String(message.text || 'Nothing to draw.'));
                 break;
