@@ -12,13 +12,31 @@ const { detectFramework } = require('./parsers/parser');
 const { ParserError } = require('./parsers/errors');
 const html = require('./views/html');
 
+const VIEW_TYPE = 'drawMeDatabase';
+
 // Parsers by detected framework (loaded on first use)
 const PARSERS = {
     laravel: () => require('./parsers/laravel'),
     symfony: () => require('./parsers/symfony'),
 };
 
-const VIEWERS = ['mermaid', 'json'];
+const FRAMEWORK_LABELS = { laravel: 'Laravel', symfony: 'Symfony' };
+
+// Settings the toolbar of the panel can change, with their allowed values (first = default)
+const SETTINGS = {
+    layout: ['elk', 'dagre'],
+    direction: ['TB', 'LR'],
+};
+
+// Files the panel can export
+const EXPORT_FORMATS = {
+    svg: { label: 'SVG image', binary: false },
+    png: { label: 'PNG image', binary: true },
+    mmd: { label: 'Mermaid diagram', binary: false },
+    md: { label: 'Markdown', binary: false },
+    json: { label: 'JSON', binary: false },
+};
+const MAX_EXPORT_LENGTH = 200 * 1024 * 1024;
 
 function activate(context) {
     const output = vscode.window.createOutputChannel('DrawMeDatabase');
@@ -32,43 +50,83 @@ function activate(context) {
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
 
-    const viewer = createViewer(context, output);
-    context.subscriptions.push(viewer);
-
     // Workspace folder of the last run, reused by a refresh from the panel (no active editor then)
     let lastFolder;
 
-    // Command to parse the schema: shows the diagram and returns the parsed tables
-    const parseCommand = vscode.commands.registerCommand('DMDB.parseSchema', () => {
-        const folder = getWorkspaceFolder(lastFolder);
-        let tables;
+    // Parses the schema of the folder and shows it: returns the parsed tables
+    const draw = (folder) => {
+        let schema;
         if (folder) {
             lastFolder = folder;
-            tables = readSchema(folder, output);
+            schema = readSchema(folder, output);
         } else {
             vscode.window.showErrorMessage("No project opened in the current workspace. Unable to draw the schema.");
         }
 
         // Nothing to draw: close the panel rather than leave the previous schema on screen
-        if (!tables || tables.length === 0) {
+        if (!schema || schema.tables.length === 0) {
             viewer.close();
-            return tables;
+            return schema ? schema.tables : undefined;
         }
 
-        // Webview
         try {
-            viewer.show(tables);
+            viewer.show({
+                tables: schema.tables,
+                warnings: schema.warnings,
+                project: {
+                    name: folder.name,
+                    folder: folder.uri.toString(),
+                    framework: schema.framework,
+                    frameworkLabel: FRAMEWORK_LABELS[schema.framework] || '',
+                },
+            });
         } catch (err) {
             reportUnexpectedError(output, err);
         }
-        return tables;
-    });
+        return schema.tables;
+    };
 
-    context.subscriptions.push(parseCommand);
+    const viewer = createViewer(context, output, {
+        refresh: () => draw(getWorkspaceFolder(lastFolder)),
+        exportFolder: () => lastFolder,
+    });
+    context.subscriptions.push(viewer);
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('DMDB.parseSchema', () => draw(getWorkspaceFolder(lastFolder))),
+        vscode.commands.registerCommand('DMDB.refresh', () => draw(getWorkspaceFolder(lastFolder))),
+        // The panel is restored after a reload of the window: draw the schema of its folder again
+        vscode.window.registerWebviewPanelSerializer(VIEW_TYPE, {
+            async deserializeWebviewPanel(panel, state) {
+                viewer.restore(panel);
+                const folders = vscode.workspace.workspaceFolders || [];
+                const folder = state && typeof state.folder === 'string'
+                    ? folders.find(candidate => candidate.uri.toString() === state.folder)
+                    : undefined;
+                if (folder) {
+                    draw(folder);
+                } else {
+                    viewer.empty('Run DrawMeDatabase (or click Refresh) to draw the schema of the project.');
+                }
+            },
+        }),
+        vscode.workspace.onDidChangeConfiguration(event => {
+            if (Object.keys(SETTINGS).some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
+                viewer.settingsChanged();
+            }
+        }),
+    );
+
+    // API of the extension (vscode.extensions.getExtension(...).exports), for the integration test
+    return {
+        get lastRender() {
+            return viewer.lastRender;
+        },
+    };
 }
 
-// Detects the framework and parses the schema: returns the tables, or undefined after an error
-// (already shown to the user)
+// Detects the framework and parses the schema: returns { tables, warnings (count), framework },
+// or undefined after an error (already shown to the user)
 function readSchema(folder, output) {
     const frameworkPath = getFrameworkPath(folder);
     const basePath = resolveBasePath(folder.uri.fsPath, frameworkPath);
@@ -82,9 +140,10 @@ function readSchema(folder, output) {
     }
 
     let result;
+    let framework;
     try {
         // Framework detection
-        const framework = detectFramework(basePath);
+        framework = detectFramework(basePath);
         output.appendLine(`Framework: ${framework} (${basePath})`);
         if (!Object.prototype.hasOwnProperty.call(PARSERS, framework)) {
             const hint = frameworkPath
@@ -117,7 +176,7 @@ function readSchema(folder, output) {
     if (tables.length === 0) {
         vscode.window.showInformationMessage(`No tables found in "${basePath}". Nothing to draw.`);
     }
-    return tables;
+    return { tables, warnings: warnings.length, framework };
 }
 
 // The workspace folder of the active editor, else the one of the last run, else the first one
@@ -174,15 +233,142 @@ function reportWarnings(output, count) {
     });
 }
 
-// A single webview panel, revealed and refreshed on each run
-function createViewer(context, output) {
+// A single webview panel. The page is loaded once: the schema and the settings are posted to it
+// (again when it reloads, after being restored), and it asks for refreshes and exports.
+function createViewer(context, output, { refresh, exportFolder }) {
     let panel;
-    let tables = [];
-    let current = 'mermaid';
+    let ready = false;
+    // What the page shows: the last schema, or a message when there is none
+    let schema = null;
+    let emptyText = '';
+    let subscriptions = [];
+    // The last drawing reported by the page (shown in the output when it failed)
+    let lastRender = null;
 
-    const render = () => {
-        panel.webview.html = getHtmlContent(context, panel.webview, tables, current);
+    const post = (message) => {
+        if (panel && ready) {
+            panel.webview.postMessage(message);
+        }
     };
+
+    const settingsMessage = () => {
+        const config = vscode.workspace.getConfiguration('DrawMeDatabase');
+        const message = { type: 'settings' };
+        for (const [key, values] of Object.entries(SETTINGS)) {
+            const value = config.get(key, values[0]);
+            message[key] = values.includes(value) ? value : values[0];
+        }
+        return message;
+    };
+
+    const toast = (text) => post({ type: 'toast', text });
+
+    function onMessage(message) {
+        if (!message || typeof message !== 'object') {
+            return;
+        }
+        switch (message.type) {
+            case 'ready':
+                ready = true;
+                post(settingsMessage());
+                if (schema) {
+                    post(schema);
+                } else if (emptyText) {
+                    post({ type: 'empty', text: emptyText });
+                }
+                break;
+            case 'refresh':
+                // Let the page show its progress bar before the (synchronous) parsing
+                post({ type: 'busy', busy: true });
+                setTimeout(() => {
+                    try {
+                        refresh();
+                    } finally {
+                        post({ type: 'busy', busy: false });
+                    }
+                }, 20);
+                break;
+            case 'setting':
+                if (Object.prototype.hasOwnProperty.call(SETTINGS, message.key) && SETTINGS[message.key].includes(message.value)) {
+                    Promise.resolve(vscode.workspace.getConfiguration('DrawMeDatabase')
+                        .update(message.key, message.value, vscode.ConfigurationTarget.Global))
+                        .catch(err => reportUnexpectedError(output, err));
+                }
+                break;
+            case 'save':
+                saveExport(message).catch(err => reportUnexpectedError(output, err));
+                break;
+            case 'copy':
+                if (typeof message.content === 'string' && message.content.length <= MAX_EXPORT_LENGTH) {
+                    Promise.resolve(vscode.env.clipboard.writeText(message.content))
+                        .then(() => toast(message.format === 'json' ? 'JSON copied to the clipboard.' : 'Mermaid source copied to the clipboard.'))
+                        .catch(err => reportUnexpectedError(output, err));
+                }
+                break;
+            case 'showOutput':
+                output.show();
+                break;
+            case 'rendered':
+                lastRender = {
+                    ok: message.ok === true,
+                    layout: String(message.layout || ''),
+                    entities: Number(message.entities) || 0,
+                    error: String(message.error || ''),
+                };
+                if (!lastRender.ok) {
+                    output.appendLine(`Diagram error: ${lastRender.error}`);
+                }
+                break;
+        }
+    }
+
+    // Writes an export where the user chooses (Save dialog, in the project folder by default)
+    async function saveExport(message) {
+        const format = Object.prototype.hasOwnProperty.call(EXPORT_FORMATS, message.format) ? EXPORT_FORMATS[message.format] : null;
+        if (!format || typeof message.content !== 'string' || message.content.length > MAX_EXPORT_LENGTH) {
+            return;
+        }
+        const requested = typeof message.fileName === 'string' ? path.basename(message.fileName) : '';
+        const fileName = requested.endsWith(`.${message.format}`) ? requested : `schema.${message.format}`;
+        const folder = exportFolder();
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri: folder ? vscode.Uri.joinPath(folder.uri, fileName) : undefined,
+            filters: { [format.label]: [message.format] },
+            saveLabel: 'Export',
+            title: 'Export the database diagram',
+        });
+        if (!uri) {
+            return;
+        }
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(message.content, format.binary ? 'base64' : 'utf8'));
+        const choice = await vscode.window.showInformationMessage(`Exported to ${path.basename(uri.fsPath)}.`, 'Open');
+        if (choice === 'Open') {
+            await vscode.commands.executeCommand('vscode.open', uri);
+        }
+    }
+
+    function setup(newPanel) {
+        panel = newPanel;
+        ready = false;
+        panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'images', 'logo_128.png');
+        panel.webview.options = webviewOptions(context);
+        subscriptions = [
+            panel.webview.onDidReceiveMessage(message => {
+                try {
+                    onMessage(message);
+                } catch (err) {
+                    reportUnexpectedError(output, err);
+                }
+            }),
+            panel.onDidDispose(() => {
+                subscriptions.forEach(subscription => subscription.dispose());
+                subscriptions = [];
+                panel = undefined;
+                ready = false;
+            }),
+        ];
+        panel.webview.html = getHtmlContent(context, panel.webview);
+    }
 
     const close = () => {
         if (panel) {
@@ -191,54 +377,55 @@ function createViewer(context, output) {
     };
 
     return {
-        show(newTables) {
-            tables = newTables;
+        show(newSchema) {
+            schema = { type: 'schema', ...newSchema };
+            emptyText = '';
             if (panel) {
                 panel.reveal();
-                render();
+                post(schema);
                 return;
             }
-
-            panel = vscode.window.createWebviewPanel(
-                'drawMeDatabase',
-                'DrawMeDatabase',
-                vscode.ViewColumn.One,
-                {
-                    enableScripts: true,
-                    localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'views')],
-                }
-            );
-
-            const messageListener = panel.webview.onDidReceiveMessage(message => {
-                if (message && message.command === 'changeViewer' && VIEWERS.includes(message.viewer)) {
-                    current = message.viewer;
-                    try {
-                        render();
-                    } catch (err) {
-                        reportUnexpectedError(output, err);
-                    }
-                }
-            });
-            panel.onDidDispose(() => {
-                messageListener.dispose();
-                panel = undefined;
-                current = 'mermaid';
-            });
-
-            render();
+            setup(vscode.window.createWebviewPanel(VIEW_TYPE, 'DrawMeDatabase', vscode.ViewColumn.One, {
+                ...webviewOptions(context),
+                // Large diagrams take seconds to draw: keep them while the tab is hidden
+                retainContextWhenHidden: true,
+            }));
+        },
+        // A panel restored by VS Code after a reload of the window
+        restore(restoredPanel) {
+            if (panel && panel !== restoredPanel) {
+                panel.dispose();
+            }
+            setup(restoredPanel);
+        },
+        empty(text) {
+            schema = null;
+            emptyText = text;
+            post({ type: 'empty', text });
+        },
+        settingsChanged() {
+            post(settingsMessage());
+        },
+        get lastRender() {
+            return lastRender;
         },
         close,
         dispose: close,
     };
 }
 
-function getHtmlContent(context, webview, tables, viewer) {
-    const template = fs.readFileSync(path.join(context.extensionPath, 'views', viewer, 'template.html'), 'utf8');
+function webviewOptions(context) {
+    return {
+        enableScripts: true,
+        localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'views')],
+    };
+}
+
+function getHtmlContent(context, webview) {
+    const template = fs.readFileSync(path.join(context.extensionPath, 'views', 'index.html'), 'utf8');
     return html.buildPage(template, {
-        viewer,
         cspSource: webview.cspSource,
         viewUri: (...segments) => webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'views', ...segments)).toString(),
-        data: tables,
     });
 }
 

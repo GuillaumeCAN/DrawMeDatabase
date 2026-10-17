@@ -13,15 +13,6 @@ function getNonce() {
     return crypto.randomBytes(18).toString('base64');
 }
 
-// JSON for a <script type="application/json"> element: with '<' escaped, the data can never
-// close the element ('</script>') or open a comment ('<!--'). Read back with JSON.parse.
-function serializeData(data) {
-    return JSON.stringify(data === undefined ? null : data)
-        .replace(/</g, '\\u003c')
-        .replace(/\u2028/g, '\\u2028')
-        .replace(/\u2029/g, '\\u2029');
-}
-
 function escapeAttribute(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -31,13 +22,14 @@ function escapeAttribute(value) {
         .replace(/>/g, '&gt;');
 }
 
-// Mermaid injects a <style> element into its SVG, hence 'unsafe-inline' for styles only
+// Mermaid injects a <style> element into its SVG, hence 'unsafe-inline' for styles only.
+// blob: images: the PNG export draws the SVG on a canvas.
 function buildCsp(cspSource, nonce) {
     return [
         "default-src 'none'",
         `script-src 'nonce-${nonce}'`,
         `style-src ${cspSource} 'unsafe-inline'`,
-        `img-src ${cspSource} data:`,
+        `img-src ${cspSource} data: blob:`,
         `font-src ${cspSource}`,
     ].join('; ');
 }
@@ -50,21 +42,28 @@ function fillTemplate(template, values) {
     ));
 }
 
-// Fills a viewer template (views/<viewer>/template.html). viewUri(...segments) returns the
-// webview URI of a file of views/, data is the list of tables.
-function buildPage(template, { viewer, cspSource, viewUri, data }) {
+// Scripts of the page (views/index.html), in loading order
+const SCRIPTS = [
+    ['vendor', 'mermaid.min.js'],
+    ['mermaid', 'generator.js'],
+    ['mermaid', 'zoom.js'],
+    ['exporters.js'],
+    ['mermaid', 'diagram.js'],
+    ['json', 'json.js'],
+    ['app.js'],
+];
+
+// Fills the page template (views/index.html). viewUri(...segments) returns the webview URI of
+// a file of views/. The schema is not in the page: the extension posts it once the page is ready.
+function buildPage(template, { cspSource, viewUri }) {
     const nonce = getNonce();
     const uri = (...segments) => escapeAttribute(viewUri(...segments));
     return fillTemplate(template, {
         CSP: escapeAttribute(buildCsp(cspSource, nonce)),
         NONCE: nonce,
         THEME_CSS: uri('theme.css'),
-        MERMAID_JS: uri('vendor', 'mermaid.min.js'),
-        GENERATOR_JS: uri('mermaid', 'generator.js'),
-        COMMON_JS: uri('common.js'),
-        VIEWER_JS: uri(viewer, `${viewer}.js`),
-        DATA: serializeData(data),
+        SCRIPTS: SCRIPTS.map(segments => `    <script nonce="${nonce}" src="${uri(...segments)}"></script>`).join('\n'),
     });
 }
 
-module.exports = { getNonce, serializeData, escapeAttribute, buildCsp, fillTemplate, buildPage };
+module.exports = { SCRIPTS, getNonce, escapeAttribute, buildCsp, fillTemplate, buildPage };

@@ -3,6 +3,7 @@
 .github/**
 docs/**
 .idea/**
+.claude/**
 builds/**
 node_modules/**
 scripts/**
