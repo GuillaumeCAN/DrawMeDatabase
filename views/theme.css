@@ -1,98 +1,139 @@
+/* Colors come from the VS Code theme (light, dark and high contrast) */
 body {
-    font-family: Arial, sans-serif;
+    font-family: var(--vscode-font-family, Arial, sans-serif);
+    font-size: var(--vscode-font-size, 13px);
+    color: var(--vscode-editor-foreground);
+    background-color: var(--vscode-editor-background);
     margin: 20px;
-  }
-  .header {
+}
+
+.header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     margin-bottom: 10px;
-  }
-  .header h1 {
+}
+
+.header h1 {
     font-size: 18px;
     margin: 0;
-  }
-  .header button {
-    background-color: #007acc;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-  .header button:hover {
-    background-color: #005f99;
-  }
-  .credit p{
-    font-size: 12px;
-    color: #777;
-  }
-  pre {
-    background-color: #313131;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    overflow-x: auto;
-  }
+}
 
-  .credit{
+.credit {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-left: 20px;
-    color: #a5a5a5;
-  }
-  /* Toast styles */
-  .toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background-color: #4caf50;
-    color: white;
-    padding: 10px 20px;
+}
+
+.credit p {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+pre {
+    background-color: var(--vscode-textCodeBlock-background);
+    color: var(--vscode-editor-foreground);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: var(--vscode-editor-font-size, 13px);
+    padding: 10px;
+    border: 1px solid var(--vscode-panel-border, transparent);
     border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
-  }
-  .toast.show {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  
-  select#viewerSelect {
-    background-color: #444;
-    color: white;
-    border: 1px solid #555;
+    overflow-x: auto;
+}
+
+.error {
+    color: var(--vscode-errorForeground);
+}
+
+select#viewer-select {
+    background-color: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border, transparent);
     padding: 5px;
     border-radius: 3px;
+    font-family: inherit;
     font-size: 14px;
-    outline: none;
-  }
-  select#viewerSelect option {
-    background-color: #444;
-    color: white;
-  }
-  select#viewerSelect:focus {
-    border-color: #007acc;
-  }
-  
-  #copy-btn {
+}
+
+select#viewer-select:focus,
+#copy-btn:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+
+/* Mermaid viewer: the page fits the panel and only the diagram area scrolls, so both of its
+   scrollbars stay on screen for a wide or tall diagram */
+body.mermaid-page {
+    height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+}
+
+.mermaid-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 1px solid var(--vscode-panel-border, transparent);
+    background-color: var(--vscode-editor-background);
+    border-radius: 7px;
+    margin-right: 10px;
+    padding: 0 10px 10px;
+    overflow: auto;
+}
+
+/* Bigger attribute text (also applied while Mermaid measures the diagram) */
+.mermaid-diagram svg text {
+    font-size: 12px !important;
+}
+
+/* JSON viewer */
+.json-viewer {
+    position: relative;
+}
+
+#copy-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
     margin: 10px;
-    background-color: #444;
-    color: white;
-    border: 1px solid #555;
+    background-color: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+    color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+    border: 1px solid var(--vscode-button-border, transparent);
     padding: 5px 10px;
     border-radius: 3px;
     cursor: pointer;
+    font-family: inherit;
     font-size: 14px;
-    transition: background-color 0.3s ease, transform 0.3s ease;
-    float: right;
-  }
-  
-  #copy-btn:hover {
-    background-color: #555;
-    transform: scale(1.05);
-  }
+}
+
+#copy-btn:hover:not(:disabled) {
+    background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+}
+
+#copy-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Toast styles */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--vscode-notifications-background, var(--vscode-editorWidget-background));
+    color: var(--vscode-notifications-foreground, var(--vscode-editor-foreground));
+    border: 1px solid var(--vscode-notifications-border, var(--vscode-contrastBorder, transparent));
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px var(--vscode-widget-shadow, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}

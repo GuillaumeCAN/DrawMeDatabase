@@ -27,12 +27,14 @@
 
 ## Run tests
 
-* Install the [Extension Test Runner](https://marketplace.visualstudio.com/items?itemName=ms-vscode.extension-test-runner)
-* Open the Testing view from the activity bar and click the Run Test" button, or use the hotkey `Ctrl/Cmd + ; A`
-* See the output of the test result in the Test Results view.
-* Make changes to `test/extension.test.js` or create new test files inside the `test` folder.
-  * The provided test runner will only consider files matching the name pattern `**.test.js`.
-  * You can create folders inside the `test` folder to structure your tests any way you want.
+* Run `npm install` first: it also copies the pinned Mermaid build to `views/vendor/` (see `scripts/copy-vendor.js`).
+* `npm run test:unit` runs the unit tests in `test/unit/` with Node's test runner (no VS Code needed).
+* `npm test` runs lint, the unit tests, then the integration tests in `test/integration/` inside a downloaded VS Code
+  (on Linux without a display: `xvfb-run -a npm test`; `.vscode-test.mjs` keeps the test VS Code on the X display that
+  xvfb-run sets, also on a Wayland desktop). Their workspace is `test/fixtures/integration/workspace`.
+* You can also install the [Extension Test Runner](https://marketplace.visualstudio.com/items?itemName=ms-vscode.extension-test-runner)
+  and run the integration tests from the Testing view.
+* `npm run package` builds the `.vsix` into `builds/`.
 
 ## Go further
 

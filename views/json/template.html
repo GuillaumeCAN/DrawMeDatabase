@@ -1,53 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JSON Viewer</title>
-  <style>
-    /* CSS_STYLES */
-  </style>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="{{CSP}}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrawMeDatabase - JSON Viewer</title>
+    <link rel="stylesheet" href="{{THEME_CSS}}">
 </head>
 
 <body>
-  <!-- Header -->
-  <div class="header">
-    <h1 id="viewerTitle">JSON Viewer</h1>
-    <div class="credit">
-      <p>DrawMeDatabase - by Guillaume Cancalon ©</p>
+    <!-- Header -->
+    <div class="header">
+        <h1 id="viewerTitle">JSON Viewer</h1>
+        <div class="credit">
+            <p>DrawMeDatabase - by Guillaume Cancalon ©</p>
+        </div>
+        <select id="viewer-select" aria-label="Viewer">
+            <option value="json" selected>JSON</option>
+            <option value="mermaid">Mermaid</option>
+        </select>
     </div>
-    <select id="viewerSelect" onchange="changeViewer(this.value)">
-      <option value="json" selected>JSON</option>
-      <option value="mermaid">Mermaid</option>
-    </select>
-  </div>
 
-  <!-- JSON Viewer -->
-  <div id="jsonViewer" style="position: relative;">
-    <button id="copy-btn" style="position: absolute; top: 0; right: 0;">
-      <i class="fa-regular fa-clipboard"></i> Copy code</button>
-    <pre id="jsonData"></pre>
-  </div>
+    <!-- JSON Viewer -->
+    <div id="json-viewer" class="json-viewer">
+        <button id="copy-btn" type="button">Copy code</button>
+        <pre id="json-output"></pre>
+    </div>
 
-  <!-- Toast Notification -->
-  <div id="toast" class="toast">JSON code successfully copied!</div>
+    <!-- Toast Notification -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <!-- JSON Data Injection -->
-  JSON_DATA
+    <!-- Schema data (JSON, not executed) -->
+    <script id="dmdb-data" type="application/json">{{DATA}}</script>
 
-  <script>
-    /* SCRIPT_METHOD */
-  </script>
-
-  <script>
-    function changeViewer(viewer) {
-      const vscode = acquireVsCodeApi();
-      vscode.postMessage({
-        command: 'changeViewer',
-        viewer: viewer
-      });
-    }
-  </script>
-
+    <script nonce="{{NONCE}}" src="{{COMMON_JS}}"></script>
+    <script nonce="{{NONCE}}" src="{{VIEWER_JS}}"></script>
 </body>
 </html>

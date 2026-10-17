@@ -7,59 +7,77 @@
 
 const fs = require('fs');
 const path = require('path');
-const vscode = require('vscode');
+const { ParserError } = require('./errors');
 
-const hasFiles = (projectPath, files) => {
-  return files.every(file => fs.existsSync(path.join(projectPath, file)));
+const isFile = (filePath) => {
+    try {
+        return fs.statSync(filePath).isFile();
+    } catch {
+        return false;
+    }
 };
 
-const getBasePath = (projectPath) => {
-  const config = vscode.workspace.getConfiguration('DrawMeDatabase');
-  const customPath = config.get('frameworkPath');
-  return customPath.length > 0 ? projectPath + '/' + customPath : projectPath;
+// The "require" section of composer.json, or null when there is no composer.json.
+// Throws a ParserError when the file cannot be read or is not valid JSON.
+const readComposerRequire = (basePath) => {
+    const composerPath = path.join(basePath, 'composer.json');
+    if (!isFile(composerPath)) {
+        return null;
+    }
+    let composer;
+    try {
+        // Strip a UTF-8 BOM, JSON.parse rejects it
+        composer = JSON.parse(fs.readFileSync(composerPath, 'utf8').replace(/^\uFEFF/, ''));
+    } catch (err) {
+        throw new ParserError(`composer.json in "${basePath}" could not be read: ${err.message}`);
+    }
+    const dependencies = composer && composer.require;
+    return dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies) ? dependencies : {};
 };
 
-module.exports.detectFramework = function(projectPath) {
-  const basePath = getBasePath(projectPath);
-
-  // Laravel Detection
-  if (hasFiles(basePath, ['artisan', 'composer.json'])) {
-    const composerPath = path.join(basePath, 'composer.json');
-    const composerData = JSON.parse(fs.readFileSync(composerPath, 'utf8'));
-    if (composerData.require && composerData.require['laravel/framework']) {
-      return 'laravel';
+// Returns 'laravel', 'symfony' or 'Unknown' for the framework root basePath
+// (ParserError: invalid composer.json)
+module.exports.detectFramework = function (basePath) {
+    if (typeof basePath !== 'string' || basePath === '') {
+        return 'Unknown';
     }
-  }
 
-  // Symfony Detection
-  if (hasFiles(basePath, ['bin/console', 'composer.json'])) {
-    const composerPath = path.join(basePath, 'composer.json');
-    const composerData = JSON.parse(fs.readFileSync(composerPath, 'utf8'));
-    if (composerData.require && Object.keys(composerData.require).some(dep => dep.startsWith('symfony/'))) {
-      return 'symfony';
+    const dependencies = readComposerRequire(basePath);
+    const packages = dependencies ? Object.keys(dependencies) : [];
+
+    // Laravel Detection
+    if (isFile(path.join(basePath, 'artisan')) && packages.includes('laravel/framework')) {
+        return 'laravel';
     }
-  }
 
-  /*
-  // Détection Django
-  if (hasFiles(basePath, ['manage.py'])) {
-    const requirementsPath = path.join(basePath, 'requirements.txt');
-    const pyprojectPath = path.join(basePath, 'pyproject.toml');
-
-    if (fs.existsSync(requirementsPath)) {
-      const requirements = fs.readFileSync(requirementsPath, 'utf8');
-      if (requirements.includes('Django')) {
-        return 'django';
-      }
-    } else if (fs.existsSync(pyprojectPath)) {
-      const pyproject = fs.readFileSync(pyprojectPath, 'utf8');
-      if (pyproject.toLowerCase().includes('django')) {
-        return 'django';
-      }
+    // Symfony Detection: symfony/framework-bundle, else any symfony/* package except the polyfills
+    // (they are pulled by many non-Symfony projects)
+    if (isFile(path.join(basePath, 'bin', 'console'))) {
+        if (packages.includes('symfony/framework-bundle')
+            || packages.some(name => name.startsWith('symfony/') && !name.startsWith('symfony/polyfill-'))) {
+            return 'symfony';
+        }
     }
-  }
-  */
 
-  console.log("Base path used for detection:", basePath);
-  return 'Unknown';
+    /*
+    // Django Detection
+    if (isFile(path.join(basePath, 'manage.py'))) {
+        const requirementsPath = path.join(basePath, 'requirements.txt');
+        const pyprojectPath = path.join(basePath, 'pyproject.toml');
+
+        if (isFile(requirementsPath)) {
+            const requirements = fs.readFileSync(requirementsPath, 'utf8');
+            if (requirements.includes('Django')) {
+                return 'django';
+            }
+        } else if (isFile(pyprojectPath)) {
+            const pyproject = fs.readFileSync(pyprojectPath, 'utf8');
+            if (pyproject.toLowerCase().includes('django')) {
+                return 'django';
+            }
+        }
+    }
+    */
+
+    return 'Unknown';
 };

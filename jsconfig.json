@@ -8,6 +8,9 @@
 		]
 	},
 	"exclude": [
-		"node_modules"
+		"node_modules",
+		"views/vendor",
+		".vscode-test",
+		"builds"
 	]
 }

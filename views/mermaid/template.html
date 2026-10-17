@@ -1,70 +1,35 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="{{CSP}}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagramme ER avec Mermaid</title>
-    <style>
-      /* CSS_STYLES */
-      .mermaid {
-        width: max-content;
-        display: inline;
-        vertical-align:top
-      }
-      .mermaid {
-        width: max-content;
-        display: inline;
-        vertical-align: top;
-      }
-
-      .mermaid svg text {
-        font-size: 12px !important;
-      }
-    </style>
-
-    <!-- Mermaid library -->
-    <script type="module">
-      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-      mermaid.initialize({
-        securityLevel: 'loose',
-        theme: 'dark',
-        startOnLoad: true,
-      });
-    </script>
+    <title>DrawMeDatabase - Mermaid Viewer</title>
+    <link rel="stylesheet" href="{{THEME_CSS}}">
 </head>
 
-<body>
-  <div class="header">
-    <h1 id="viewerTitle">Mermaid Viewer</h1>
-    <select id="viewerSelect" onchange="changeViewer(this.value)">
-      <option value="json">JSON</option>
-      <option value="mermaid" selected>Mermaid</option>
-    </select>
-  </div>
-  
-
-  <div class="mermaid-container" style="border: 1px solid black; background-color: #3d3d3d; border-radius: 7px; margin-right: 10px;">
-    <div class="credit">
-      <p>DrawMeDatabase - by Guillaume Cancalon ©</p>
+<body class="mermaid-page">
+    <div class="header">
+        <h1 id="viewerTitle">Mermaid Viewer</h1>
+        <select id="viewer-select" aria-label="Viewer">
+            <option value="json">JSON</option>
+            <option value="mermaid" selected>Mermaid</option>
+        </select>
     </div>
-    <div id="mermaid-diagram"></div>
-  </div>
 
-  JSON_DATA
+    <div class="mermaid-container">
+        <div class="credit">
+            <p>DrawMeDatabase - by Guillaume Cancalon ©</p>
+        </div>
+        <div id="mermaid-diagram" class="mermaid-diagram"></div>
+    </div>
 
-  <script>
-    /* SCRIPT_METHOD */
-  </script>
-  
-  <script>
-    function changeViewer(viewer) {
-      const vscode = acquireVsCodeApi();
-      vscode.postMessage({
-        command: 'changeViewer',
-        viewer: viewer
-      });
-    }
-  </script>
-  
+    <!-- Schema data (JSON, not executed) -->
+    <script id="dmdb-data" type="application/json">{{DATA}}</script>
+
+    <script nonce="{{NONCE}}" src="{{MERMAID_JS}}"></script>
+    <script nonce="{{NONCE}}" src="{{GENERATOR_JS}}"></script>
+    <script nonce="{{NONCE}}" src="{{COMMON_JS}}"></script>
+    <script nonce="{{NONCE}}" src="{{VIEWER_JS}}"></script>
 </body>
 </html>

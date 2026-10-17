@@ -3,7 +3,7 @@
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "icon": "images/logo_128.png",
   "engines": {
     "vscode": "^1.96.0"
@@ -16,9 +16,15 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": false
+  },
   "contributes": {
     "commands": [
       {
@@ -33,26 +39,30 @@
         "DrawMeDatabase.frameworkPath": {
           "type": "string",
           "default": "",
+          "scope": "resource",
           "markdownDescription": "Relative path to the framework folder **(leave empty if the framework is at the root of the workspace)** \n\n Example : **`my-project/app/symfony`**"
         }
       }
     }
   },
   "scripts": {
+    "postinstall": "node scripts/copy-vendor.js",
+    "vscode:prepublish": "node scripts/copy-vendor.js --strict",
     "lint": "eslint .",
-    "pretest": "npm run lint",
-    "test": "vscode-test"
+    "test:unit": "node --test \"test/unit/**/*.test.js\"",
+    "pretest": "npm run lint && npm run test:unit",
+    "test": "vscode-test",
+    "package": "vsce package --out builds/"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "@types/vscode": "^1.96.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.16.0"
-  },
-  "dependencies": {
-    "simple-git": "^3.28.0",
-    "vsce": "^1.97.0"
+    "@types/vscode": "~1.96.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "mermaid": "10.9.8"
   }
 }

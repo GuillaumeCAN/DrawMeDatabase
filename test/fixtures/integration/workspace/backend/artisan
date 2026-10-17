@@ -1,0 +1,4 @@
+#!/usr/bin/env php
+<?php
+
+// Test fixture: only its presence matters for the framework detection
