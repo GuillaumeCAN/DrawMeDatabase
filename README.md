@@ -76,6 +76,8 @@ npm test               # lint + unit tests + integration tests in VS Code (on Li
 npm run package        # builds builds/draw-me-database-<version>.vsix
 ```
 
+GitHub Actions runs these checks on every pull request and keeps the `.vsix` as an artifact. Releases are published from a version tag to GitHub Releases and Open VSX; the VS Code Marketplace is updated by hand. See [docs/publishing.md](docs/publishing.md).
+
 ## Changelog
 
 Latest release : **v1.1.2**
