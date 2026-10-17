@@ -1,0 +1,45 @@
+# Weekly update pull requests for npm devDependencies and the actions of .github/workflows.
+# Security updates are separate: enable "Dependabot security updates" in the repository settings.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    # Wait a week before proposing a new release (security updates are not delayed)
+    cooldown:
+      default-days: 7
+    # Raise the version written in package.json: exact pins (mermaid) stay exact
+    versioning-strategy: increase
+    ignore:
+      # Bundled in the .vsix: a new major changes the diagrams and is migrated by hand
+      - dependency-name: mermaid
+        update-types: ["version-update:semver-major"]
+      # Must not be newer than engines.vscode (^1.96.0), or vsce refuses to package
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # VS Code 1.96 runs the extension on Node 20
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # One pull request for the minor and patch updates of the tooling; Mermaid keeps its own
+      dev-tooling:
+        patterns: ["*"]
+        exclude-patterns: [mermaid]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

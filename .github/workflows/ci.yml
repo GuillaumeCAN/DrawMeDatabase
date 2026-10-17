@@ -1,0 +1,69 @@
+# Lint, unit tests, integration test in VS Code, then the .vsix as an artifact.
+# Also called by release.yml, which publishes the .vsix built here.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      vsix:
+        description: File name of the .vsix, which is also the name of its artifact
+        value: ${{ jobs.build.outputs.vsix }}
+
+permissions:
+  contents: read
+
+concurrency:
+  # "ci-" prefix: release.yml calls this workflow on the same ref, a shared group would deadlock
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Lint, test and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      vsix: ${{ steps.package.outputs.vsix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      # Also runs postinstall, which copies the pinned Mermaid build into views/vendor/
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run test:unit
+
+      - name: Integration test in VS Code
+        # --ignore-scripts skips the pretest hook: lint and unit tests already ran above
+        run: xvfb-run -a npm test --ignore-scripts
+
+      - name: Package
+        id: package
+        run: |
+          npm run package
+          vsix=$(node -p "const p = require('./package.json'); p.name + '-' + p.version + '.vsix'")
+          test -f "builds/$vsix"
+          echo "vsix=$vsix" >> "$GITHUB_OUTPUT"
+
+      # builds/ also holds the .vsix of older releases (committed): upload only the new one.
+      # Not zipped (archive: false), so the artifact is the .vsix itself, named after it.
+      # overwrite: a re-run of this job replaces the artifact instead of failing on its name.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: builds/${{ steps.package.outputs.vsix }}
+          archive: false
+          overwrite: true
+          if-no-files-found: error

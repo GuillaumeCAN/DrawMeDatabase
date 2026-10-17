@@ -1,0 +1,159 @@
+# On a version tag (v1.2.3): build and test the .vsix (ci.yml), attach it to a GitHub Release,
+# then publish it to Open VSX. The VS Code Marketplace is updated by hand with the same .vsix.
+# One-time setup and the release checklist: docs/publishing.md
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check version and changelog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      notes: ${{ steps.changelog.outputs.notes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Tag matches package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the version of package.json ($version): expected v$version"
+            exit 1
+          fi
+
+      # Release notes: the "## [vX.Y.Z] - date" section of CHANGELOG.md, up to the next one
+      - name: Changelog section
+        id: changelog
+        run: |
+          notes=$(awk -v header="## [$GITHUB_REF_NAME]" '
+            index($0, header) == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$(echo "$notes" | tr -d '[:space:]')" ]; then
+            echo "::error::CHANGELOG.md has no \"## [$GITHUB_REF_NAME]\" section"
+            exit 1
+          fi
+          delimiter="NOTES_$(openssl rand -hex 16)"
+          { echo "notes<<$delimiter"; echo "$notes"; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    uses: ./.github/workflows/ci.yml
+
+  github-release:
+    name: GitHub Release
+    needs: [check, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.vsix }}
+          path: dist
+
+      - name: Create the release with the .vsix
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ needs.check.outputs.notes }}
+          VSIX: dist/${{ needs.build.outputs.vsix }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$VSIX" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$GITHUB_REF_NAME" --notes "$NOTES"
+
+  open-vsx:
+    name: Publish to Open VSX
+    needs: [build, github-release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: open-vsx
+      url: https://open-vsx.org/extension/GuillaumeCancalon/draw-me-database
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # Only for the ovsx CLI, at the version of package-lock.json; no install script runs
+      # in the job that holds the token
+      - run: npm ci --ignore-scripts
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.vsix }}
+          path: dist
+
+      # ovsx reads the token from OVSX_PAT (same as -p). --skip-duplicate: a re-run does not
+      # fail on a version that is already published.
+      - name: Publish
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSIX: dist/${{ needs.build.outputs.vsix }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "::error::The OVSX_PAT secret is not set (see docs/publishing.md), then re-run this job"
+            exit 1
+          fi
+          npx ovsx publish "$VSIX" --skip-duplicate
+
+  # VS Code Marketplace: not automated. Personal access tokens can no longer publish after
+  # December 1, 2026 (global Azure DevOps PATs are retired), so the default is to upload the
+  # .vsix of the GitHub Release on https://marketplace.visualstudio.com/manage (docs/publishing.md).
+  # Automated alternative, pending a decision and a test with this publisher: Microsoft Entra ID
+  # with a user-assigned managed identity that GitHub signs in to through OIDC (no secret).
+  # Uncomment once the identity is set up (see "Marketplace: Entra ID option" in docs/publishing.md).
+  #
+  # marketplace:
+  #   name: Publish to the VS Code Marketplace
+  #   needs: [build, github-release]
+  #   runs-on: ubuntu-24.04
+  #   timeout-minutes: 10
+  #   # Must match the environment of the identity's federated credential
+  #   environment:
+  #     name: marketplace
+  #     url: https://marketplace.visualstudio.com/items?itemName=GuillaumeCancalon.draw-me-database
+  #   permissions:
+  #     contents: read
+  #     id-token: write # OIDC token exchanged by azure/login
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #       with:
+  #         persist-credentials: false
+  #     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+  #       with:
+  #         node-version: 22
+  #     - run: npm ci --ignore-scripts
+  #     - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+  #       with:
+  #         name: ${{ needs.build.outputs.vsix }}
+  #         path: dist
+  #     - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+  #       with:
+  #         client-id: ${{ vars.AZURE_CLIENT_ID }} # the managed identity, not an app registration
+  #         tenant-id: ${{ vars.AZURE_TENANT_ID }}
+  #         allow-no-subscriptions: true
+  #     - name: Publish
+  #       env:
+  #         VSIX: dist/${{ needs.build.outputs.vsix }}
+  #       run: npx vsce publish --packagePath "$VSIX" --azure-credential --skip-duplicate
