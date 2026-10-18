@@ -44,6 +44,8 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 - **Language**: English or French, or the language of VS Code (the diagram, the messages, and the commands and settings of VS Code)
 - **Tools and exports** of DrawMeDatabase Pro, greyed with a PRO badge until it is installed, and the state of its license
 
+![The options panel: the options of the diagram, the theme, the palettes and the custom colors; the tools and exports of DrawMeDatabase Pro, greyed with a PRO badge](images/screenshots/options-panel.png)
+
 **JSON viewer:** the parsed schema, colored like code, to save or copy.
 
 **Code-Driven Visualization**: 
