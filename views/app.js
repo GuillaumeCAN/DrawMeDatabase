@@ -452,6 +452,7 @@
         'pro.addColumns': 'columns',
         'pro.compare': 'compare',
         'pro.compareRefs': 'compare',
+        'pro.drift': 'database',
         'pro.migrationChanges': 'migration',
         'pro.checks': 'checks',
         'pro.findPath': 'path',

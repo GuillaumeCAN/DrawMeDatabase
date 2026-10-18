@@ -86,7 +86,7 @@ const PRO_EXTENSION_ID = 'GuillaumeCancalon.draw-me-database-pro';
 const API_VERSION = 2;
 
 // Tools and exports of DrawMeDatabase Pro, shown greyed in the side panel until it adds them
-const PRO_TOOLS = ['pro.canvas', 'pro.timeline', 'pro.designer', 'pro.addColumns', 'pro.compare', 'pro.compareRefs', 'pro.migrationChanges', 'pro.checks', 'pro.findPath', 'pro.saveView', 'pro.openView', 'pro.models'];
+const PRO_TOOLS = ['pro.canvas', 'pro.timeline', 'pro.designer', 'pro.addColumns', 'pro.compare', 'pro.compareRefs', 'pro.drift', 'pro.migrationChanges', 'pro.checks', 'pro.findPath', 'pro.saveView', 'pro.openView', 'pro.models'];
 const PRO_EXPORTS = ['pro.sql-mysql', 'pro.sql-postgresql', 'pro.sql-sqlite', 'pro.dbml', 'pro.plantuml', 'pro.typescript', 'pro.html'];
 const LICENSE_KINDS = ['licensed', 'trial', 'expired', 'development'];
 
