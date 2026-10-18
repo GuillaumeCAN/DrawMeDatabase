@@ -1549,3 +1549,24 @@ describe('laravel parser: table sources', () => {
         ]);
     });
 });
+
+describe('laravel parser: options for tools', () => {
+    it('columnSources gives the statement of each column', () => {
+        const { tables } = parser.parse(fixture('blog-app'), { git: false, columnSources: true });
+        const users = tables.find(t => t.table === 'users');
+        assert.deepEqual(users.columns.find(c => c.name === 'email').source,
+            { file: 'database/migrations/0001_01_01_000000_create_users_table.php', line: 17 });
+        assert.ok(tables.every(t => t.columns.every(c => c.source && c.source.line > 0)));
+        assert.ok(parser.parse(fixture('blog-app'), { git: false }).tables.every(t => t.columns.every(c => c.source === undefined)));
+    });
+
+    it('until gives the schema right after a migration', () => {
+        const files = fs.readdirSync(path.join(fixture('blog-app'), 'database', 'migrations')).sort();
+        const after = (file) => parser.parse(fixture('blog-app'), { git: false, until: file }).tables.map(t => t.table);
+        assert.deepEqual(after(files[0]), ['users', 'password_reset_tokens', 'sessions']);
+        assert.ok(after(files[1]).includes('cache'));
+        assert.deepEqual(after('0000'), [], 'before the first migration');
+        assert.deepEqual(after(files.at(-1)), parser.parse(fixture('blog-app'), { git: false }).tables.map(t => t.table));
+    });
+});
+

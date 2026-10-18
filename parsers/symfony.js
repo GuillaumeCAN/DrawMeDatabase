@@ -585,6 +585,8 @@ function joinColumns(mappings, joinTable) {
 // - git: false skips the git status (e.g. untrusted workspace)
 // - overrides: Map of absolute file path → text of an unsaved editor, read instead of the file
 // - gitCache: Map kept between parses, to run git again only once it is cleared
+// - columnSources: true adds the declaration of each column (source: { file, line }), for the
+//   tools that point at a column (not shown in the JSON viewer)
 module.exports.parse = function (basePath, options = {}) {
     const entityDir = path.join(basePath, 'src', 'Entity');
     if (!isDirectory(entityDir)) {
@@ -764,6 +766,9 @@ module.exports.parse = function (basePath, options = {}) {
                 return false;
             }
             setStatus(column, statusOf(owner, property.lines[0], property.lines[1]));
+            if (options.columnSources) {
+                column.source = { file: owner.file.rel, line: property.lines[0] };
+            }
             table.columns.push(column);
             return true;
         };

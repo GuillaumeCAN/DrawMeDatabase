@@ -141,3 +141,10 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - An automatic refresh that changes nothing is not drawn again, and while a large schema is being drawn, only the last edit is drawn next
 - git runs only when files change on disk or in the repository, not while you type
 
+## [v1.5.0] - 2026-10-18
+
+### Added
+- An API for other extensions (`docs/api.md`): the schema on screen and its changes, the parsers, exports added to the Export menu, focus on a set of tables, and the SVG of the diagram. DrawMeDatabase Pro is built on it
+- The Export menu points to DrawMeDatabase Pro (SQL, DBML, TypeScript, documentation...) while it is not installed
+- Parser options for tools: `columnSources` (where each column is declared) and, for Laravel, `until` (the schema right after a migration)
+

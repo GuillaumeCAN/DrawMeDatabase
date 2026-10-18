@@ -19,6 +19,13 @@
 
         <div id="summary" class="summary"></div>
 
+        <div id="focus" class="focus" hidden>
+            <span id="focus-label" class="focus-label"></span>
+            <button type="button" class="icon" id="focus-clear" title="Show the whole schema" aria-label="Show the whole schema">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+            </button>
+        </div>
+
         <div class="search">
             <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
             <input type="search" id="search" placeholder="Filter tables" aria-label="Filter tables by table or column name (Ctrl+F)" title="Tables whose name or columns contain the text, with their neighbours (Ctrl+F)" spellcheck="false" autocomplete="off">

@@ -1658,3 +1658,13 @@ describe('symfony parser: table sources', () => {
         assert.ok(tables.every(t => t.source.file.startsWith('src/Entity/') && t.source.line > 0));
     });
 });
+
+describe('symfony parser: options for tools', () => {
+    it('columnSources gives the property of each column', () => {
+        const { tables } = parser.parse(FIXTURE, { git: false, columnSources: true });
+        const article = tables.find(t => t.table === 'blog_article');
+        assert.deepEqual(article.columns.find(c => c.name === 'headline_text').source, { file: 'src/Entity/Blog/BlogArticle.php', line: 18 });
+        assert.ok(parser.parse(FIXTURE, { git: false }).tables.every(t => t.columns.every(c => c.source === undefined)));
+    });
+});
+

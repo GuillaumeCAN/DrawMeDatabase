@@ -1010,7 +1010,7 @@ function applyMigration(state, file, filePath, source) {
 }
 
 // Internal table state to the pivot format (docs/pivot-format.md)
-function toPivot(table, statusOf) {
+function toPivot(table, statusOf, basePath, columnSources) {
     const status = (origin) => (origin ? statusOf(origin.path)(origin.first, origin.last) : null);
     const columnStatuses = table.columns.map(c => status(c.origin));
     const tableGit = tableStatus(status(table.origin), columnStatuses);
@@ -1029,6 +1029,9 @@ function toPivot(table, statusOf) {
             }
             if (columnStatuses[index]) {
                 column.git = columnStatuses[index];
+            }
+            if (columnSources && c.origin) {
+                column.source = { file: path.relative(basePath, c.origin.path).split(path.sep).join('/'), line: c.origin.first };
             }
             return column;
         }),
@@ -1056,6 +1059,9 @@ function stat(file) {
 // - git: false skips the git status of the tables and columns
 // - overrides: Map of absolute file path → text of an unsaved editor, read instead of the file
 // - gitCache: Map kept between parses, to run git again only once it is cleared
+// - columnSources: true adds the statement that last created, changed or renamed each column
+//   (source: { file, line }), for the tools that point at a column
+// - until: a migration file name: the schema right after it (the later migrations are skipped)
 module.exports.parse = function (basePath, options = {}) {
     const migrationsPath = path.join(basePath, 'database', 'migrations');
     const folder = stat(migrationsPath);
@@ -1067,7 +1073,12 @@ module.exports.parse = function (basePath, options = {}) {
     const files = fs.readdirSync(migrationsPath)
         .filter(file => !file.startsWith('.') && file.includes('_') && file.endsWith('.php'))
         .filter(file => stat(path.join(migrationsPath, file))?.isFile())
-        .sort();
+        .sort()
+        .filter(file => typeof options.until !== 'string' || file <= options.until);
+    if (files.length === 0 && typeof options.until === 'string') {
+        // Before the first migration: no table yet
+        return { tables: [], warnings: [] };
+    }
     if (files.length === 0) {
         throw new ParserError(`No PHP migration files found in ${migrationsPath}`);
     }
@@ -1085,5 +1096,8 @@ module.exports.parse = function (basePath, options = {}) {
     if (reader.warning) {
         state.warnings.push(reader.warning);
     }
-    return { tables: state.tables.map(table => toPivot(table, reader.statusOf)), warnings: state.warnings };
+    return {
+        tables: state.tables.map(table => toPivot(table, reader.statusOf, basePath, options.columnSources === true)),
+        warnings: state.warnings,
+    };
 };

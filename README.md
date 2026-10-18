@@ -1,4 +1,4 @@
-**v1.4.0**
+**v1.5.0**
 
 ## About DrawMeDatabase
 
@@ -42,6 +42,19 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 **Code-Driven Visualization**: 
 
     Automatically analyzes your codebase to create detailed and accurate diagrams, saving time and effort. No database connection is needed, and everything works offline.
+
+## DrawMeDatabase Pro
+
+DrawMeDatabase is free, and everything it does today stays free. **DrawMeDatabase Pro** is a separate, paid extension that adds tools on top of it:
+
+- **Table designer**: draw a table (columns, types, keys, relations) and get the Laravel migration or the Doctrine entity written for you
+- **Schema comparison**: what changed between two branches or commits, and what a migration does, with a report to paste in a pull request
+- **Exports**: SQL (MySQL, PostgreSQL, SQLite), DBML, PlantUML, TypeScript types, and an HTML documentation of the schema
+- **Schema checks** in the Problems panel: missing primary or foreign keys, mismatched types, naming...
+- **Large schemas**: the path between two tables, saved views shared with your team
+- **Laravel**: Eloquent models with their relationships, generated from the schema
+
+It has a free 14-day trial. Search for "DrawMeDatabase Pro" in the Extensions view.
 
 ## Usage
 
@@ -100,5 +113,5 @@ GitHub Actions runs these checks on every pull request, the integration tests al
 
 ## Changelog
 
-Latest release : **v1.4.0**
+Latest release : **v1.5.0**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

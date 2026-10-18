@@ -39,6 +39,37 @@ const EXPORT_FORMATS = {
 };
 const MAX_EXPORT_LENGTH = 200 * 1024 * 1024;
 
+// DrawMeDatabase Pro adds its exports and tools through the API below
+const PRO_EXTENSION_ID = 'GuillaumeCancalon.draw-me-database-pro';
+const API_VERSION = 1;
+
+// A minimal vscode.Event: event(listener, thisArgs, disposables) → Disposable
+function createEmitter() {
+    const listeners = new Set();
+    const event = (listener, thisArgs, disposables) => {
+        const bound = thisArgs ? listener.bind(thisArgs) : listener;
+        listeners.add(bound);
+        const disposable = { dispose: () => listeners.delete(bound) };
+        if (Array.isArray(disposables)) {
+            disposables.push(disposable);
+        }
+        return disposable;
+    };
+    return {
+        event,
+        fire(value) {
+            for (const listener of [...listeners]) {
+                try {
+                    listener(value);
+                } catch {
+                    // A listener of another extension must not break the diagram
+                }
+            }
+        },
+        dispose: () => listeners.clear(),
+    };
+}
+
 function activate(context) {
     const output = vscode.window.createOutputChannel('DrawMeDatabase');
     context.subscriptions.push(output);
@@ -57,6 +88,10 @@ function activate(context) {
     let current = null;
     // git status by folder, kept while only unsaved editors change (see parsers/git.js)
     const gitCache = new Map();
+    // API: the schema on screen changed; exports added by other extensions
+    const schemaChanged = createEmitter();
+    context.subscriptions.push(schemaChanged);
+    const exporters = new Map();
 
     // Parses the schema of the folder and shows it: returns the parsed tables. auto: refresh
     // after a change of the code, without messages and without closing the panel on an error
@@ -104,6 +139,7 @@ function activate(context) {
                 },
             }, { reveal: !auto });
             watcher.watch(current);
+            schemaChanged.fire(publicSchema());
         } catch (err) {
             reportUnexpectedError(output, err);
         }
@@ -175,11 +211,28 @@ function activate(context) {
         watchGitRepositories(() => watcher.schedule({ disk: true })),
     );
 
+    // The schema on screen, as other extensions get it (copies: they cannot change it)
+    const publicSchema = () => (current ? {
+        tables: JSON.parse(JSON.stringify(current.tables)),
+        framework: current.framework,
+        basePath: current.basePath,
+        project: { name: current.folder.name, folder: current.folder.uri.toString() },
+    } : null);
+
     const viewer = createViewer(context, output, {
         refresh: () => draw(getWorkspaceFolder(lastFolder)),
         exportFolder: () => lastFolder,
         openTable,
         onClose: () => watcher.stop(),
+        exporters: () => [...exporters.values()],
+        schemaFor: (names) => {
+            const schema = publicSchema();
+            if (schema && Array.isArray(names)) {
+                const shown = new Set(names.filter(name => typeof name === 'string'));
+                schema.tables = schema.tables.filter(table => shown.has(table.table));
+            }
+            return schema;
+        },
     });
     context.subscriptions.push(viewer);
 
@@ -222,11 +275,56 @@ function activate(context) {
         }),
     );
 
-    // API of the extension (vscode.extensions.getExtension(...).exports), for the integration test
+    // API of the extension: vscode.extensions.getExtension('GuillaumeCancalon.draw-me-database').exports.
+    // Used by DrawMeDatabase Pro and the integration test; documented in docs/api.md.
     return {
+        apiVersion: API_VERSION,
         get lastRender() {
             return viewer.lastRender;
         },
+        // The schema on screen ({ tables, framework, basePath, project }), or null
+        getSchema: publicSchema,
+        onDidChangeSchema: schemaChanged.event,
+        // Opens the diagram of the workspace (like the DrawMeDatabase command): the parsed tables
+        showDiagram: () => vscode.commands.executeCommand('DMDB.parseSchema'),
+        detectFramework,
+        // Parses a framework folder ({ tables, warnings }), options as in docs/pivot-format.md
+        parseSchema(basePath, framework, options = {}) {
+            if (!Object.prototype.hasOwnProperty.call(PARSERS, framework)) {
+                throw new ParserError(`Unknown framework: ${framework}`);
+            }
+            return PARSERS[framework]().parse(basePath, options);
+        },
+        // The page files, for the panels of other extensions (localResourceRoots, script order)
+        viewsUri: vscode.Uri.joinPath(context.extensionUri, 'views'),
+        viewScripts: html.SCRIPTS.filter(segments => !['app.js', 'json.js'].includes(segments[segments.length - 1])).map(segments => segments.join('/')),
+        // An item of the Export menu: { id, label, extension, export(schema) → text } (schema: the
+        // tables on screen). Returns a Disposable.
+        registerExporter(exporter) {
+            if (!exporter || typeof exporter.id !== 'string' || typeof exporter.export !== 'function') {
+                throw new TypeError('An exporter needs an id and an export(schema) function');
+            }
+            exporters.set(exporter.id, {
+                id: exporter.id,
+                label: String(exporter.label || exporter.id),
+                extension: String(exporter.extension || 'txt').replace(/[^A-Za-z0-9]/g, '') || 'txt',
+                export: exporter.export,
+            });
+            viewer.exportersChanged();
+            return {
+                dispose() {
+                    exporters.delete(exporter.id);
+                    viewer.exportersChanged();
+                },
+            };
+        },
+        // Shows these tables only (with the relations between them), the highlighted ones standing
+        // out, and a label to go back to the whole schema: { tables, highlight, label }
+        focusTables(focus) {
+            viewer.focus(focus);
+        },
+        // The diagram on screen as an SVG file (text), or null when none is drawn
+        getDiagramSvg: () => viewer.requestSvg(),
     };
 }
 
@@ -444,7 +542,7 @@ function watchGitRepositories(onChange) {
 
 // A single webview panel. The page is loaded once: the schema and the settings are posted to it
 // (again when it reloads, after being restored), and it asks for refreshes and exports.
-function createViewer(context, output, { refresh, exportFolder, openTable, onClose }) {
+function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor }) {
     let panel;
     let ready = false;
     // What the page shows: the last schema, or a message when there is none
@@ -453,6 +551,26 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
     let subscriptions = [];
     // The last drawing reported by the page (shown in the output when it failed)
     let lastRender = null;
+    // A focus asked before the page was ready; SVG requests waiting for the page
+    let pendingFocus = null;
+    const svgRequests = new Map();
+    let svgRequestCount = 0;
+
+    const exportersMessage = () => ({
+        type: 'exporters',
+        items: exporters().map(({ id, label, extension }) => ({ id, label, extension })),
+        pro: Boolean(vscode.extensions && vscode.extensions.getExtension(PRO_EXTENSION_ID)),
+    });
+
+    const focusMessage = (focus) => {
+        const names = (list) => (Array.isArray(list) ? list.filter(name => typeof name === 'string') : []);
+        return {
+            type: 'focus',
+            tables: names(focus && focus.tables),
+            highlight: names(focus && focus.highlight),
+            label: focus && typeof focus.label === 'string' ? focus.label : '',
+        };
+    };
 
     const post = (message) => {
         if (panel && ready) {
@@ -480,12 +598,37 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
             case 'ready':
                 ready = true;
                 post(settingsMessage());
+                post(exportersMessage());
                 if (schema) {
                     post(schema);
                 } else if (emptyText) {
                     post({ type: 'empty', text: emptyText });
                 }
+                if (pendingFocus) {
+                    post(pendingFocus);
+                    pendingFocus = null;
+                }
                 break;
+            case 'export': {
+                // An export of another extension, on the tables on screen
+                const exporter = exporters().find(candidate => candidate.id === message.id);
+                if (exporter) {
+                    runExporter(exporter, message.tables).catch(err => reportUnexpectedError(output, err));
+                }
+                break;
+            }
+            case 'pro':
+                Promise.resolve(vscode.commands.executeCommand('extension.open', PRO_EXTENSION_ID))
+                    .catch(err => reportUnexpectedError(output, err));
+                break;
+            case 'svg': {
+                const resolve = svgRequests.get(message.id);
+                if (resolve) {
+                    svgRequests.delete(message.id);
+                    resolve(typeof message.svg === 'string' ? message.svg : null);
+                }
+                break;
+            }
             case 'refresh':
                 // Let the page show its progress bar before the (synchronous) parsing
                 post({ type: 'busy', busy: true });
@@ -534,25 +677,43 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
         }
     }
 
+    // An export of another extension: its text, saved like the others
+    async function runExporter(exporter, names) {
+        const schemaToExport = schemaFor(names);
+        if (!schemaToExport) {
+            return;
+        }
+        const content = await exporter.export(schemaToExport);
+        if (typeof content !== 'string' || content.length === 0) {
+            return;
+        }
+        const name = schemaToExport.project.name.normalize('NFC').replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^[-.]+|-+$/g, '');
+        await saveFile(content, { extension: exporter.extension, label: exporter.label, binary: false }, `${name ? `${name}-` : ''}schema.${exporter.extension}`);
+    }
+
     // Writes an export where the user chooses (Save dialog, in the project folder by default)
     async function saveExport(message) {
         const format = Object.prototype.hasOwnProperty.call(EXPORT_FORMATS, message.format) ? EXPORT_FORMATS[message.format] : null;
         if (!format || typeof message.content !== 'string' || message.content.length > MAX_EXPORT_LENGTH) {
             return;
         }
-        const requested = typeof message.fileName === 'string' ? path.basename(message.fileName) : '';
-        const fileName = requested.endsWith(`.${message.format}`) ? requested : `schema.${message.format}`;
+        await saveFile(message.content, { extension: message.format, label: format.label, binary: format.binary }, message.fileName);
+    }
+
+    async function saveFile(content, { extension, label, binary }, suggestedName) {
+        const requested = typeof suggestedName === 'string' ? path.basename(suggestedName) : '';
+        const fileName = requested.endsWith(`.${extension}`) ? requested : `schema.${extension}`;
         const folder = exportFolder();
         const uri = await vscode.window.showSaveDialog({
             defaultUri: folder ? vscode.Uri.joinPath(folder.uri, fileName) : undefined,
-            filters: { [format.label]: [message.format] },
+            filters: { [label]: [extension] },
             saveLabel: 'Export',
             title: 'Export the database diagram',
         });
         if (!uri) {
             return;
         }
-        await vscode.workspace.fs.writeFile(uri, Buffer.from(message.content, format.binary ? 'base64' : 'utf8'));
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(content, binary ? 'base64' : 'utf8'));
         const choice = await vscode.window.showInformationMessage(`Exported to ${path.basename(uri.fsPath)}.`, 'Open');
         if (choice === 'Open') {
             await vscode.commands.executeCommand('vscode.open', uri);
@@ -577,6 +738,8 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 subscriptions = [];
                 panel = undefined;
                 ready = false;
+                svgRequests.forEach(resolve => resolve(null));
+                svgRequests.clear();
                 onClose();
             }),
         ];
@@ -631,6 +794,36 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
         isOpen: () => Boolean(panel),
         get lastRender() {
             return lastRender;
+        },
+        exportersChanged() {
+            post(exportersMessage());
+        },
+        focus(focus) {
+            const message = focusMessage(focus);
+            if (panel && ready) {
+                panel.reveal();
+                post(message);
+            } else {
+                pendingFocus = message;
+                if (!panel) {
+                    Promise.resolve(vscode.commands.executeCommand('DMDB.parseSchema')).catch(err => reportUnexpectedError(output, err));
+                }
+            }
+        },
+        requestSvg() {
+            if (!panel || !ready || !schema) {
+                return Promise.resolve(null);
+            }
+            const id = ++svgRequestCount;
+            return new Promise(resolve => {
+                svgRequests.set(id, resolve);
+                post({ type: 'svgRequest', id });
+                setTimeout(() => {
+                    if (svgRequests.delete(id)) {
+                        resolve(null);
+                    }
+                }, 15000);
+            });
         },
         close,
         dispose: close,
