@@ -447,6 +447,7 @@
 
     const TOOL_ICONS = {
         'pro.canvas': 'canvas',
+        'pro.timeline': 'history',
         'pro.designer': 'designer',
         'pro.addColumns': 'columns',
         'pro.compare': 'compare',

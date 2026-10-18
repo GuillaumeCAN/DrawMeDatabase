@@ -105,7 +105,7 @@
             'inspector.notInSchema': 'This table is no longer in the schema.',
             'inspector.pro.title': 'More about this table',
             'inspector.pro.details': 'Indexes, default values, lengths, enum values, comments and ON DELETE',
-            'inspector.pro.history': 'History: the migrations and the commits that changed it, by whom and when',
+            'inspector.pro.history': 'History: the migrations and the commits that changed it, by whom and when, and the time machine of the schema',
             'inspector.pro.actions': 'Actions: add columns, generate its model, compare it with a branch',
 
             // Exports
@@ -212,6 +212,8 @@
             // Tools of DrawMeDatabase Pro (shown before it is installed)
             'tool.pro.canvas': 'Schema canvas',
             'tool.pro.canvas.hint': 'Move the tables and the links by hand',
+            'tool.pro.timeline': 'Schema time machine',
+            'tool.pro.timeline.hint': 'Replay the history of the schema, migration after migration or commit after commit',
             'tool.pro.designer': 'Design a table',
             'tool.pro.designer.hint': 'The migration or the entity is written for you',
             'tool.pro.addColumns': 'Add columns',
@@ -349,7 +351,7 @@
             'inspector.notInSchema': 'Cette table n\'est plus dans le schéma.',
             'inspector.pro.title': 'Plus d\'infos sur cette table',
             'inspector.pro.details': 'Index, valeurs par défaut, longueurs, valeurs des enums, commentaires et ON DELETE',
-            'inspector.pro.history': 'Historique : les migrations et les commits qui l\'ont modifiée, par qui et quand',
+            'inspector.pro.history': 'Historique : les migrations et les commits qui l\'ont modifiée, par qui et quand, et la machine à remonter le temps du schéma',
             'inspector.pro.actions': 'Actions : ajouter des colonnes, générer son modèle, la comparer avec une branche',
 
             'export.svg': 'Enregistrer en SVG…',
@@ -453,6 +455,8 @@
 
             'tool.pro.canvas': 'Canevas du schéma',
             'tool.pro.canvas.hint': 'Déplacez les tables et les liens à la main',
+            'tool.pro.timeline': 'Machine à remonter le temps',
+            'tool.pro.timeline.hint': 'Rejouez l\'histoire du schéma, migration après migration ou commit après commit',
             'tool.pro.designer': 'Dessiner une table',
             'tool.pro.designer.hint': 'La migration ou l\'entité s\'écrit pour vous',
             'tool.pro.addColumns': 'Ajouter des colonnes',

@@ -47,7 +47,7 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 - **Language**: English or French, or the language of VS Code (the diagram, the messages, and the commands and settings of VS Code)
 - **Tools and exports** of DrawMeDatabase Pro, greyed with a PRO badge until it is installed, and the state of its license
 
-![The options panel: the options of the diagram, the theme, the palettes and the custom colors; the tools and exports of DrawMeDatabase Pro, greyed with a PRO badge](images/screenshots/options-panel.png)
+![The options panel: the options of the diagram and the theme; the git status of each column, the palettes, the colors, and the tools and exports of DrawMeDatabase Pro, greyed with a PRO badge](images/screenshots/options-panel.png)
 
 **JSON viewer:** the parsed schema, colored like code, to save or copy.
 
@@ -62,6 +62,7 @@ DrawMeDatabase is free, and everything it does today stays free. **DrawMeDatabas
 - **Git status of every column**, live: the new, modified and unsaved columns in the diagram and in the inspector
 - **Inspector of the tables**: the columns in detail (sizes, defaults, enum values, comments), the indexes, the foreign keys with their `ON DELETE`, the history of the table (migrations, commits, authors, dates) and actions
 - **Your colors**: palettes in a light and a dark version, custom colors (background, headers, text, borders, links, highlight, git status) and fonts
+- **Schema time machine**: replay the history of the schema, migration after migration or commit after commit, with what each step added, changed or removed
 - **Schema canvas**: a second view where you move the tables and the links by hand, with the git status of every column; the layout is kept and can be shared with your team
 - **Table designer**: draw a table (columns, types, keys, relations) and get the Laravel migration or the Doctrine entity written for you
 - **Schema comparison**: what changed between two branches or commits, and what a migration does, with a report to paste in a pull request
@@ -69,6 +70,8 @@ DrawMeDatabase is free, and everything it does today stays free. **DrawMeDatabas
 - **Schema checks** in the Problems panel: missing primary or foreign keys, mismatched types, naming...
 - **Large schemas**: the path between two tables, saved views shared with your team
 - **Laravel**: Eloquent models with their relationships, generated from the schema
+
+![DrawMeDatabase Pro: the schema time machine replays the migrations one after the other](images/screenshots/pro-time-machine.gif)
 
 ![DrawMeDatabase Pro: the git status of every column follows a migration as it is typed](images/screenshots/pro-live-columns.gif)
 
