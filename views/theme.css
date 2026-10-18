@@ -1458,16 +1458,20 @@ button.inspector-column:hover,
     font-family: var(--vscode-editor-font-family, monospace);
 }
 
+/* Label on the left (at most 45 %), value on the right (wrapped when long), badge */
 .inspector-item {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: fit-content(45%) minmax(0, 1fr) auto;
     gap: 2px 8px;
     align-items: baseline;
     padding: 3px 0;
 }
 
 .inspector-item-label {
-    overflow-wrap: anywhere;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .inspector-item-value {

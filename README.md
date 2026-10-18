@@ -33,6 +33,9 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 - Two layouts: ELK (compact, right-angled links, the default) or Dagre (curved links), top to bottom or left to right
 - Export as SVG, PNG, Mermaid source (`.mmd`) or Markdown, or copy the Mermaid source
 - Click on a table to inspect it: its columns with their keys, types and git status (a click opens the line of a column), the tables it references and the tables that reference it, the file it comes from. Double-click opens its migration or entity
+
+  ![The inspector of a table: its columns with their keys, types and git status, the tables that reference it, and what DrawMeDatabase Pro adds](images/screenshots/inspector.png)
+
 - Search: keep the tables whose name or columns contain a text, with the tables they are linked to
 - Live: the diagram follows what you type in a migration or an entity, before you save it
 - Git status: new, modified and unsaved tables and columns, in the colors of the git decorations of VS Code (Laravel and Symfony, when the project is a git repository)

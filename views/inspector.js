@@ -145,7 +145,7 @@
             const body = [];
             (extra.items || []).forEach(item => {
                 body.push(element('div', { className: `inspector-item${item.tone ? ` tone-${item.tone}` : ''}` }, [
-                    element('span', { className: 'inspector-item-label', text: item.label }),
+                    element('span', { className: 'inspector-item-label', text: item.label, title: item.label }),
                     item.value ? element('span', { className: 'inspector-item-value', text: item.value }) : null,
                     item.badge ? element('span', { className: 'inspector-item-badge', text: item.badge }) : null,
                     item.hint ? element('span', { className: 'inspector-item-hint', text: item.hint }) : null,
