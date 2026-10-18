@@ -1,4 +1,4 @@
-**v1.5.0**
+**v1.6.0**
 
 ## About DrawMeDatabase
 
@@ -28,7 +28,7 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 **Diagram viewer:**
 
 - Mermaid 12 entity-relationship diagram: columns with their type (`type?` when nullable), primary and foreign keys, one-to-many / one-to-one / many-to-many relations
-- In the colors of your VS Code theme (light, dark, high contrast or any other)
+- In the colors of your VS Code theme (light, dark, high contrast or any other), or in your own: see the options panel
 - Zoom and pan: drag to move, Ctrl (Cmd on macOS) + mouse wheel or pinch to zoom, buttons to zoom in, zoom out, fit to window and show at 100 %
 - Two layouts: ELK (compact, right-angled links, the default) or Dagre (curved links), top to bottom or left to right
 - Export as SVG, PNG, Mermaid source (`.mmd`) or Markdown, or copy the Mermaid source
@@ -36,6 +36,13 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 - Search: keep the tables whose name or columns contain a text, with the tables they are linked to
 - Live: the diagram follows what you type in a migration or an entity, before you save it
 - Git status: new, modified and unsaved tables and columns, in the colors of the git decorations of VS Code (Laravel and Symfony, when the project is a git repository)
+
+**Options panel** (the panel button at the right of the toolbar): everything in one place, saved in your settings.
+
+- **Diagram**: layout, direction, git status, keys only (primary and foreign keys), relation names, background grid
+- **Appearance**: like VS Code, light or dark whatever the VS Code theme; palettes (Ocean, Forest, Sunset, Violet, Graphite, Paper) in a light and a dark version; your own colors for the background, the table headers, the text, the borders, the links, the highlight and the git status; the font and the size of the text
+- **Language**: English or French, or the language of VS Code (the diagram, the messages, and the commands and settings of VS Code)
+- **Tools and exports** of DrawMeDatabase Pro, greyed with a PRO badge until it is installed, and the state of its license
 
 **JSON viewer:** the parsed schema, colored like code, to save or copy.
 
@@ -82,6 +89,9 @@ In the panel:
 - `DrawMeDatabase.direction`: `TB` (top to bottom, default) or `LR` (left to right)
 - `DrawMeDatabase.autoRefresh`: draw the open diagram again while you edit a migration or an entity, and when one is saved, created, deleted or committed (default: on)
 - `DrawMeDatabase.showGitStatus`: show the git status of the tables and columns in the diagram (default: on, also the **Git** button of the toolbar)
+- `DrawMeDatabase.keysOnly`, `DrawMeDatabase.relationLabels`: only the keys of each table, the names of the relations (also in the options panel)
+- `DrawMeDatabase.language`: `auto` (the language of VS Code), `en` or `fr`
+- `DrawMeDatabase.theme`, `DrawMeDatabase.palette`, `DrawMeDatabase.colors`, `DrawMeDatabase.font`, `DrawMeDatabase.customFont`, `DrawMeDatabase.fontSize`, `DrawMeDatabase.grid`: the appearance of the diagram, easier to change from the options panel
 
 Details and warnings (for example a table whose name cannot be read) are written in the **DrawMeDatabase** output panel.
 
@@ -120,5 +130,5 @@ GitHub Actions runs these checks on every pull request, the integration tests al
 
 ## Changelog
 
-Latest release : **v1.5.0**
+Latest release : **v1.6.0**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

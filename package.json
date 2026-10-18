@@ -3,7 +3,7 @@
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "icon": "images/logo_128.png",
   "engines": {
     "vscode": "^1.96.0"
@@ -30,13 +30,13 @@
     "commands": [
       {
         "command": "DMDB.parseSchema",
-        "title": "Draw Database Schema",
+        "title": "%command.parseSchema%",
         "category": "DrawMeDatabase",
         "icon": "$(type-hierarchy)"
       },
       {
         "command": "DMDB.refresh",
-        "title": "Refresh Diagram",
+        "title": "%command.refresh%",
         "category": "DrawMeDatabase",
         "icon": "$(refresh)"
       }
@@ -49,7 +49,20 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "markdownDescription": "Relative path to the framework folder **(leave empty if the framework is at the root of the workspace)** \n\n Example : **`my-project/app/symfony`**"
+          "markdownDescription": "%setting.frameworkPath%",
+          "order": 0
+        },
+        "DrawMeDatabase.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%setting.autoRefresh%",
+          "order": 1
+        },
+        "DrawMeDatabase.showGitStatus": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%setting.showGitStatus%",
+          "order": 2
         },
         "DrawMeDatabase.layout": {
           "type": "string",
@@ -58,11 +71,12 @@
             "dagre"
           ],
           "enumDescriptions": [
-            "ELK: compact layout with straight, right-angled links (best for large schemas)",
-            "Dagre: the classic Mermaid layout with curved links"
+            "%setting.layout.elk%",
+            "%setting.layout.dagre%"
           ],
           "default": "elk",
-          "markdownDescription": "How the tables of the diagram are placed. Also available in the toolbar of the diagram."
+          "markdownDescription": "%setting.layout%",
+          "order": 3
         },
         "DrawMeDatabase.direction": {
           "type": "string",
@@ -71,21 +85,158 @@
             "LR"
           ],
           "enumDescriptions": [
-            "Top to bottom",
-            "Left to right"
+            "%setting.direction.TB%",
+            "%setting.direction.LR%"
           ],
           "default": "TB",
-          "markdownDescription": "Direction of the diagram, from the referenced tables to the tables that reference them. Also available in the toolbar of the diagram."
+          "markdownDescription": "%setting.direction%",
+          "order": 4
         },
-        "DrawMeDatabase.autoRefresh": {
+        "DrawMeDatabase.keysOnly": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%setting.keysOnly%",
+          "order": 5
+        },
+        "DrawMeDatabase.relationLabels": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Refresh the open diagram while you edit a migration (Laravel) or an entity (Symfony), before saving, and when one is created, deleted or committed."
+          "markdownDescription": "%setting.relationLabels%",
+          "order": 6
         },
-        "DrawMeDatabase.showGitStatus": {
+        "DrawMeDatabase.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "fr"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "%setting.language.auto%",
+            "English",
+            "Français"
+          ],
+          "markdownDescription": "%setting.language%",
+          "order": 7
+        },
+        "DrawMeDatabase.theme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "%setting.theme.auto%",
+            "%setting.theme.light%",
+            "%setting.theme.dark%"
+          ],
+          "markdownDescription": "%setting.theme%",
+          "order": 8
+        },
+        "DrawMeDatabase.palette": {
+          "type": "string",
+          "enum": [
+            "vscode",
+            "ocean",
+            "forest",
+            "sunset",
+            "violet",
+            "graphite",
+            "paper"
+          ],
+          "default": "vscode",
+          "markdownDescription": "%setting.palette%",
+          "order": 9
+        },
+        "DrawMeDatabase.colors": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "background": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "header": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "text": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "border": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "line": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "accent": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "gitNew": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "gitModified": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "gitUnsaved": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            }
+          },
+          "additionalProperties": false,
+          "markdownDescription": "%setting.colors%",
+          "order": 10
+        },
+        "DrawMeDatabase.font": {
+          "type": "string",
+          "enum": [
+            "default",
+            "editor",
+            "sans",
+            "serif",
+            "mono",
+            "custom"
+          ],
+          "default": "default",
+          "enumDescriptions": [
+            "%setting.font.default%",
+            "%setting.font.editor%",
+            "%setting.font.sans%",
+            "%setting.font.serif%",
+            "%setting.font.mono%",
+            "%setting.font.custom%"
+          ],
+          "markdownDescription": "%setting.font%",
+          "order": 11
+        },
+        "DrawMeDatabase.customFont": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%setting.customFont%",
+          "order": 12
+        },
+        "DrawMeDatabase.fontSize": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 20,
+          "default": 13,
+          "markdownDescription": "%setting.fontSize%",
+          "order": 13
+        },
+        "DrawMeDatabase.grid": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show the git status in the diagram: tables and columns new (not in the last commit), modified, or changed in an editor and not saved yet. Also available in the toolbar of the diagram."
+          "markdownDescription": "%setting.grid%",
+          "order": 14
         }
       }
     },

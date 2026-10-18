@@ -19,6 +19,26 @@ const { ParserError } = require('../../parsers/errors');
 const html = require('../../views/html');
 
 const ROOT = path.join(__dirname, '..', '..');
+
+// The settings posted to the page when nothing is configured
+const DEFAULT_SETTINGS = {
+    type: 'settings',
+    layout: 'elk',
+    direction: 'TB',
+    showGitStatus: true,
+    keysOnly: false,
+    relationLabels: true,
+    autoRefresh: true,
+    language: 'auto',
+    theme: 'auto',
+    palette: 'vscode',
+    font: 'default',
+    grid: true,
+    fontSize: 13,
+    customFont: '',
+    colors: {},
+    languageResolved: 'en',
+};
 const EXTENSION = path.join(ROOT, 'extension.js');
 const WEBVIEW_ROOT = 'https://webview.test/';
 
@@ -371,8 +391,8 @@ test('draws the schema in one panel: the page once, then the settings and the sc
     // Nothing is posted before the page is ready
     assert.deepEqual(panel.posted, []);
     panel.postFromPage({ type: 'ready' });
-    assert.deepEqual(panel.posted, [
-        { type: 'settings', layout: 'elk', direction: 'TB', showGitStatus: true },
+    assert.deepEqual(panel.posted.filter(message => message.type !== 'features'), [
+        DEFAULT_SETTINGS,
         { type: 'exporters', items: [], pro: false },
         {
             type: 'schema',
@@ -451,7 +471,7 @@ test('the settings come from the configuration, the toolbar changes them globall
     ext.run();
     const panel = ext.state.panels[0];
     panel.postFromPage({ type: 'ready' });
-    assert.deepEqual(panel.sent('settings'), [{ type: 'settings', layout: 'dagre', direction: 'TB', showGitStatus: true }]);
+    assert.deepEqual(panel.sent('settings'), [{ ...DEFAULT_SETTINGS, layout: 'dagre' }]);
 
     panel.postFromPage({ type: 'setting', key: 'direction', value: 'LR' });
     panel.postFromPage({ type: 'setting', key: 'layout', value: 'elk' });
@@ -464,8 +484,8 @@ test('the settings come from the configuration, the toolbar changes them globall
     ext.vscode.changeConfiguration('DrawMeDatabase.direction');
     ext.vscode.changeConfiguration('DrawMeDatabase.frameworkPath');
     assert.deepEqual(panel.sent('settings'), [
-        { type: 'settings', layout: 'dagre', direction: 'TB', showGitStatus: true },
-        { type: 'settings', layout: 'elk', direction: 'LR', showGitStatus: true },
+        { ...DEFAULT_SETTINGS, layout: 'dagre' },
+        { ...DEFAULT_SETTINGS, layout: 'elk', direction: 'LR' },
     ]);
 
     // The frameworkPath change scheduled a refresh: deactivation cancels it
@@ -738,7 +758,7 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     const api = ext.context.api;
     const dir = folder('api', LARAVEL);
     ext.openFolders(dir);
-    assert.equal(api.apiVersion, 1);
+    assert.equal(api.apiVersion, 2);
     assert.equal(api.getSchema(), null);
 
     const seen = [];
@@ -909,7 +929,7 @@ test('warnings are written to the output and announced once per run', async () =
     assert.ok(ext.state.output.includes('Warning: a.php:3: dynamic table name skipped'));
     assert.ok(ext.state.output.includes('Warning: b.php:9: unknown table'));
     assert.deepEqual(ext.state.warnings, [{
-        text: '2 warning(s) while reading the schema. See the "DrawMeDatabase" output for details.',
+        text: '2 warnings while reading the schema. See the "DrawMeDatabase" output for details.',
         items: ['Show Output'],
     }]);
     assert.equal(ext.state.panels.length, 1, 'the diagram is still drawn');
@@ -1064,4 +1084,145 @@ test('no workspace folder', () => {
     const ext = activate();
     assert.equal(ext.run(), undefined);
     assert.deepEqual(ext.state.errors.map(error => error.text), ['No project opened in the current workspace. Unable to draw the schema.']);
+});
+
+test('side panel: the tools and exports of DrawMeDatabase Pro are listed greyed until it adds them', async () => {
+    const ext = activate();
+    const api = ext.context.api;
+    ext.openFolders(folder('panel-free', LARAVEL));
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+
+    const free = panel.sent('features').at(-1);
+    assert.ok(free.tools.length >= 10 && free.tools.every(tool => tool.state === 'missing' && tool.pro), 'every Pro tool is missing');
+    assert.ok(free.exports.some(item => item.id === 'pro.sql-mysql' && item.state === 'missing'));
+    assert.deepEqual(free.license, { kind: 'free', actions: ['discover'] });
+
+    // A missing tool, or "Discover", opens the page of DrawMeDatabase Pro
+    panel.postFromPage({ type: 'tool', id: 'pro.canvas' });
+    panel.postFromPage({ type: 'license', action: 'discover' });
+    panel.postFromPage({ type: 'tool', id: 'unknown' });
+    await flush();
+    assert.deepEqual(ext.state.executed, [
+        { id: 'extension.open', args: ['GuillaumeCancalon.draw-me-database-pro'] },
+        { id: 'extension.open', args: ['GuillaumeCancalon.draw-me-database-pro'] },
+    ]);
+
+    // Pro adds its tools: they run their command, with their arguments
+    const canvas = api.registerTool({ id: 'pro.canvas', label: 'Schema canvas', command: 'DMDBPro.openCanvas', pro: true });
+    api.registerTool({ id: 'acme.audit', label: 'Audit', command: 'acme.audit', args: ['users', { bad: true }, 3] });
+    api.registerExporter({ id: 'pro.sql-mysql', label: 'Save as SQL (MySQL)…', extension: 'sql', export: () => 'SQL' });
+    assert.throws(() => api.registerTool({ id: 'x' }), TypeError);
+    const listed = panel.sent('features').at(-1);
+    assert.deepEqual(listed.tools.find(tool => tool.id === 'pro.canvas'), { id: 'pro.canvas', label: 'Schema canvas', hint: '', icon: undefined, pro: true, state: 'available' });
+    assert.deepEqual(listed.tools.at(-1), { id: 'acme.audit', label: 'Audit', hint: '', icon: undefined, pro: false, state: 'available' });
+    assert.equal(listed.exports.find(item => item.id === 'pro.sql-mysql').state, 'available');
+
+    ext.state.executed = [];
+    panel.postFromPage({ type: 'tool', id: 'pro.canvas' });
+    panel.postFromPage({ type: 'tool', id: 'acme.audit' });
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.openCanvas', args: [] }, { id: 'acme.audit', args: ['users', 3] }]);
+
+    // Its license: the trial, then the end of the trial locks its tools and exports
+    api.setLicenseStatus({ kind: 'trial', daysLeft: 9.4, commands: { buy: 'DMDBPro.buyLicense', enter: 'DMDBPro.enterLicense', manage: 'DMDBPro.licenseStatus' } });
+    assert.deepEqual(panel.sent('features').at(-1).license, { kind: 'trial', daysLeft: 9, actions: ['buy', 'enter'] });
+    api.setLicenseStatus({ kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
+    const expired = panel.sent('features').at(-1);
+    assert.deepEqual(expired.license, { kind: 'expired', daysLeft: undefined, actions: ['buy'] });
+    assert.equal(expired.tools.find(tool => tool.id === 'pro.canvas').state, 'locked');
+    assert.equal(expired.tools.find(tool => tool.id === 'acme.audit').state, 'available', 'not a Pro tool');
+    assert.equal(expired.exports.find(item => item.id === 'pro.sql-mysql').state, 'locked');
+    ext.state.executed = [];
+    panel.postFromPage({ type: 'license', action: 'buy' });
+    panel.postFromPage({ type: 'license', action: 'enter' });
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.buyLicense', args: [] }]);
+
+    api.setLicenseStatus({ kind: 'licensed', commands: { manage: 'DMDBPro.licenseStatus' } });
+    assert.deepEqual(panel.sent('features').at(-1).license.actions, ['manage']);
+    api.setLicenseStatus({ kind: 'stolen' });
+    assert.equal(panel.sent('features').at(-1).license.kind, 'free');
+
+    canvas.update({ locked: true, label: 'Canvas' });
+    assert.deepEqual(panel.sent('features').at(-1).tools.find(tool => tool.id === 'pro.canvas'), { id: 'pro.canvas', label: 'Canvas', hint: '', icon: undefined, pro: true, state: 'locked' });
+    canvas.dispose();
+    assert.equal(panel.sent('features').at(-1).tools.find(tool => tool.id === 'pro.canvas').state, 'missing');
+});
+
+test('side panel: appearance, options and language are saved globally, after validation', async () => {
+    const ext = activate();
+    ext.openFolders(folder('panel-settings', LARAVEL));
+    ext.state.settings[''] = { 'DrawMeDatabase.palette': 'neon', 'DrawMeDatabase.fontSize': 400, 'DrawMeDatabase.colors': { header: '#ABCDEF', text: 'blue' } };
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    const settings = panel.sent('settings').at(-1);
+    assert.equal(settings.palette, 'vscode', 'an unknown palette is the default one');
+    assert.equal(settings.fontSize, 20, 'clamped');
+    assert.deepEqual(settings.colors, { header: '#abcdef' });
+
+    for (const [key, value] of [
+        ['theme', 'light'], ['palette', 'forest'], ['font', 'mono'], ['grid', false], ['keysOnly', true],
+        ['relationLabels', false], ['language', 'fr'], ['autoRefresh', false], ['fontSize', 15.2],
+        ['customFont', 'Fira Sans; x'], ['colors', { accent: '#FF0000', nope: '#000000' }],
+        // Refused
+        ['theme', 'pink'], ['fontSize', 'big'], ['customFont', 42], ['language', 'de'], ['toString', 1],
+    ]) {
+        panel.postFromPage({ type: 'setting', key, value });
+    }
+    await flush();
+    assert.deepEqual(ext.state.updates.map(update => [update.key.replace('DrawMeDatabase.', ''), update.value, update.target]), [
+        ['theme', 'light', 1], ['palette', 'forest', 1], ['font', 'mono', 1], ['grid', false, 1], ['keysOnly', true, 1],
+        ['relationLabels', false, 1], ['language', 'fr', 1], ['autoRefresh', false, 1], ['fontSize', 15, 1],
+        ['customFont', 'Fira Sans x', 1], ['colors', { accent: '#ff0000' }, 1],
+    ]);
+
+    // Reset: every appearance setting back to its default
+    ext.state.updates = [];
+    panel.postFromPage({ type: 'resetAppearance' });
+    await flush();
+    assert.deepEqual(ext.state.updates.map(update => [update.key, update.value]), ['theme', 'palette', 'colors', 'font', 'customFont', 'fontSize', 'grid'].map(key => [`DrawMeDatabase.${key}`, undefined]));
+
+    // Settings of VS Code, at the framework folder or at every setting of the extension
+    panel.postFromPage({ type: 'openSettings', target: 'frameworkPath' });
+    panel.postFromPage({ type: 'openSettings', target: 'anything' });
+    await flush();
+    assert.deepEqual(ext.state.executed, [
+        { id: 'workbench.action.openSettings', args: ['DrawMeDatabase.frameworkPath'] },
+        { id: 'workbench.action.openSettings', args: ['@ext:GuillaumeCancalon.draw-me-database'] },
+    ]);
+
+    // A new appearance setting is posted to the page
+    ext.state.settings[''] = { 'DrawMeDatabase.theme': 'dark', 'DrawMeDatabase.language': 'fr' };
+    ext.vscode.changeConfiguration('DrawMeDatabase.theme');
+    assert.equal(panel.sent('settings').at(-1).theme, 'dark');
+    assert.equal(panel.sent('settings').at(-1).languageResolved, 'fr');
+});
+
+test('the messages follow the language setting, else the language of VS Code', () => {
+    const ext = activate();
+    ext.vscode.env.language = 'fr-ca';
+    ext.run();
+    assert.deepEqual(ext.state.errors.at(-1).text, 'Aucun projet ouvert dans l\'espace de travail. Impossible de dessiner le schéma.');
+    ext.state.settings[''] = { 'DrawMeDatabase.language': 'en' };
+    ext.run();
+    assert.deepEqual(ext.state.errors.at(-1).text, 'No project opened in the current workspace. Unable to draw the schema.');
+});
+
+test('API: the display settings (appearance and language) and their changes', () => {
+    const ext = activate();
+    const api = ext.context.api;
+    ext.state.settings[''] = { 'DrawMeDatabase.palette': 'ocean', 'DrawMeDatabase.fontSize': 16, 'DrawMeDatabase.language': 'auto' };
+    ext.vscode.env.language = 'fr';
+    assert.deepEqual(api.getDisplaySettings(), { theme: 'auto', palette: 'ocean', colors: {}, font: 'default', customFont: '', fontSize: 16, grid: true, language: 'fr' });
+
+    const seen = [];
+    const subscription = api.onDidChangeDisplaySettings(settings => seen.push(settings));
+    ext.state.settings[''] = { 'DrawMeDatabase.theme': 'dark', 'DrawMeDatabase.language': 'en' };
+    ext.vscode.changeConfiguration('DrawMeDatabase.theme');
+    ext.vscode.changeConfiguration('DrawMeDatabase.layout');
+    assert.deepEqual(seen.map(settings => [settings.theme, settings.language]), [['dark', 'en']], 'only the display settings fire');
+    subscription.dispose();
 });

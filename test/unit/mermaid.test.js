@@ -457,3 +457,37 @@ test('the marks option: a CSS class per marked table and a comment per noted col
     assert.ok(!source.includes('bad mark'), 'only plain class names');
     assert.ok(!generate(tables).includes('diffAdded'), 'off by default');
 });
+
+test('the keysOnly option keeps the primary and foreign keys of each table', () => {
+    const output = lines(generate([USERS, POSTS], { keysOnly: true }));
+    assert.ok(output.includes('    bigIncrements id PK'));
+    assert.ok(output.includes('    unsignedBigInteger user_id FK'));
+    assert.ok(!output.some(line => /\b(email|title|created_at)\b/.test(line)), 'the other columns are left out');
+    const keyless = lines(generate([{ table: 'logs', columns: [{ name: 'message', type: 'text' }], relations: [] }], { keysOnly: true }));
+    assert.ok(keyless.includes('  logs'), 'a table without key is drawn without columns');
+});
+
+test('relationLabels: false draws the links without the name of their foreign key', () => {
+    assert.ok(lines(generate([USERS, POSTS])).includes('  users ||--o{ posts : "user_id"'));
+    assert.ok(lines(generate([USERS, POSTS], { relationLabels: false })).includes('  users ||--o{ posts : ""'));
+});
+
+test('gitLabels writes the git status in another language, as safe Mermaid text', () => {
+    const { gitLabel } = require('../../views/mermaid/generator');
+    const labels = { untracked: 'nouveau', modified: 'modifié', unsaved: 'non "enregistré"' };
+    const output = lines(generate(GIT_TABLES, { git: true, gitLabels: labels }));
+    assert.ok(output.includes(`    string email "${gitLabel('unsaved', labels)}"`));
+    assert.ok(output.includes(`    integer id "${gitLabel('untracked', labels)}"`));
+    assert.ok(!gitLabel('unsaved', labels).includes('"'), 'quotes are removed');
+    assert.equal(gitLabel('modified', {}), gitLabel('modified'), 'English when a word is missing');
+});
+
+test('Mermaid reads the diagrams of the keysOnly, relationLabels and gitLabels options', { skip }, async () => {
+    const { entities, relationships } = await parseWithMermaid(generateMermaidER([USERS, POSTS], { keysOnly: true, relationLabels: false }));
+    assert.deepEqual(entities.get('posts').attributes.map(attribute => attribute.name), ['id', 'user_id']);
+    assert.equal(relationships[0].roleA, '');
+    const { gitLabel } = require('../../views/mermaid/generator');
+    const labels = { untracked: 'nouveau', modified: 'modifié', unsaved: 'non enregistré' };
+    const french = await parseWithMermaid(generateMermaidER(GIT_TABLES, { git: true, gitLabels: labels }));
+    assert.equal(french.entities.get('users').attributes[1].comment, gitLabel('unsaved', labels));
+});

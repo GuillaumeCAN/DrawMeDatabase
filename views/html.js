@@ -45,11 +45,14 @@ function fillTemplate(template, values) {
 // Scripts of the page (views/index.html), in loading order
 const SCRIPTS = [
     ['vendor', 'mermaid.min.js'],
+    ['i18n.js'],
+    ['appearance.js'],
     ['mermaid', 'generator.js'],
     ['mermaid', 'zoom.js'],
     ['exporters.js'],
     ['search.js'],
     ['mermaid', 'diagram.js'],
+    ['sidepanel.js'],
     ['json', 'json.js'],
     ['app.js'],
 ];

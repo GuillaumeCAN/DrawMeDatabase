@@ -63,9 +63,9 @@ export default [
         },
         rules,
     },
-    // Shared with the unit tests through module.exports
+    // Shared with the unit tests (and the extension) through module.exports
     {
-        files: ["views/mermaid/generator.js", "views/mermaid/zoom.js", "views/exporters.js", "views/search.js"],
+        files: ["views/mermaid/generator.js", "views/mermaid/zoom.js", "views/exporters.js", "views/search.js", "views/i18n.js", "views/appearance.js"],
         languageOptions: {
             globals: {
                 module: "readonly",

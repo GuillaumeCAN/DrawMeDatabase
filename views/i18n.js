@@ -1,0 +1,497 @@
+//
+// Copyright (c) 2025 Guillaume Cancalon - All rights reserved
+//
+// This file is part of DrawMeDatabase, and is released under the "GNU GENERAL PUBLIC LICENSE".
+// Please see the LICENSE file that should have been included as part of this package.
+//
+
+// Languages of the pages and of the messages of the extension (setting DrawMeDatabase.language).
+// Used by the pages (window.DrawMeDatabaseI18n) and by the extension (require), so it has no
+// dependency. Other extensions add their own strings with register().
+(function (root) {
+    'use strict';
+
+    const LANGUAGES = ['en', 'fr'];
+
+    // Keys ending in .one / .other are plurals: t('tables', { count }) picks one of them.
+    // {name} is replaced by the parameter of the same name.
+    const STRINGS = {
+        en: {
+            // Toolbar
+            'tab.diagram': 'Diagram',
+            'tab.json': 'JSON',
+            'focus.clear': 'Show the whole schema',
+            'search.placeholder': 'Filter tables',
+            'search.label': 'Filter tables by table or column name (Ctrl+F)',
+            'search.title': 'Tables whose name or columns contain the text, with their neighbours (Ctrl+F)',
+            'search.none': 'No match',
+            'search.count': '{count} of {total}',
+            'layout.label': 'Layout engine',
+            'direction.TB': 'Direction: top to bottom',
+            'direction.LR': 'Direction: left to right',
+            'git.title': 'Git status: new, modified and unsaved tables and columns',
+            'git.show': 'Show the git status',
+            'git.hide': 'Hide the git status',
+            'zoom.out': 'Zoom out (-)',
+            'zoom.in': 'Zoom in (+)',
+            'zoom.actual': 'Actual size (0)',
+            'zoom.fit': 'Fit to window (F)',
+            'export.button': 'Export',
+            'refresh': 'Refresh from the code',
+            'panel.toggle': 'Options, appearance and tools',
+            'viewport.label': 'Database diagram. Drag to move it, Ctrl and the mouse wheel to zoom, F to fit.',
+            'legend.label': 'Git status of the tables',
+            'legend.untracked': 'New',
+            'legend.modified': 'Modified',
+            'legend.unsaved': 'Unsaved',
+            'legend.untracked.title.one': '{count} table not in the last commit',
+            'legend.untracked.title.other': '{count} tables not in the last commit',
+            'legend.modified.title.one': '{count} table changed since the last commit',
+            'legend.modified.title.other': '{count} tables changed since the last commit',
+            'legend.unsaved.title.one': '{count} table with changes not saved yet',
+            'legend.unsaved.title.other': '{count} tables with changes not saved yet',
+            'summary.tables.one': '{count} table',
+            'summary.tables.other': '{count} tables',
+            'summary.warnings.one': '{count} warning',
+            'summary.warnings.other': '{count} warnings',
+            'summary.warnings.title': 'Show the details in the DrawMeDatabase output',
+            'focus.count.one': '{count} table',
+            'focus.count.other': '{count} tables',
+
+            // Diagram
+            'git.label.untracked': 'new',
+            'git.label.modified': 'modified',
+            'git.label.unsaved': 'unsaved',
+            'diagram.focusMissing': 'None of these tables is in the schema.',
+            'diagram.noMatch': 'No table or column matches "{query}".',
+            'diagram.nothing': 'Nothing to draw.',
+            'diagram.noMermaid': 'The Mermaid library could not be loaded.',
+            'diagram.parseError': 'Mermaid could not read the generated diagram.',
+            'diagram.renderError': 'Mermaid could not draw the diagram.',
+            'diagram.drawError': 'The diagram could not be drawn.',
+            'diagram.source': 'Generated Mermaid source:',
+            'diagram.openTable': 'Click to open',
+
+            // Exports
+            'export.svg': 'Save as SVG…',
+            'export.png': 'Save as PNG…',
+            'export.mmd': 'Save as Mermaid (.mmd)…',
+            'export.md': 'Save as Markdown…',
+            'export.copyMermaid': 'Copy Mermaid source',
+            'export.json': 'Save as JSON…',
+            'export.copyJson': 'Copy JSON',
+            'export.proTeaser': 'SQL, DBML, TypeScript, docs… (Pro)',
+            'export.proTeaser.title': 'More export formats and tools with DrawMeDatabase Pro',
+            'export.nothing': 'Nothing to export yet.',
+            'export.failed': 'Export failed: {error}',
+            'export.pro.sql-mysql': 'SQL (MySQL)',
+            'export.pro.sql-postgresql': 'SQL (PostgreSQL)',
+            'export.pro.sql-sqlite': 'SQL (SQLite)',
+            'export.pro.dbml': 'DBML (dbdiagram.io)',
+            'export.pro.plantuml': 'PlantUML',
+            'export.pro.typescript': 'TypeScript interfaces',
+            'export.pro.html': 'HTML documentation',
+
+            // Side panel
+            'panel.title': 'Options',
+            'panel.close': 'Close the panel',
+            'panel.view': 'Diagram',
+            'panel.appearance': 'Appearance',
+            'panel.tools': 'Tools',
+            'panel.exports': 'Export',
+            'panel.settings': 'Settings',
+            'panel.layout': 'Layout',
+            'panel.direction': 'Direction',
+            'panel.direction.TB': 'Top to bottom',
+            'panel.direction.LR': 'Left to right',
+            'panel.git': 'Git status',
+            'panel.git.hint': 'New, modified and unsaved tables and columns',
+            'panel.keysOnly': 'Keys only',
+            'panel.keysOnly.hint': 'Only the primary and foreign keys of each table',
+            'panel.relationLabels': 'Relation names',
+            'panel.relationLabels.hint': 'The foreign key written on each link',
+            'panel.grid': 'Background grid',
+            'panel.theme': 'Theme',
+            'panel.theme.auto': 'Like VS Code',
+            'panel.theme.light': 'Light',
+            'panel.theme.dark': 'Dark',
+            'panel.palette': 'Palette',
+            'palette.vscode': 'VS Code',
+            'palette.ocean': 'Ocean',
+            'palette.forest': 'Forest',
+            'palette.sunset': 'Sunset',
+            'palette.violet': 'Violet',
+            'palette.graphite': 'Graphite',
+            'palette.paper': 'Paper',
+            'panel.colors': 'Custom colors',
+            'panel.colors.reset': 'Back to the palette',
+            'color.background': 'Background',
+            'color.header': 'Table headers',
+            'color.text': 'Text',
+            'color.border': 'Borders',
+            'color.line': 'Links',
+            'color.accent': 'Highlight',
+            'color.gitNew': 'New',
+            'color.gitModified': 'Modified',
+            'color.gitUnsaved': 'Unsaved',
+            'panel.font': 'Font',
+            'font.default': 'Interface (default)',
+            'font.editor': 'Editor font',
+            'font.sans': 'Sans serif',
+            'font.serif': 'Serif',
+            'font.mono': 'Monospace',
+            'font.custom': 'Custom…',
+            'panel.customFont': 'Font name',
+            'panel.customFont.placeholder': 'Inter, Fira Sans…',
+            'panel.fontSize': 'Text size',
+            'panel.resetAppearance': 'Reset the appearance',
+            'panel.language': 'Language',
+            'language.auto': 'Like VS Code',
+            'language.en': 'English',
+            'language.fr': 'Français',
+            'panel.autoRefresh': 'Live refresh',
+            'panel.autoRefresh.hint': 'Draw again while you type, and on save',
+            'panel.frameworkPath': 'Framework folder…',
+            'panel.frameworkPath.hint': 'When the project is in a subfolder',
+            'panel.allSettings': 'All the settings',
+            'panel.pro': 'PRO',
+            'panel.pro.missing': 'Available with DrawMeDatabase Pro',
+            'panel.pro.locked': 'Your trial of DrawMeDatabase Pro has ended',
+            'panel.license.free': 'Free version',
+            'panel.license.free.hint': 'The tools marked PRO come with DrawMeDatabase Pro, free for 14 days.',
+            'panel.license.discover': 'Discover DrawMeDatabase Pro',
+            'panel.license.licensed': 'DrawMeDatabase Pro',
+            'panel.license.development': 'DrawMeDatabase Pro (development)',
+            'panel.license.trial.one': 'Pro trial: {count} day left',
+            'panel.license.trial.other': 'Pro trial: {count} days left',
+            'panel.license.expired': 'Your Pro trial has ended',
+            'panel.license.buy': 'Buy a license',
+            'panel.license.enter': 'Enter a license key',
+            'panel.license.manage': 'License',
+
+            // Tools of DrawMeDatabase Pro (shown before it is installed)
+            'tool.pro.canvas': 'Schema canvas',
+            'tool.pro.canvas.hint': 'Move the tables and the links by hand',
+            'tool.pro.designer': 'Design a table',
+            'tool.pro.designer.hint': 'The migration or the entity is written for you',
+            'tool.pro.addColumns': 'Add columns',
+            'tool.pro.addColumns.hint': 'To an existing table, with the code',
+            'tool.pro.compare': 'Compare with a branch',
+            'tool.pro.compare.hint': 'What changed since a branch, a tag or a commit',
+            'tool.pro.compareRefs': 'Compare two versions',
+            'tool.pro.compareRefs.hint': 'Between two branches, tags or commits',
+            'tool.pro.migrationChanges': 'What a migration changes',
+            'tool.pro.migrationChanges.hint': 'The schema before and after it (Laravel)',
+            'tool.pro.checks': 'Check the schema',
+            'tool.pro.checks.hint': 'Missing keys, mismatched types, naming',
+            'tool.pro.findPath': 'Path between two tables',
+            'tool.pro.findPath.hint': 'The relations that link them',
+            'tool.pro.saveView': 'Save this view',
+            'tool.pro.saveView.hint': 'A set of tables, shared with your team',
+            'tool.pro.openView': 'Open a saved view',
+            'tool.pro.openView.hint': 'The views of the project',
+            'tool.pro.models': 'Generate Eloquent models',
+            'tool.pro.models.hint': 'With their relationships (Laravel)',
+
+            // Messages of the extension
+            'message.noProject': 'No project opened in the current workspace. Unable to draw the schema.',
+            'message.restore': 'Run DrawMeDatabase (or click Refresh) to draw the schema of the project.',
+            'statusBar.tooltip': 'Draw the database schema',
+            'message.openFailed': 'Unable to open {file}.',
+            'message.previousNoTables': 'No tables found: the diagram shows the previous schema.',
+            'message.previousError': 'The schema could not be read (see the DrawMeDatabase output): the diagram shows the previous schema.',
+            'message.frameworkPathMissing': 'The DrawMeDatabase.frameworkPath folder "{path}" was not found in "{folder}"{elsewhere}. Check the setting.',
+            'message.frameworkPathElsewhere': ', nor as an absolute path',
+            'message.folderMissing': 'The folder "{path}" does not exist. Unable to draw the schema.',
+            'message.noFramework': 'No Laravel or Symfony project found in "{path}". {hint} Unable to draw the schema.',
+            'message.noFramework.checkSetting': 'Check the DrawMeDatabase.frameworkPath setting.',
+            'message.noFramework.setSetting': 'If the project is in a subfolder, set DrawMeDatabase.frameworkPath.',
+            'message.noTables': 'No tables found in "{path}". Nothing to draw.',
+            'message.unexpected': 'An unexpected error occurred while drawing the schema. See the "DrawMeDatabase" output for details.',
+            'message.warnings.one': '{count} warning while reading the schema. See the "DrawMeDatabase" output for details.',
+            'message.warnings.other': '{count} warnings while reading the schema. See the "DrawMeDatabase" output for details.',
+            'message.showOutput': 'Show Output',
+            'message.copiedJson': 'JSON copied to the clipboard.',
+            'message.copiedMermaid': 'Mermaid source copied to the clipboard.',
+            'message.exported': 'Exported to {file}.',
+            'message.open': 'Open',
+            'save.label': 'Export',
+            'save.title': 'Export the database diagram',
+            'format.svg': 'SVG image',
+            'format.png': 'PNG image',
+            'format.mmd': 'Mermaid diagram',
+            'format.md': 'Markdown',
+            'format.json': 'JSON',
+        },
+        fr: {
+            'tab.diagram': 'Diagramme',
+            'tab.json': 'JSON',
+            'focus.clear': 'Afficher tout le schéma',
+            'search.placeholder': 'Filtrer les tables',
+            'search.label': 'Filtrer les tables par nom de table ou de colonne (Ctrl+F)',
+            'search.title': 'Les tables dont le nom ou les colonnes contiennent le texte, avec leurs voisines (Ctrl+F)',
+            'search.none': 'Aucun résultat',
+            'search.count': '{count} sur {total}',
+            'layout.label': 'Moteur de disposition',
+            'direction.TB': 'Sens : de haut en bas',
+            'direction.LR': 'Sens : de gauche à droite',
+            'git.title': 'Statut git : tables et colonnes nouvelles, modifiées ou non enregistrées',
+            'git.show': 'Afficher le statut git',
+            'git.hide': 'Masquer le statut git',
+            'zoom.out': 'Dézoomer (-)',
+            'zoom.in': 'Zoomer (+)',
+            'zoom.actual': 'Taille réelle (0)',
+            'zoom.fit': 'Ajuster à la fenêtre (F)',
+            'export.button': 'Exporter',
+            'refresh': 'Relire le code',
+            'panel.toggle': 'Options, apparence et outils',
+            'viewport.label': 'Diagramme de la base de données. Glissez pour le déplacer, Ctrl et la molette pour zoomer, F pour l\'ajuster.',
+            'legend.label': 'Statut git des tables',
+            'legend.untracked': 'Nouvelles',
+            'legend.modified': 'Modifiées',
+            'legend.unsaved': 'Non enregistrées',
+            'legend.untracked.title.one': '{count} table absente du dernier commit',
+            'legend.untracked.title.other': '{count} tables absentes du dernier commit',
+            'legend.modified.title.one': '{count} table modifiée depuis le dernier commit',
+            'legend.modified.title.other': '{count} tables modifiées depuis le dernier commit',
+            'legend.unsaved.title.one': '{count} table avec des modifications non enregistrées',
+            'legend.unsaved.title.other': '{count} tables avec des modifications non enregistrées',
+            'summary.tables.one': '{count} table',
+            'summary.tables.other': '{count} tables',
+            'summary.warnings.one': '{count} avertissement',
+            'summary.warnings.other': '{count} avertissements',
+            'summary.warnings.title': 'Voir le détail dans la sortie DrawMeDatabase',
+            'focus.count.one': '{count} table',
+            'focus.count.other': '{count} tables',
+
+            'git.label.untracked': 'nouveau',
+            'git.label.modified': 'modifié',
+            'git.label.unsaved': 'non enregistré',
+            'diagram.focusMissing': 'Aucune de ces tables n\'est dans le schéma.',
+            'diagram.noMatch': 'Aucune table ni colonne ne correspond à « {query} ».',
+            'diagram.nothing': 'Rien à dessiner.',
+            'diagram.noMermaid': 'La bibliothèque Mermaid n\'a pas pu être chargée.',
+            'diagram.parseError': 'Mermaid n\'a pas pu lire le diagramme généré.',
+            'diagram.renderError': 'Mermaid n\'a pas pu dessiner le diagramme.',
+            'diagram.drawError': 'Le diagramme n\'a pas pu être dessiné.',
+            'diagram.source': 'Source Mermaid générée :',
+            'diagram.openTable': 'Cliquez pour ouvrir',
+
+            'export.svg': 'Enregistrer en SVG…',
+            'export.png': 'Enregistrer en PNG…',
+            'export.mmd': 'Enregistrer en Mermaid (.mmd)…',
+            'export.md': 'Enregistrer en Markdown…',
+            'export.copyMermaid': 'Copier la source Mermaid',
+            'export.json': 'Enregistrer en JSON…',
+            'export.copyJson': 'Copier le JSON',
+            'export.proTeaser': 'SQL, DBML, TypeScript, docs… (Pro)',
+            'export.proTeaser.title': 'Plus de formats d\'export et d\'outils avec DrawMeDatabase Pro',
+            'export.nothing': 'Rien à exporter pour l\'instant.',
+            'export.failed': 'L\'export a échoué : {error}',
+            'export.pro.sql-mysql': 'SQL (MySQL)',
+            'export.pro.sql-postgresql': 'SQL (PostgreSQL)',
+            'export.pro.sql-sqlite': 'SQL (SQLite)',
+            'export.pro.dbml': 'DBML (dbdiagram.io)',
+            'export.pro.plantuml': 'PlantUML',
+            'export.pro.typescript': 'Interfaces TypeScript',
+            'export.pro.html': 'Documentation HTML',
+
+            'panel.title': 'Options',
+            'panel.close': 'Fermer le panneau',
+            'panel.view': 'Diagramme',
+            'panel.appearance': 'Apparence',
+            'panel.tools': 'Outils',
+            'panel.exports': 'Exporter',
+            'panel.settings': 'Réglages',
+            'panel.layout': 'Disposition',
+            'panel.direction': 'Sens',
+            'panel.direction.TB': 'De haut en bas',
+            'panel.direction.LR': 'De gauche à droite',
+            'panel.git': 'Statut git',
+            'panel.git.hint': 'Tables et colonnes nouvelles, modifiées ou non enregistrées',
+            'panel.keysOnly': 'Clés seulement',
+            'panel.keysOnly.hint': 'Uniquement les clés primaires et étrangères de chaque table',
+            'panel.relationLabels': 'Noms des relations',
+            'panel.relationLabels.hint': 'La clé étrangère écrite sur chaque lien',
+            'panel.grid': 'Grille de fond',
+            'panel.theme': 'Thème',
+            'panel.theme.auto': 'Comme VS Code',
+            'panel.theme.light': 'Clair',
+            'panel.theme.dark': 'Sombre',
+            'panel.palette': 'Palette',
+            'palette.vscode': 'VS Code',
+            'palette.ocean': 'Océan',
+            'palette.forest': 'Forêt',
+            'palette.sunset': 'Crépuscule',
+            'palette.violet': 'Violet',
+            'palette.graphite': 'Graphite',
+            'palette.paper': 'Papier',
+            'panel.colors': 'Couleurs personnalisées',
+            'panel.colors.reset': 'Revenir à la palette',
+            'color.background': 'Fond',
+            'color.header': 'En-têtes des tables',
+            'color.text': 'Texte',
+            'color.border': 'Bordures',
+            'color.line': 'Liens',
+            'color.accent': 'Surbrillance',
+            'color.gitNew': 'Nouveau',
+            'color.gitModified': 'Modifié',
+            'color.gitUnsaved': 'Non enregistré',
+            'panel.font': 'Police',
+            'font.default': 'Interface (par défaut)',
+            'font.editor': 'Police de l\'éditeur',
+            'font.sans': 'Sans empattement',
+            'font.serif': 'Avec empattement',
+            'font.mono': 'Chasse fixe',
+            'font.custom': 'Personnalisée…',
+            'panel.customFont': 'Nom de la police',
+            'panel.customFont.placeholder': 'Inter, Fira Sans…',
+            'panel.fontSize': 'Taille du texte',
+            'panel.resetAppearance': 'Réinitialiser l\'apparence',
+            'panel.language': 'Langue',
+            'language.auto': 'Comme VS Code',
+            'language.en': 'English',
+            'language.fr': 'Français',
+            'panel.autoRefresh': 'Rafraîchissement en direct',
+            'panel.autoRefresh.hint': 'Redessine pendant la frappe et à l\'enregistrement',
+            'panel.frameworkPath': 'Dossier du framework…',
+            'panel.frameworkPath.hint': 'Quand le projet est dans un sous-dossier',
+            'panel.allSettings': 'Tous les réglages',
+            'panel.pro': 'PRO',
+            'panel.pro.missing': 'Disponible avec DrawMeDatabase Pro',
+            'panel.pro.locked': 'Votre essai de DrawMeDatabase Pro est terminé',
+            'panel.license.free': 'Version gratuite',
+            'panel.license.free.hint': 'Les outils marqués PRO viennent avec DrawMeDatabase Pro, gratuit pendant 14 jours.',
+            'panel.license.discover': 'Découvrir DrawMeDatabase Pro',
+            'panel.license.licensed': 'DrawMeDatabase Pro',
+            'panel.license.development': 'DrawMeDatabase Pro (développement)',
+            'panel.license.trial.one': 'Essai Pro : encore {count} jour',
+            'panel.license.trial.other': 'Essai Pro : encore {count} jours',
+            'panel.license.expired': 'Votre essai Pro est terminé',
+            'panel.license.buy': 'Acheter une licence',
+            'panel.license.enter': 'Saisir une clé de licence',
+            'panel.license.manage': 'Licence',
+
+            'tool.pro.canvas': 'Canevas du schéma',
+            'tool.pro.canvas.hint': 'Déplacez les tables et les liens à la main',
+            'tool.pro.designer': 'Dessiner une table',
+            'tool.pro.designer.hint': 'La migration ou l\'entité s\'écrit pour vous',
+            'tool.pro.addColumns': 'Ajouter des colonnes',
+            'tool.pro.addColumns.hint': 'À une table existante, avec le code',
+            'tool.pro.compare': 'Comparer avec une branche',
+            'tool.pro.compare.hint': 'Ce qui a changé depuis une branche, un tag ou un commit',
+            'tool.pro.compareRefs': 'Comparer deux versions',
+            'tool.pro.compareRefs.hint': 'Entre deux branches, tags ou commits',
+            'tool.pro.migrationChanges': 'Ce que change une migration',
+            'tool.pro.migrationChanges.hint': 'Le schéma avant et après elle (Laravel)',
+            'tool.pro.checks': 'Vérifier le schéma',
+            'tool.pro.checks.hint': 'Clés manquantes, types incohérents, nommage',
+            'tool.pro.findPath': 'Chemin entre deux tables',
+            'tool.pro.findPath.hint': 'Les relations qui les relient',
+            'tool.pro.saveView': 'Enregistrer cette vue',
+            'tool.pro.saveView.hint': 'Un ensemble de tables, partagé avec l\'équipe',
+            'tool.pro.openView': 'Ouvrir une vue enregistrée',
+            'tool.pro.openView.hint': 'Les vues du projet',
+            'tool.pro.models': 'Générer les modèles Eloquent',
+            'tool.pro.models.hint': 'Avec leurs relations (Laravel)',
+
+            'message.noProject': 'Aucun projet ouvert dans l\'espace de travail. Impossible de dessiner le schéma.',
+            'message.restore': 'Lancez DrawMeDatabase (ou cliquez sur Relire le code) pour dessiner le schéma du projet.',
+            'statusBar.tooltip': 'Dessiner le schéma de la base de données',
+            'message.openFailed': 'Impossible d\'ouvrir {file}.',
+            'message.previousNoTables': 'Aucune table trouvée : le diagramme montre le schéma précédent.',
+            'message.previousError': 'Le schéma n\'a pas pu être lu (voir la sortie DrawMeDatabase) : le diagramme montre le schéma précédent.',
+            'message.frameworkPathMissing': 'Le dossier DrawMeDatabase.frameworkPath « {path} » est introuvable dans « {folder} »{elsewhere}. Vérifiez le réglage.',
+            'message.frameworkPathElsewhere': ', ni comme chemin absolu',
+            'message.folderMissing': 'Le dossier « {path} » n\'existe pas. Impossible de dessiner le schéma.',
+            'message.noFramework': 'Aucun projet Laravel ou Symfony dans « {path} ». {hint} Impossible de dessiner le schéma.',
+            'message.noFramework.checkSetting': 'Vérifiez le réglage DrawMeDatabase.frameworkPath.',
+            'message.noFramework.setSetting': 'Si le projet est dans un sous-dossier, renseignez DrawMeDatabase.frameworkPath.',
+            'message.noTables': 'Aucune table trouvée dans « {path} ». Rien à dessiner.',
+            'message.unexpected': 'Une erreur inattendue est survenue en dessinant le schéma. Le détail est dans la sortie « DrawMeDatabase ».',
+            'message.warnings.one': '{count} avertissement en lisant le schéma. Le détail est dans la sortie « DrawMeDatabase ».',
+            'message.warnings.other': '{count} avertissements en lisant le schéma. Le détail est dans la sortie « DrawMeDatabase ».',
+            'message.showOutput': 'Voir la sortie',
+            'message.copiedJson': 'JSON copié dans le presse-papiers.',
+            'message.copiedMermaid': 'Source Mermaid copiée dans le presse-papiers.',
+            'message.exported': 'Exporté dans {file}.',
+            'message.open': 'Ouvrir',
+            'save.label': 'Exporter',
+            'save.title': 'Exporter le diagramme de la base de données',
+            'format.svg': 'Image SVG',
+            'format.png': 'Image PNG',
+            'format.mmd': 'Diagramme Mermaid',
+            'format.md': 'Markdown',
+            'format.json': 'JSON',
+        },
+    };
+
+    const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+
+    // The language of the setting ('auto', 'en', 'fr'), 'auto' being the one of VS Code
+    // (vscode.env.language: 'fr', 'fr-ca', 'en-us'...), English when it is not translated
+    function resolveLanguage(setting, vscodeLanguage) {
+        if (LANGUAGES.includes(setting)) {
+            return setting;
+        }
+        const base = String(vscodeLanguage || '').toLowerCase().split(/[-_]/)[0];
+        return LANGUAGES.includes(base) ? base : 'en';
+    }
+
+    // Adds strings: { en: { key: text }, fr: { key: text } }. Existing keys are kept.
+    function register(strings) {
+        if (!strings || typeof strings !== 'object') {
+            return;
+        }
+        for (const language of LANGUAGES) {
+            const added = strings[language];
+            if (added && typeof added === 'object') {
+                for (const [key, text] of Object.entries(added)) {
+                    if (typeof text === 'string' && !has(STRINGS[language], key)) {
+                        STRINGS[language][key] = text;
+                    }
+                }
+            }
+        }
+    }
+
+    // French uses the singular for 0 and 1
+    const pluralForm = (language, count) => (language === 'fr' ? (Math.abs(count) < 2 ? 'one' : 'other') : (count === 1 ? 'one' : 'other'));
+
+    // t(key, params): the text in the language, else in English, else the key itself.
+    // t.has(key): whether the key is known; t.language: the language.
+    function translator(language) {
+        const strings = STRINGS[LANGUAGES.includes(language) ? language : 'en'];
+        const t = function (key, params) {
+            const values = params || {};
+            // A count picks the plural form, when the key has one
+            const plural = typeof values.count === 'number' ? `${key}.${pluralForm(language, values.count)}` : null;
+            const name = plural && (has(strings, plural) || has(STRINGS.en, plural)) ? plural : key;
+            const text = has(strings, name) ? strings[name] : has(STRINGS.en, name) ? STRINGS.en[name] : key;
+            return text.replace(/\{(\w+)\}/g, (placeholder, param) => (has(values, param) ? String(values[param]) : placeholder));
+        };
+        t.has = (key) => has(STRINGS.en, key) || has(strings, key) || has(STRINGS.en, `${key}.other`);
+        t.language = LANGUAGES.includes(language) ? language : 'en';
+        return t;
+    }
+
+    // Translates the elements of a page marked with data-i18n (text), data-i18n-title,
+    // data-i18n-label (aria-label) and data-i18n-placeholder
+    const ATTRIBUTES = [['i18nTitle', 'title'], ['i18nLabel', 'aria-label'], ['i18nPlaceholder', 'placeholder']];
+    function translateDocument(element, t) {
+        element.querySelectorAll('[data-i18n]').forEach(node => {
+            node.textContent = t(node.dataset.i18n);
+        });
+        for (const [data, attribute] of ATTRIBUTES) {
+            const selector = `[data-${data.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}]`;
+            element.querySelectorAll(selector).forEach(node => node.setAttribute(attribute, t(node.dataset[data])));
+        }
+    }
+
+    const api = { LANGUAGES, STRINGS, resolveLanguage, register, translator, translateDocument };
+    if (typeof module === 'object' && module.exports) {
+        module.exports = api;
+    } else {
+        root.DrawMeDatabaseI18n = api;
+    }
+})(typeof window !== 'undefined' ? window : globalThis);

@@ -106,6 +106,31 @@ suite('DrawMeDatabase extension', () => {
         assert.ok(dagre && dagre.ok, `Dagre drawing: ${JSON.stringify(dagre)}`);
     });
 
+    test('the options of the side panel redraw the diagram: language, theme, palette, font, keys only', async function () {
+        this.timeout(60000);
+        const extension = vscode.extensions.getExtension(EXTENSION_ID);
+        const config = vscode.workspace.getConfiguration('DrawMeDatabase');
+        const keys = ['language', 'theme', 'palette', 'colors', 'fontSize', 'keysOnly', 'relationLabels'];
+        try {
+            const before = extension.exports.lastRender;
+            await config.update('language', 'fr', vscode.ConfigurationTarget.Global);
+            await config.update('theme', 'light', vscode.ConfigurationTarget.Global);
+            await config.update('palette', 'forest', vscode.ConfigurationTarget.Global);
+            await config.update('colors', { accent: '#ff0000' }, vscode.ConfigurationTarget.Global);
+            await config.update('fontSize', 16, vscode.ConfigurationTarget.Global);
+            await config.update('keysOnly', true, vscode.ConfigurationTarget.Global);
+            await config.update('relationLabels', false, vscode.ConfigurationTarget.Global);
+            assert.equal(extension.exports.getDisplaySettings().language, 'fr');
+            assert.equal(extension.exports.getDisplaySettings().palette, 'forest');
+            const redrawn = await rendered(extension, render => render !== before && render.ok);
+            assert.ok(redrawn && redrawn.ok && redrawn.entities >= 2, JSON.stringify(redrawn));
+        } finally {
+            for (const key of keys) {
+                await config.update(key, undefined, vscode.ConfigurationTarget.Global);
+            }
+        }
+    });
+
     test('running the command again reuses the same panel', async () => {
         const tables = await vscode.commands.executeCommand('DMDB.parseSchema');
         assert.equal(tables.length, 2);

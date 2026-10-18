@@ -153,3 +153,11 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 ### Changed
 - New animation in the README: the live diagram and its git status
 
+## [v1.6.0] - 2026-10-18
+
+### Added
+- An options panel next to the diagram (the panel button of the toolbar): the options of the diagram, the appearance, the tools and exports of DrawMeDatabase Pro (greyed with a PRO badge until it is installed, locked when its trial has ended), the settings and the license
+- Appearance: light or dark whatever the VS Code theme, seven palettes with a light and a dark version, custom colors (background, table headers, text, borders, links, highlight, git status), the font and the size of the text, the background grid
+- Diagram options: keys only, relation names
+- French: the diagram, the messages, and the commands and settings in VS Code (`DrawMeDatabase.language`: `auto`, `en` or `fr`)
+- API version 2: `registerTool()`, `setLicenseStatus()`, `getDisplaySettings()` and `onDidChangeDisplaySettings`, and the page scripts `i18n.js`, `appearance.js` and `sidepanel.js` for the panels of other extensions (`docs/api.md`)
