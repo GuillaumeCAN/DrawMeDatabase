@@ -329,5 +329,119 @@
         };
     }
 
-    window.DrawMeDatabaseSidePanel = { create, ICONS };
+    // ---------------------------------------------------------------------------------------------
+    // The Appearance section, shared by the pages (appearance.js must be loaded)
+
+    // A color of the page as #rrggbb (rgb(), names...), for the color inputs
+    const colorProbe = document.createElement('canvas').getContext('2d');
+    function toHex(value) {
+        if (!value) {
+            return '#000000';
+        }
+        colorProbe.fillStyle = '#000000';
+        colorProbe.fillStyle = value;
+        const normalized = colorProbe.fillStyle;
+        if (/^#[0-9a-f]{6}$/i.test(normalized)) {
+            return normalized;
+        }
+        const rgb = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(normalized);
+        return rgb ? `#${rgb.slice(1, 4).map(part => Number(part).toString(16).padStart(2, '0')).join('')}` : '#000000';
+    }
+
+    // The colors shown for each key: the custom one, else the one in use
+    function currentColors(appearance, t) {
+        const Appearance = window.DrawMeDatabaseAppearance;
+        const palette = Appearance.colors();
+        const style = getComputedStyle(document.body);
+        const used = {
+            background: palette.background,
+            header: palette.header,
+            text: palette.text,
+            border: palette.border,
+            line: palette.line,
+            accent: palette.accent,
+            gitNew: style.getPropertyValue('--dmdb-git-new').trim(),
+            gitModified: style.getPropertyValue('--dmdb-git-modified').trim(),
+            gitUnsaved: style.getPropertyValue('--dmdb-git-unsaved').trim(),
+        };
+        return Appearance.COLOR_KEYS.map(key => ({
+            key,
+            label: t(`color.${key}`),
+            value: toHex(appearance.colors[key] || used[key]),
+            custom: Boolean(appearance.colors[key]),
+        }));
+    }
+
+    // Four colors of a palette for its swatch, in the current theme
+    function paletteSwatch(appearance, name) {
+        const Appearance = window.DrawMeDatabaseAppearance;
+        const kind = Appearance.themeKind(appearance, document.body.classList);
+        const colors = Appearance.PALETTES[name][kind === 'light' || kind === 'hc-light' ? 'light' : 'dark'];
+        const style = getComputedStyle(document.body);
+        const vscodeColor = (variable) => style.getPropertyValue(variable).trim();
+        return [
+            colors.header || vscodeColor('--vscode-editorWidget-background'),
+            colors.border || vscodeColor('--vscode-editorWidget-border') || vscodeColor('--vscode-widget-border'),
+            colors.line || vscodeColor('--vscode-descriptionForeground'),
+            colors.accent || vscodeColor('--vscode-focusBorder'),
+        ].map(toHex);
+    }
+
+    // Items of the Appearance section: theme, palette, custom colors, font, text size, reset
+    function appearanceItems(appearance, t) {
+        const Appearance = window.DrawMeDatabaseAppearance;
+        const items = [
+            {
+                type: 'choice',
+                id: 'theme',
+                label: t('panel.theme'),
+                value: appearance.theme,
+                options: Appearance.THEMES.map(theme => ({ value: theme, label: t(`panel.theme.${theme}`) })),
+            },
+            {
+                type: 'palettes',
+                id: 'palette',
+                label: t('panel.palette'),
+                value: appearance.palette,
+                options: Object.keys(Appearance.PALETTES).map(name => ({ value: name, label: t(`palette.${name}`), colors: paletteSwatch(appearance, name) })),
+            },
+            { type: 'colors', id: 'colors', label: t('panel.colors'), resetLabel: t('panel.colors.reset'), items: currentColors(appearance, t) },
+            {
+                type: 'select',
+                id: 'font',
+                label: t('panel.font'),
+                value: appearance.font,
+                options: Appearance.FONTS.map(font => ({ value: font, label: t(`font.${font}`) })),
+            },
+        ];
+        if (appearance.font === 'custom') {
+            items.push({ type: 'text', id: 'customFont', label: t('panel.customFont'), value: appearance.customFont, placeholder: t('panel.customFont.placeholder') });
+        }
+        items.push(
+            { type: 'range', id: 'fontSize', label: t('panel.fontSize'), value: appearance.fontSize, min: Appearance.FONT_SIZE.min, max: Appearance.FONT_SIZE.max, unit: ' px' },
+            { type: 'button', id: 'resetAppearance', label: t('panel.resetAppearance'), icon: 'reset' },
+        );
+        return items;
+    }
+
+    // A change of an appearance control: { appearance (the new one), key, value (the setting to
+    // save) }, or null when the control is not an appearance one ('grid' included)
+    const APPEARANCE_KEYS = ['theme', 'palette', 'font', 'customFont', 'fontSize', 'grid'];
+    function changeAppearance(appearance, id, value) {
+        if (id === 'colors' && value && typeof value === 'object') {
+            const colors = { ...appearance.colors };
+            if (value.value) {
+                colors[value.key] = value.value;
+            } else {
+                delete colors[value.key];
+            }
+            return { appearance: { ...appearance, colors }, key: 'colors', value: colors };
+        }
+        if (APPEARANCE_KEYS.includes(id)) {
+            return { appearance: { ...appearance, [id]: value }, key: id, value };
+        }
+        return null;
+    }
+
+    window.DrawMeDatabaseSidePanel = { create, ICONS, appearanceItems, changeAppearance, toHex };
 })();

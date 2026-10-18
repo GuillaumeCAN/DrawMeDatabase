@@ -449,59 +449,6 @@
     };
     const exportIcon = (id) => (/sql/.test(id) ? 'database' : /typescript|json/.test(id) ? 'code' : 'file');
 
-    // A color of the page as #rrggbb (rgb(), names...), for the color inputs
-    const colorProbe = document.createElement('canvas').getContext('2d');
-    function toHex(value) {
-        if (!value) {
-            return '#000000';
-        }
-        colorProbe.fillStyle = '#000000';
-        colorProbe.fillStyle = value;
-        const normalized = colorProbe.fillStyle;
-        if (/^#[0-9a-f]{6}$/i.test(normalized)) {
-            return normalized;
-        }
-        const rgb = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(normalized);
-        return rgb ? `#${rgb.slice(1, 4).map(part => Number(part).toString(16).padStart(2, '0')).join('')}` : '#000000';
-    }
-
-    // The colors shown for each key: the custom one, else the one in use
-    function currentColors() {
-        const palette = Appearance.colors();
-        const style = getComputedStyle(document.body);
-        const used = {
-            background: palette.background,
-            header: palette.header,
-            text: palette.text,
-            border: palette.border,
-            line: palette.line,
-            accent: palette.accent,
-            gitNew: style.getPropertyValue('--dmdb-git-new').trim(),
-            gitModified: style.getPropertyValue('--dmdb-git-modified').trim(),
-            gitUnsaved: style.getPropertyValue('--dmdb-git-unsaved').trim(),
-        };
-        return Appearance.COLOR_KEYS.map(key => ({
-            key,
-            label: t(`color.${key}`),
-            value: toHex(settings.appearance.colors[key] || used[key]),
-            custom: Boolean(settings.appearance.colors[key]),
-        }));
-    }
-
-    // Four colors of a palette for its swatch, in the current theme
-    function paletteSwatch(name) {
-        const kind = Appearance.themeKind(settings.appearance, document.body.classList);
-        const colors = Appearance.PALETTES[name][kind === 'light' || kind === 'hc-light' ? 'light' : 'dark'];
-        const style = getComputedStyle(document.body);
-        const vscodeColor = (variable) => style.getPropertyValue(variable).trim();
-        return [
-            colors.header || vscodeColor('--vscode-editorWidget-background'),
-            colors.border || vscodeColor('--vscode-editorWidget-border') || vscodeColor('--vscode-widget-border'),
-            colors.line || vscodeColor('--vscode-descriptionForeground'),
-            colors.accent || vscodeColor('--vscode-focusBorder'),
-        ].map(toHex);
-    }
-
     const label = (prefix, item) => (t.has(`${prefix}.${item.id}`) ? t(`${prefix}.${item.id}`) : item.label || item.id);
     const hint = (prefix, item) => (t.has(`${prefix}.${item.id}.hint`) ? t(`${prefix}.${item.id}.hint`) : item.hint || '');
     const stateTitle = (state) => (state === 'missing' ? t('panel.pro.missing') : state === 'locked' ? t('panel.pro.locked') : undefined);
@@ -524,37 +471,7 @@
 
     function panelModel() {
         const appearance = settings.appearance;
-        const appearanceItems = [
-            {
-                type: 'choice',
-                id: 'theme',
-                label: t('panel.theme'),
-                value: appearance.theme,
-                options: Appearance.THEMES.map(theme => ({ value: theme, label: t(`panel.theme.${theme}`) })),
-            },
-            {
-                type: 'palettes',
-                id: 'palette',
-                label: t('panel.palette'),
-                value: appearance.palette,
-                options: Object.keys(Appearance.PALETTES).map(name => ({ value: name, label: t(`palette.${name}`), colors: paletteSwatch(name) })),
-            },
-            { type: 'colors', id: 'colors', label: t('panel.colors'), resetLabel: t('panel.colors.reset'), items: currentColors() },
-            {
-                type: 'select',
-                id: 'font',
-                label: t('panel.font'),
-                value: appearance.font,
-                options: Appearance.FONTS.map(font => ({ value: font, label: t(`font.${font}`) })),
-            },
-        ];
-        if (appearance.font === 'custom') {
-            appearanceItems.push({ type: 'text', id: 'customFont', label: t('panel.customFont'), value: appearance.customFont, placeholder: t('panel.customFont.placeholder') });
-        }
-        appearanceItems.push(
-            { type: 'range', id: 'fontSize', label: t('panel.fontSize'), value: appearance.fontSize, min: Appearance.FONT_SIZE.min, max: Appearance.FONT_SIZE.max, unit: ' px' },
-            { type: 'button', id: 'resetAppearance', label: t('panel.resetAppearance'), icon: 'reset' },
-        );
+        const appearanceItems = window.DrawMeDatabaseSidePanel.appearanceItems(appearance, t);
 
         const builtIn = [...EXPORTS.diagram, ...EXPORTS.json].map(item => ({ id: `export:${item.id}`, label: t(item.label), icon: item.icon, state: schema ? 'available' : 'locked' }));
         const others = features.exports.map(item => ({
@@ -626,8 +543,7 @@
         };
     }
 
-    // Settings of the page, and the appearance settings applied here at once (then saved)
-    const APPEARANCE_KEYS = ['theme', 'palette', 'font', 'customFont', 'fontSize', 'grid'];
+    // Settings of the page; the appearance settings are applied here at once (then saved)
     const SETTING_KEYS = { git: 'showGitStatus', layout: 'layout', direction: 'direction', keysOnly: 'keysOnly', relationLabels: 'relationLabels', language: 'language', autoRefresh: 'autoRefresh' };
 
     let previewTimer;
@@ -639,24 +555,11 @@
     }
 
     function onPanelChange(id, value, { preview }) {
-        if (id === 'colors') {
-            const colors = { ...settings.appearance.colors };
-            if (value.value) {
-                colors[value.key] = value.value;
-            } else {
-                delete colors[value.key];
-            }
-            previewAppearance({ ...settings.appearance, colors });
+        const change = window.DrawMeDatabaseSidePanel.changeAppearance(settings.appearance, id, value);
+        if (change) {
+            previewAppearance(change.appearance);
             if (!preview) {
-                setSetting('colors', colors);
-                renderPanel();
-            }
-            return;
-        }
-        if (APPEARANCE_KEYS.includes(id)) {
-            previewAppearance({ ...settings.appearance, [id]: value });
-            if (!preview) {
-                setSetting(id, value);
+                setSetting(change.key, change.value);
                 renderPanel();
             }
             return;
