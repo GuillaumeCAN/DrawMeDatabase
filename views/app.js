@@ -525,6 +525,7 @@
                             type: 'choice',
                             id: 'language',
                             label: t('panel.language'),
+                            hint: t('panel.language.hint'),
                             value: settings.language,
                             options: ['auto', ...I18n.LANGUAGES].map(language => ({ value: language, label: t(`language.${language}`) })),
                         },
