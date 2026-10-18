@@ -441,3 +441,19 @@ test('Mermaid reads the git comments, and a table keeps both its search and git 
     assert.match(entities.get('posts').cssClasses, /\bgitNew\b/);
     assert.match(entities.get('users').cssClasses, /\bdimmed\b.*\bgitModified\b|\bgitModified\b.*\bdimmed\b/);
 });
+
+test('the marks option: a CSS class per marked table and a comment per noted column', () => {
+    const tables = [
+        { table: 'users', mark: 'diffChanged', columns: [{ name: 'id', type: 'integer', primary: true }, { name: 'email', type: 'string', note: '~ type: text → string' }], relations: [] },
+        { table: 'posts', mark: 'diffAdded', columns: [{ name: 'id', type: 'integer', note: '+ added' }], relations: [] },
+        { table: 'tags', mark: 'bad mark"', columns: [], relations: [] },
+    ];
+    const source = generate(tables, { marks: true });
+    const output = lines(source);
+    assert.ok(output.includes('    string email "~ type#58; text → string"'));
+    assert.ok(output.includes('    integer id "+ added"'));
+    assert.ok(output.includes('  class users diffChanged'));
+    assert.ok(output.includes('  class posts diffAdded'));
+    assert.ok(!source.includes('bad mark'), 'only plain class names');
+    assert.ok(!generate(tables).includes('diffAdded'), 'off by default');
+});

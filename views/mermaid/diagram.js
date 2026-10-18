@@ -138,6 +138,7 @@
                 direction: settings.direction,
                 highlight: settings.highlight,
                 git: settings.git,
+                marks: settings.marks,
             });
             const theme = mermaidTheme();
             background = theme.background;

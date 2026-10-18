@@ -26,6 +26,7 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 | `registerExporter({ id, label, extension, export })` | Adds an item to the Export menu of the diagram. `export(schema)` gets the tables on screen (the search result when there is one) and returns the text of the file (or a promise), saved with the Save dialog. Returns a `Disposable` |
 | `focusTables({ tables, highlight, label })` | Shows only these tables (and the relations between them) in the diagram, `highlight` standing out, with `label` and a button to go back to the whole schema. Opens the diagram when needed |
 | `getDiagramSvg()` | The diagram on screen as an SVG file (text), or `null` when no diagram is drawn |
+| Generator `marks` | The page scripts draw a table's `mark` as a CSS class of its node and a column's `note` as its comment when the diagram is drawn with `{ marks: true }` (for example a schema comparison: added, removed, changed) |
 | `lastRender` | The last drawing reported by the page (`{ ok, layout, entities, error }`), for tests |
 
 Without DrawMeDatabase Pro, the Export menu has one more item that opens the page of DrawMeDatabase Pro in the Extensions view. It disappears once Pro, or any extension that registers an export, is installed.
