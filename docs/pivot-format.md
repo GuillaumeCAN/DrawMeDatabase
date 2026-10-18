@@ -10,7 +10,10 @@ parse(basePath, options) // → { tables, warnings }
 - `options`:
   - `git: false` skips the git status;
   - `overrides`: a `Map` of absolute file path → text of an editor not saved yet, read instead of the file (live diagram);
-  - `gitCache`: a `Map` kept between parses: git runs again only once it is cleared (the extension clears it when files change on disk or in the repository, not while the user types).
+  - `gitCache`: a `Map` kept between parses: git runs again only once it is cleared (the extension clears it when files change on disk or in the repository, not while the user types);
+  - `columnSources: true`: each column gets `source: { file, line }` (where it is declared);
+  - `until` (Laravel): a migration file name, the schema right after it;
+  - `details: true`: the column details, indexes and referential actions below (for exports and tools; the JSON viewer does not ask for them).
 - A missing migrations or entities folder, or a folder without PHP files, throws a `ParserError` (`parsers/errors.js`), whose message is shown to the user as is.
 
 ## `tables`
@@ -63,3 +66,35 @@ One object per table, in the order of the code (migrations by file name, entitie
 ## `warnings`
 
 Strings, one per skipped construct, written to the **DrawMeDatabase** output: `file:line: message` for Laravel (`2024_01_01_000000_create_users_table.php:12: renameColumn('a', '') skipped: empty name`), `file: message` for Symfony. The text and line numbers are checked by the unit tests.
+
+## Details (option `details: true`)
+
+Only what the code declares is given; a field that is missing means "not declared" (the database default applies).
+
+**Columns**
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `length` | integer | Length of a string or binary column (Laravel `string('name', 100)`, Doctrine `length:`) |
+| `precision`, `scale` | integer | Decimal and float columns (Laravel `decimal('total', 10, 2)`, Doctrine `precision:` / `scale:`) |
+| `unsigned` | `true` | Unsigned integer or decimal (Laravel `unsigned*` types and `->unsigned()`, Doctrine `options: ['unsigned' => true]`) |
+| `default` | string, number, boolean or `null` | Default value written in the code (`->default(...)`, Doctrine `options: ['default' => ...]`). A key present with `null` means `DEFAULT NULL` |
+| `defaultRaw` | string | Default as an SQL expression: `CURRENT_TIMESTAMP` for `->useCurrent()`, the text of `DB::raw('...')` / `new Expression('...')` |
+| `onUpdateCurrent` | `true` | `->useCurrentOnUpdate()` (MySQL `ON UPDATE CURRENT_TIMESTAMP`) |
+| `values` | array of strings | Allowed values of an enum or set column (Laravel `enum('status', [...])`; Doctrine: the cases of a backed `enumType`, when the enum is in the project) |
+| `unique` | `true` | The column alone is unique (`->unique()`, a one-column unique index, Doctrine `unique: true`) |
+| `autoIncrement` | `true` | Auto-incremented (Laravel `id()`, `*Increments()`, `->autoIncrement()`; Doctrine `#[ORM\GeneratedValue]` with the IDENTITY or AUTO strategy) |
+| `comment` | string | `->comment('...')`, Doctrine `options: ['comment' => ...]` |
+
+**Tables**
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `indexes` | array | `{ columns: [names], type: 'index' \| 'unique' \| 'fulltext' \| 'spatial', name? }`, in the order of the code. One-column unique indexes are given as the column's `unique` instead. Laravel: `index()`, `unique()`, `fullText()`, `spatialIndex()` (statements and column modifiers), minus `dropIndex()` / `dropUnique()`...; Doctrine: `#[ORM\Index]`, `#[ORM\UniqueConstraint]` (or the `indexes` / `uniqueConstraints` of `#[ORM\Table]`) |
+
+**Relations**
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `onDelete`, `onUpdate` | string | Referential action, lower case: `cascade`, `set null`, `restrict`, `no action`, `set default`. Laravel: `cascadeOnDelete()`, `nullOnDelete()`, `restrictOnDelete()`, `noActionOnDelete()`, `onDelete('...')`, and the `OnUpdate` ones; Doctrine: `JoinColumn(onDelete: '...')` |
+

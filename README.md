@@ -8,7 +8,7 @@ Whether you're working on a complex project or managing a simple schema, DrawMeD
 
 With its seamless integration into VSCode, DrawMeDatabase empowers developers to focus more on building and less on deciphering. Best of all, it’s entirely free to use—download it today and bring your database to life through intuitive diagrams!
 
-<img src="https://i.ibb.co/H4dX5gB/dmdb-record-final.gif" alt="Gif">
+![A migration typed on the left, the diagram on the right following it live: the new column is marked unsaved, then new once the file is saved](images/screenshots/live-diagram.gif)
 
 ## Features
 
@@ -55,6 +55,12 @@ DrawMeDatabase is free, and everything it does today stays free. **DrawMeDatabas
 - **Large schemas**: the path between two tables, saved views shared with your team
 - **Laravel**: Eloquent models with their relationships, generated from the schema
 
+![The schema canvas of DrawMeDatabase Pro: tables and links dragged by hand, the git status of every column](images/screenshots/pro-canvas.gif)
+
+![A schema comparison with the main branch: an added table and an added column](images/screenshots/pro-compare.png)
+
+![The table designer: a table described in a form, and the Laravel migration written for it](images/screenshots/pro-designer-code.png)
+
 It has a free 14-day trial. Search for "DrawMeDatabase Pro" in the Extensions view.
 
 ## Usage
@@ -92,7 +98,7 @@ DrawMeDatabase reads your code, it does not execute it nor connect to a database
   - Embeddables are not shown, and Symfony's default naming strategy is assumed.
   - Backed enums declared outside `src/Entity` are shown as `string`.
 - **Both**
-  - Only the column type, the primary key and the nullable flag are shown (no length, default value or index). Many-to-many join tables are drawn as a single link.
+  - The diagram shows the column type, the primary key and the nullable flag. Lengths, default values, indexes and `ON DELETE` are read too, for the exports of DrawMeDatabase Pro and the API (`details` option). Many-to-many join tables are drawn as a single link.
   - In the diagram, characters that Mermaid cannot read in an attribute name or type (spaces, `$`, `#`...) are replaced with `_` (the JSON viewer always shows the exact names).
   - Very large schemas (hundreds of tables) take a few seconds to draw.
   - The extension does not run in Restricted Mode (untrusted workspaces) or in virtual workspaces.

@@ -69,12 +69,12 @@ const OTHER_METHODS = [
     'dropTimestamps', 'dropTimestampsTz', 'dropSoftDeletes', 'dropSoftDeletesTz', 'dropRememberToken', 'dropMorphs',
     'dropForeign', 'dropConstrainedForeignId', 'dropForeignIdFor', 'dropConstrainedForeignIdFor',
     'dropUnique', 'dropPrimary', 'rename', 'drop', 'dropIfExists', 'after',
+    'index', 'fullText', 'spatialIndex', 'dropIndex', 'dropFullText', 'dropSpatialIndex', 'renameIndex',
 ];
 
 // Blueprint methods that never change columns or relations
 const IGNORED_METHODS = [
-    'index', 'fullText', 'spatialIndex', 'vectorIndex', 'rawIndex', 'dropIndex', 'dropFullText',
-    'dropSpatialIndex', 'dropVectorIndex', 'renameIndex', 'engine', 'innoDb', 'charset', 'collation',
+    'vectorIndex', 'rawIndex', 'dropVectorIndex', 'engine', 'innoDb', 'charset', 'collation',
     'comment', 'temporary', 'create', 'getTable', 'getPrefix', 'getColumns', 'getCommands',
     'getAddedColumns', 'getChangedColumns',
 ];
@@ -335,7 +335,105 @@ function findClosure(ctx, from, to) {
 // --- Table state ---
 
 const findTable = (state, name) => state.tables.find(t => t.name === name);
-const newColumn = (name, type, flags = {}) => ({ name, type, primary: false, nullable: false, unique: false, ...flags });
+// `details`: length, default... given with the `details` option; `uniqueName`: name of its unique index
+const newColumn = (name, type, flags = {}) => ({ name, type, primary: false, nullable: false, unique: false, details: {}, ...flags });
+
+// Details of a column given with the `details` option, in this order (docs/pivot-format.md)
+const DETAIL_KEYS = ['length', 'precision', 'scale', 'unsigned', 'default', 'defaultRaw', 'onUpdateCurrent', 'values', 'unique', 'autoIncrement', 'comment'];
+
+// Index types of Laravel, and the suffix of their default name
+const INDEX_TYPES = { index: 'index', unique: 'unique', fullText: 'fulltext', spatialIndex: 'spatial' };
+const INDEX_SUFFIXES = { index: 'index', unique: 'unique', fulltext: 'fulltext', spatial: 'spatialindex' };
+
+const intArg = (value) => (value !== undefined && /^\d+$/.test(value.trim()) ? parseInt(value.trim(), 10) : undefined);
+
+// A PHP literal: { value } for a string, number, boolean or null, { raw } for DB::raw('...') or
+// new Expression('...'), null for anything else (constants, enum cases, function calls)
+function phpValue(text) {
+    const value = (text || '').trim();
+    const string = parseStringLiteral(value);
+    if (string !== null) {
+        return { value: string };
+    }
+    if (/^-?\d+$/.test(value)) {
+        return { value: parseInt(value, 10) };
+    }
+    if (/^-?(?:\d+\.\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(value)) {
+        return { value: parseFloat(value) };
+    }
+    if (/^(?:true|false|null)$/i.test(value)) {
+        return { value: value.toLowerCase() === 'null' ? null : value.toLowerCase() === 'true' };
+    }
+    const raw = /^(?:\\?(?:Illuminate\\Support\\Facades\\)?DB::raw|new\s+\\?(?:Illuminate\\Database\\Query\\)?Expression)\s*\(([\s\S]*)\)$/i.exec(value);
+    const expression = raw ? parseStringLiteral(raw[1]) : null;
+    return expression === null ? null : { raw: expression };
+}
+
+// Length, precision, values... given by the arguments of a column method
+function typeDetails(method, args) {
+    const details = {};
+    if (method === 'string' || method === 'char' || method === 'binary') {
+        const length = intArg(arg(args, 1, 'length'));
+        if (length !== undefined) {
+            details.length = length;
+        }
+    }
+    if (/^(?:unsigned)?(?:decimal|float|double)$/i.test(method)) {
+        // Laravel 11: float(column, precision); before: (column, total, places)
+        const precision = intArg(arg(args, 1, 'total') || arg(args, 1, 'precision'));
+        const scale = intArg(arg(args, 2, 'places'));
+        if (precision !== undefined) {
+            details.precision = precision;
+        }
+        if (scale !== undefined) {
+            details.scale = scale;
+        }
+        if (isTrue(arg(args, 3, 'unsigned'))) {
+            details.unsigned = true;
+        }
+    }
+    if (method === 'enum' || method === 'set') {
+        const values = stringList(arg(args, 1, 'allowed') || '');
+        if (values && values.length > 0 && !values.includes(null)) {
+            details.values = values;
+        }
+    }
+    if (/^unsigned/.test(method) || INCREMENTS.has(method) || method === 'foreignId' || (INTEGERS.has(method) && isTrue(arg(args, 2, 'unsigned')))) {
+        details.unsigned = true;
+    }
+    return details;
+}
+
+// Referential actions of a foreign key chain: cascadeOnDelete(), onDelete('set null')...
+const ACTIONS = { cascade: 'cascade', restrict: 'restrict', null: 'set null', noaction: 'no action' };
+function referentialActions(calls) {
+    const actions = {};
+    for (const call of calls) {
+        const name = call.method.toLowerCase();
+        const shortcut = /^(cascade|restrict|null|noaction)on(delete|update)$/.exec(name);
+        if (shortcut) {
+            actions[shortcut[2] === 'delete' ? 'onDelete' : 'onUpdate'] = ACTIONS[shortcut[1]];
+        } else if (name === 'ondelete' || name === 'onupdate') {
+            const value = parseStringLiteral(call.args.length > 0 ? call.args[0].value : '');
+            if (value) {
+                actions[name === 'ondelete' ? 'onDelete' : 'onUpdate'] = value.toLowerCase();
+            }
+        }
+    }
+    return actions;
+}
+
+// Indexes of a table: { columns, type, name, explicit (a name given by the code) }; one per columns and type
+function addIndex(table, index) {
+    table.indexes = table.indexes.filter(other => other.type !== index.type || other.columns.join(',') !== index.columns.join(','));
+    table.indexes.push(index);
+}
+
+// Removes the indexes of these types on these columns, or the one with this (default or custom) name
+function dropIndexes(table, types, { columns, name }) {
+    table.indexes = table.indexes.filter(index => !types.includes(index.type)
+        || !((columns.length > 0 && index.columns.join(',') === columns.join(',')) || (name && index.name === name)));
+}
 
 function removeTable(state, name) {
     state.tables = state.tables.filter(t => t.name !== name);
@@ -382,6 +480,9 @@ function addColumn(table, column, change) {
         existing.nullable = column.nullable;
         existing.primary = existing.primary || column.primary;
         existing.unique = existing.unique || column.unique;
+        existing.uniqueName = column.uniqueName || existing.uniqueName;
+        // Laravel 11: ->change() drops the modifiers that are not given again
+        existing.details = column.details;
         existing.origin = column.origin;
     } else {
         table.columns[index] = column;
@@ -392,6 +493,7 @@ function addColumn(table, column, change) {
 function dropColumns(table, names) {
     table.columns = table.columns.filter(c => !names.includes(c.name));
     table.relations = table.relations.filter(r => !names.includes(r.foreignKey));
+    table.indexes = table.indexes.filter(index => !index.columns.some(name => names.includes(name)));
 }
 
 function addRelation(table, relation) {
@@ -415,6 +517,9 @@ function renameColumn(ctx, table, from, to, index) {
     }
     column.name = to;
     column.origin = ctx.origin;
+    for (const tableIndex of table.indexes) {
+        tableIndex.columns = tableIndex.columns.map(name => (name === from ? to : name));
+    }
     for (const relation of table.relations) {
         if (relation.foreignKey === from) {
             relation.foreignKey = to;
@@ -469,13 +574,17 @@ function columnsFor(ctx, method, args, index) {
             return [];
         }
         const autoIncrement = INCREMENTS.has(method) || (INTEGERS.has(method) && isTrue(arg(args, 1, 'autoIncrement')));
-        return [newColumn(name, method, { primary: autoIncrement })];
+        const details = typeDetails(method, args);
+        if (autoIncrement) {
+            details.autoIncrement = true;
+        }
+        return [newColumn(name, method, { primary: autoIncrement, details })];
     }
 
     switch (method) {
         case 'id': {
             const name = columnName(ctx, nameArg, method, 'id', index);
-            return name === null ? [] : [newColumn(name, 'bigIncrements', { primary: true })];
+            return name === null ? [] : [newColumn(name, 'bigIncrements', { primary: true, details: { unsigned: true, autoIncrement: true } })];
         }
         case 'addColumn': {
             const type = parseStringLiteral(arg(args, 0, 'type') || '');
@@ -489,7 +598,8 @@ function columnsFor(ctx, method, args, index) {
         case 'foreignUuidFor':
         case 'foreignUlidFor': {
             const name = modelColumn(ctx, args, method, index);
-            return name === null ? [] : [newColumn(name, method.replace('For', ''))];
+            const type = method.replace('For', '');
+            return name === null ? [] : [newColumn(name, type, { details: typeDetails(type, []) })];
         }
         case 'timestamps':
         case 'nullableTimestamps':
@@ -507,7 +617,7 @@ function columnsFor(ctx, method, args, index) {
             return name === null ? [] : [newColumn(name, type, { nullable: true })];
         }
         case 'rememberToken':
-            return [newColumn('remember_token', 'string', { nullable: true })];
+            return [newColumn('remember_token', 'string', { nullable: true, details: { length: 100 } })];
         case 'morphs':
         case 'numericMorphs':
         case 'nullableMorphs':
@@ -524,27 +634,59 @@ function columnsFor(ctx, method, args, index) {
             const lower = method.toLowerCase();
             const idType = lower.includes('uuid') ? 'uuid' : lower.includes('ulid') ? 'ulid' : 'unsignedBigInteger';
             const nullable = method.startsWith('nullable');
-            return [newColumn(`${name}_type`, 'string', { nullable }), newColumn(`${name}_id`, idType, { nullable })];
+            return [newColumn(`${name}_type`, 'string', { nullable }), newColumn(`${name}_id`, idType, { nullable, details: typeDetails(idType, []) })];
         }
         default:
             throw new Error(`COLUMN_HELPERS lists ${method}() but columnsFor() does not expand it`);
     }
 }
 
-// Applies ->nullable(), ->primary()... Modifiers after ->constrained() or ->references() belong to
-// the foreign key, not to the column, so Laravel ignores them: so do we.
-function applyModifiers(column, calls) {
+// Applies ->nullable(), ->primary(), ->default()... Modifiers after ->constrained() or ->references()
+// belong to the foreign key, not to the column, so Laravel ignores them: so do we. The index
+// modifiers (->index(), ->fullText()...) are applied with the index statements of the Blueprint.
+function applyModifiers(blueprint, column, calls) {
+    const { details } = column;
     for (const call of calls) {
         const name = call.method.toLowerCase();
+        const value = arg(call.args, 0, 'value');
         if (name === 'constrained' || name === 'references') {
             break;
         }
         if (name === 'nullable') {
-            column.nullable = !isFalse(arg(call.args, 0, 'value'));
+            column.nullable = !isFalse(value);
         } else if (name === 'primary' || name === 'autoincrement') {
             column.primary = true;
+            if (name === 'autoincrement') {
+                details.autoIncrement = true;
+            }
         } else if (name === 'unique') {
             column.unique = true;
+            column.uniqueName = parseStringLiteral(arg(call.args, 0, 'indexName') || '') || indexName(blueprint.table.name, [column.name], 'unique');
+        } else if (name === 'index' || name === 'fulltext' || name === 'spatialindex') {
+            const type = INDEX_TYPES[canonical(call.method)];
+            const custom = parseStringLiteral(arg(call.args, 0, 'indexName') || '');
+            blueprint.indexes.push({ type, columns: [column.name], name: custom || null });
+        } else if (name === 'unsigned') {
+            details.unsigned = true;
+        } else if (name === 'default') {
+            const parsed = phpValue(value);
+            delete details.default;
+            delete details.defaultRaw;
+            if (parsed && 'raw' in parsed) {
+                details.defaultRaw = parsed.raw;
+            } else if (parsed) {
+                details.default = parsed.value;
+            }
+        } else if (name === 'usecurrent') {
+            delete details.default;
+            details.defaultRaw = 'CURRENT_TIMESTAMP';
+        } else if (name === 'usecurrentonupdate') {
+            details.onUpdateCurrent = true;
+        } else if (name === 'comment') {
+            const comment = parseStringLiteral(arg(call.args, 0, 'comment') || '');
+            if (comment !== null) {
+                details.comment = comment;
+            }
         }
     }
 }
@@ -585,7 +727,7 @@ function foreignIdRelation(ctx, table, column, calls, model, index) {
         warn(ctx, index, `foreign key on ${table.name}.${column} skipped: unknown referenced table or column`);
         return;
     }
-    addRelation(table, { foreignKey: column, references, on, constraint: constraint || indexName(table.name, [column], 'foreign') });
+    addRelation(table, { foreignKey: column, references, on, constraint: constraint || indexName(table.name, [column], 'foreign'), ...referentialActions(calls) });
 }
 
 // $table->foreign('col' or ['a', 'b'], name?)->references(...)->on(...), in any order
@@ -598,8 +740,9 @@ function foreignRelation(ctx, table, head, calls, index) {
         return;
     }
     const constraint = parseStringLiteral(arg(head.args, 1, 'name') || '') || indexName(table.name, columns, 'foreign');
+    const actions = referentialActions(calls);
     columns.forEach((column, i) => {
-        addRelation(table, { foreignKey: column, references: references[i] || references[0], on, constraint });
+        addRelation(table, { foreignKey: column, references: references[i] || references[0], on, constraint, ...actions });
     });
 }
 
@@ -634,7 +777,12 @@ function applyStatement(ctx, blueprint, chain, index) {
         const columns = columnsFor(ctx, method, args, index);
         const change = modifiers.some(call => call.method.toLowerCase() === 'change');
         if (columns.length === 1) {
-            applyModifiers(columns[0], modifiers);
+            applyModifiers(blueprint, columns[0], modifiers);
+        }
+        if (method.toLowerCase().endsWith('morphs') && columns.length === 2) {
+            // morphs('taggable') also indexes taggable_type and taggable_id
+            const custom = parseStringLiteral(arg(args, 1, 'indexName') || '');
+            blueprint.indexes.push({ type: 'index', columns: columns.map(column => column.name), name: custom || null });
         }
         for (const column of columns) {
             column.origin = ctx.origin;
@@ -652,12 +800,39 @@ function applyStatement(ctx, blueprint, chain, index) {
 
     switch (method) {
         case 'primary':
-        case 'unique': {
+        case 'unique':
+        case 'index':
+        case 'fullText':
+        case 'spatialIndex': {
             // Applied at the end of the closure, like Laravel runs index commands after the columns
             const columns = stringList(arg(args, 0, 'columns'));
             if (columns) {
-                blueprint.indexes.push({ type: method, columns });
+                const custom = parseStringLiteral(arg(args, 1, 'name') || '');
+                blueprint.indexes.push({ type: method === 'primary' ? 'primary' : INDEX_TYPES[method], columns, name: custom || null });
             }
+            break;
+        }
+        case 'dropIndex':
+        case 'dropFullText':
+        case 'dropSpatialIndex': {
+            const target = indexArgument(ctx, method, arg(args, 0, 'index'), index);
+            if (target) {
+                dropIndexes(table, [{ dropIndex: 'index', dropFullText: 'fulltext', dropSpatialIndex: 'spatial' }[method]], target);
+            }
+            break;
+        }
+        case 'renameIndex': {
+            const from = parseStringLiteral(arg(args, 0, 'from') || '');
+            const to = parseStringLiteral(arg(args, 1, 'to') || '');
+            if (!from || !to) {
+                warn(ctx, index, 'renameIndex() skipped: dynamic index name');
+                break;
+            }
+            for (const other of table.indexes.filter(candidate => candidate.name === from)) {
+                other.name = to;
+                other.explicit = true;
+            }
+            table.columns.filter(column => column.uniqueName === from).forEach(column => { column.uniqueName = to; });
             break;
         }
         case 'foreign':
@@ -738,10 +913,13 @@ function applyStatement(ctx, blueprint, chain, index) {
             const target = indexArgument(ctx, method, arg(args, 0, 'index'), index);
             if (target) {
                 for (const column of table.columns) {
-                    if (target.columns.includes(column.name) || indexName(table.name, [column.name], 'unique') === target.name) {
+                    if (target.columns.includes(column.name) || indexName(table.name, [column.name], 'unique') === target.name
+                        || (column.uniqueName && column.uniqueName === target.name)) {
                         column.unique = false;
+                        delete column.uniqueName;
                     }
                 }
+                dropIndexes(table, ['unique'], target);
             }
             break;
         }
@@ -803,13 +981,18 @@ function applyBlueprint(ctx, table, from, to, index) {
     const blueprint = { table, indexes: [], added: new Set(), rename: null, drop: false };
     applyClosureBody(ctx, blueprint, closure);
 
-    for (const { type, columns } of blueprint.indexes) {
-        for (const column of table.columns.filter(c => columns.includes(c.name))) {
-            if (type === 'primary') {
-                column.primary = true;
-            } else if (columns.length === 1) {
-                column.unique = true;
+    for (const { type, columns, name } of blueprint.indexes) {
+        if (type === 'primary' || (type === 'unique' && columns.length === 1)) {
+            for (const column of table.columns.filter(c => columns.includes(c.name))) {
+                if (type === 'primary') {
+                    column.primary = true;
+                } else {
+                    column.unique = true;
+                    column.uniqueName = name || indexName(table.name, columns, 'unique');
+                }
             }
+        } else if (columns.every(column => table.columns.some(c => c.name === column))) {
+            addIndex(table, { columns, type, name: name || indexName(table.name, columns, INDEX_SUFFIXES[type]), explicit: Boolean(name) });
         }
     }
     if (blueprint.drop) {
@@ -865,6 +1048,7 @@ function applySchemaCall(ctx, method, from, to, index) {
                     name,
                     columns: [],
                     relations: [],
+                    indexes: [],
                     source: { file: `database/migrations/${ctx.file}`, line: ctx.lineAt(index) },
                     origin: { path: ctx.path, first: ctx.lineAt(index), last: ctx.lineAt(to) },
                 };
@@ -1010,7 +1194,7 @@ function applyMigration(state, file, filePath, source) {
 }
 
 // Internal table state to the pivot format (docs/pivot-format.md)
-function toPivot(table, statusOf, basePath, columnSources) {
+function toPivot(table, statusOf, basePath, columnSources, details) {
     const status = (origin) => (origin ? statusOf(origin.path)(origin.first, origin.last) : null);
     const columnStatuses = table.columns.map(c => status(c.origin));
     const tableGit = tableStatus(status(table.origin), columnStatuses);
@@ -1033,6 +1217,10 @@ function toPivot(table, statusOf, basePath, columnSources) {
             if (columnSources && c.origin) {
                 column.source = { file: path.relative(basePath, c.origin.path).split(path.sep).join('/'), line: c.origin.first };
             }
+            if (details) {
+                const declared = { ...c.details, ...(c.unique ? { unique: true } : {}) };
+                DETAIL_KEYS.filter(key => key in declared).forEach(key => { column[key] = declared[key]; });
+            }
             return column;
         }),
         relations: table.relations.map(r => ({
@@ -1040,9 +1228,14 @@ function toPivot(table, statusOf, basePath, columnSources) {
             references: r.references,
             on: r.on,
             type: isUnique(r.foreignKey) ? 'one-to-one' : 'many-to-one',
+            ...(details && r.onDelete ? { onDelete: r.onDelete } : {}),
+            ...(details && r.onUpdate ? { onUpdate: r.onUpdate } : {}),
         })),
         ...(table.source ? { source: table.source } : {}),
         ...(tableGit ? { git: tableGit } : {}),
+        ...(details && table.indexes.length > 0
+            ? { indexes: table.indexes.map(i => ({ columns: [...i.columns], type: i.type, ...(i.explicit ? { name: i.name } : {}) })) }
+            : {}),
     };
 }
 
@@ -1062,6 +1255,8 @@ function stat(file) {
 // - columnSources: true adds the statement that last created, changed or renamed each column
 //   (source: { file, line }), for the tools that point at a column
 // - until: a migration file name: the schema right after it (the later migrations are skipped)
+// - details: true adds the length, default, indexes, ON DELETE... declared by the migrations,
+//   for the exports (docs/pivot-format.md)
 module.exports.parse = function (basePath, options = {}) {
     const migrationsPath = path.join(basePath, 'database', 'migrations');
     const folder = stat(migrationsPath);
@@ -1097,7 +1292,7 @@ module.exports.parse = function (basePath, options = {}) {
         state.warnings.push(reader.warning);
     }
     return {
-        tables: state.tables.map(table => toPivot(table, reader.statusOf, basePath, options.columnSources === true)),
+        tables: state.tables.map(table => toPivot(table, reader.statusOf, basePath, options.columnSources === true, options.details === true)),
         warnings: state.warnings,
     };
 };

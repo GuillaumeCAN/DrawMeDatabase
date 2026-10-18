@@ -5,6 +5,7 @@ docs/**
 .idea/**
 .claude/**
 builds/**
+images/screenshots/**
 node_modules/**
 scripts/**
 test/**

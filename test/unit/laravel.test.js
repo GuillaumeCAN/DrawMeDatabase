@@ -1570,3 +1570,178 @@ describe('laravel parser: options for tools', () => {
     });
 });
 
+
+describe('laravel parser: details', () => {
+    // Parses migrations given as up() bodies with the `details` option
+    function parseDetails(...ups) {
+        const files = {};
+        ups.forEach((up, i) => {
+            files[`2025_01_${String(i + 1).padStart(2, '0')}_000000_migration_${i + 1}.php`] = migration(up);
+        });
+        return parse(project(files), { details: true });
+    }
+    const create = (name, body) => `        Schema::create('${name}', function (Blueprint $table) {\n${body}\n        });`;
+    const alter = (name, body) => `        Schema::table('${name}', function (Blueprint $table) {\n${body}\n        });`;
+    const column = (result, tableName, name) => table(result, tableName).columns.find(col => col.name === name);
+
+    it('are only given with the option', () => {
+        const up = create('orders', "            $table->id();\n            $table->string('code', 20)->unique()->default('new');\n            $table->index(['code', 'id']);");
+        const plain = parseUp(up);
+        assert.deepEqual(table(plain, 'orders'), { table: 'orders', columns: [c('id', 'bigIncrements', 'pk'), c('code', 'string')], relations: [] });
+        assert.deepEqual(column(parseDetails(up), 'orders', 'code'), { name: 'code', type: 'string', length: 20, default: 'new', unique: true });
+    });
+
+    it('reads lengths, precisions, unsigned, enum values and auto-increments from the column methods', () => {
+        const result = parseDetails(create('products', [
+            '            $table->id();',
+            "            $table->string('name');",
+            "            $table->char('code', length: 3);",
+            "            $table->decimal('price', 10, 2);",
+            "            $table->float('ratio', 24);",
+            "            $table->decimal('weight', 8, 3, true);",
+            "            $table->unsignedInteger('stock');",
+            "            $table->integer('rank', false, true);",
+            "            $table->integer('legacy_id', true);",
+            "            $table->enum('status', ['draft', 'published']);",
+            "            $table->set('flags', ['a', 'b']);",
+            "            $table->foreignId('category_id');",
+            '            $table->rememberToken();',
+            "            $table->morphs('owner');",
+        ].join('\n')));
+        const products = table(result, 'products');
+        const byName = Object.fromEntries(products.columns.map(col => [col.name, col]));
+        assert.deepEqual(byName.id, { name: 'id', type: 'bigIncrements', primary: true, unsigned: true, autoIncrement: true });
+        assert.deepEqual(byName.name, { name: 'name', type: 'string' }, 'the default length is not declared');
+        assert.equal(byName.code.length, 3);
+        assert.deepEqual([byName.price.precision, byName.price.scale], [10, 2]);
+        assert.deepEqual([byName.ratio.precision, byName.ratio.scale], [24, undefined]);
+        assert.equal(byName.weight.unsigned, true);
+        assert.equal(byName.stock.unsigned, true);
+        assert.equal(byName.rank.unsigned, true);
+        assert.deepEqual(byName.legacy_id, { name: 'legacy_id', type: 'integer', primary: true, autoIncrement: true });
+        assert.deepEqual(byName.status.values, ['draft', 'published']);
+        assert.deepEqual(byName.flags.values, ['a', 'b']);
+        assert.equal(byName.category_id.unsigned, true);
+        assert.equal(byName.remember_token.length, 100);
+        assert.equal(byName.owner_id.unsigned, true);
+        assert.deepEqual(products.indexes, [{ columns: ['owner_type', 'owner_id'], type: 'index' }], 'morphs() indexes its columns');
+    });
+
+    it('reads defaults, useCurrent, comments and unsigned from the modifiers', () => {
+        const result = parseDetails(create('posts', [
+            "            $table->string('title')->default('Untitled')->comment('Shown in the list');",
+            "            $table->integer('views')->unsigned()->default(0);",
+            "            $table->decimal('score', 5, 2)->default(-1.5);",
+            "            $table->boolean('published')->default(false);",
+            "            $table->string('slug')->nullable()->default(null);",
+            "            $table->json('meta')->default(new Expression('(JSON_ARRAY())'));",
+            "            $table->string('kind')->default(DB::raw(\"'post'\"));",
+            "            $table->string('state')->default(State::Draft);",
+            '            $table->timestamp(\'published_at\')->useCurrent()->useCurrentOnUpdate();',
+        ].join('\n')));
+        const byName = Object.fromEntries(table(result, 'posts').columns.map(col => [col.name, col]));
+        assert.deepEqual(byName.title, { name: 'title', type: 'string', default: 'Untitled', comment: 'Shown in the list' });
+        assert.deepEqual(byName.views, { name: 'views', type: 'integer', unsigned: true, default: 0 });
+        assert.equal(byName.score.default, -1.5);
+        assert.equal(byName.published.default, false);
+        assert.ok('default' in byName.slug && byName.slug.default === null, 'DEFAULT NULL');
+        assert.deepEqual([byName.meta.default, byName.meta.defaultRaw], [undefined, '(JSON_ARRAY())']);
+        assert.equal(byName.kind.defaultRaw, "'post'");
+        assert.equal('default' in byName.state, false, 'an enum case is not a literal');
+        assert.deepEqual(byName.published_at, { name: 'published_at', type: 'timestamp', defaultRaw: 'CURRENT_TIMESTAMP', onUpdateCurrent: true });
+    });
+
+    it('reads the referential actions of foreign keys', () => {
+        const result = parseDetails(
+            create('users', '            $table->id();'),
+            create('posts', [
+                '            $table->id();',
+                "            $table->foreignId('user_id')->constrained()->cascadeOnDelete()->restrictOnUpdate();",
+                "            $table->foreignId('editor_id')->nullable()->constrained('users')->nullOnDelete();",
+                "            $table->unsignedBigInteger('reviewer_id');",
+                "            $table->foreign('reviewer_id')->references('id')->on('users')->onDelete('SET NULL')->onUpdate('cascade');",
+                "            $table->foreignId('owner_id')->constrained('users');",
+            ].join('\n')),
+        );
+        const relations = table(result, 'posts').relations;
+        assert.deepEqual(relations.map(r => [r.foreignKey, r.onDelete, r.onUpdate]), [
+            ['user_id', 'cascade', 'restrict'],
+            ['editor_id', 'set null', undefined],
+            ['reviewer_id', 'set null', 'cascade'],
+            ['owner_id', undefined, undefined],
+        ]);
+        assert.deepEqual(Object.keys(relations[3]), ['foreignKey', 'references', 'on', 'type']);
+    });
+
+    it('reads the indexes: statements and modifiers, unique, full text and spatial', () => {
+        const result = parseDetails(create('places', [
+            '            $table->id();',
+            "            $table->string('name')->index();",
+            "            $table->string('city');",
+            "            $table->string('country');",
+            "            $table->text('about')->fullText();",
+            "            $table->geometry('area')->spatialIndex();",
+            "            $table->string('email')->unique('places_email_key');",
+            "            $table->index(['city', 'country'], 'places_location');",
+            "            $table->unique(['name', 'city']);",
+            "            $table->unique('country');",
+        ].join('\n')));
+        const places = table(result, 'places');
+        assert.deepEqual(places.indexes, [
+            { columns: ['name'], type: 'index' },
+            { columns: ['about'], type: 'fulltext' },
+            { columns: ['area'], type: 'spatial' },
+            { columns: ['city', 'country'], type: 'index', name: 'places_location' },
+            { columns: ['name', 'city'], type: 'unique' },
+        ]);
+        assert.equal(column(result, 'places', 'email').unique, true);
+        assert.equal(column(result, 'places', 'country').unique, true, 'a one-column unique index is the column\'s unique');
+    });
+
+    it('follows the index history: drops by name or columns, renames, renamed and dropped columns', () => {
+        const result = parseDetails(
+            create('events', [
+                '            $table->id();',
+                "            $table->string('title')->index();",
+                "            $table->string('place');",
+                "            $table->string('code')->unique();",
+                "            $table->date('day');",
+                "            $table->index(['place', 'day']);",
+                "            $table->fullText('title');",
+                "            $table->index('day', 'events_day');",
+            ].join('\n')),
+            alter('events', [
+                "            $table->dropIndex('events_title_index');",
+                "            $table->dropFullText(['title']);",
+                "            $table->renameIndex('events_day', 'events_by_day');",
+                "            $table->renameColumn('place', 'venue');",
+                "            $table->dropUnique('events_code_unique');",
+            ].join('\n')),
+            alter('events', "            $table->dropIndex('events_by_day');\n            $table->string('slug');\n            $table->unique(['slug', 'day'], 'events_slug');"),
+            alter('events', "            $table->dropColumn('slug');"),
+        );
+        assert.deepEqual(table(result, 'events').indexes, [{ columns: ['venue', 'day'], type: 'index' }]);
+        assert.equal(column(result, 'events', 'code').unique, undefined);
+    });
+
+    it('->change() replaces the details of a column (Laravel 11)', () => {
+        const result = parseDetails(
+            create('notes', "            $table->string('title', 100)->default('x')->comment('Title');"),
+            alter('notes', "            $table->string('title', 200)->nullable()->change();"),
+        );
+        assert.deepEqual(column(result, 'notes', 'title'), { name: 'title', type: 'string', nullable: true, length: 200 });
+    });
+
+    it('gives details for the blog fixture without changing the rest', () => {
+        const plain = parse(fixture('blog-app'));
+        const detailed = parse(fixture('blog-app'), { details: true });
+        const keys = ['name', 'type', 'primary', 'nullable'];
+        const strip = (tables) => tables.map(t => ({
+            table: t.table,
+            columns: t.columns.map(col => Object.fromEntries(Object.entries(col).filter(([key]) => keys.includes(key)))),
+            relations: t.relations.map(r => ({ foreignKey: r.foreignKey, references: r.references, on: r.on, type: r.type })),
+        }));
+        assert.deepEqual(strip(detailed.tables), strip(plain.tables));
+        assert.deepEqual(detailed.warnings, plain.warnings);
+    });
+});

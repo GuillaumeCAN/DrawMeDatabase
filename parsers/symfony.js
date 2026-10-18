@@ -26,15 +26,37 @@ const {
 const MAPPING_NAMESPACE = 'doctrine\\orm\\mapping\\';
 const RELATION_KINDS = ['manytoone', 'onetoone', 'onetomany', 'manytomany'];
 
-// Unnamed arguments we understand, in Doctrine's constructor order
+// Unnamed arguments we understand, in Doctrine's constructor order (ORM 3). The other arguments of
+// JoinColumn (unique, nullable, onDelete) are read by name only.
 const POSITIONAL = {
-    column: ['name', 'type', 'length', 'precision', 'scale', 'unique', 'nullable'],
-    table: ['name'],
+    column: ['name', 'type', 'length', 'precision', 'scale', 'unique', 'nullable', 'insertable', 'updatable', 'enumType', 'options'],
+    table: ['name', 'schema', 'indexes', 'uniqueConstraints'],
     jointable: ['name'],
     joincolumn: ['name', 'referencedColumnName'],
     inheritancetype: ['value'],
-    discriminatorcolumn: ['name', 'type'],
+    discriminatorcolumn: ['name', 'type', 'length', 'columnDefinition', 'enumType', 'options'],
+    generatedvalue: ['strategy'],
+    index: ['name', 'columns', 'fields', 'flags', 'options'],
+    uniqueconstraint: ['name', 'columns', 'fields', 'options'],
 };
+
+// Details of a column (option `details`), in the order of docs/pivot-format.md
+const DETAIL_KEYS = ['length', 'precision', 'scale', 'unsigned', 'default', 'defaultRaw', 'values', 'unique', 'autoIncrement', 'comment'];
+// Details a foreign key column takes from the column it references, like its type
+const KEY_DETAILS = ['length', 'precision', 'scale', 'unsigned'];
+// GeneratedValue strategies that let the database number the rows (AUTO is IDENTITY or SEQUENCE)
+const GENERATED = new Set(['AUTO', 'IDENTITY', 'SEQUENCE']);
+const ACTIONS = new Set(['cascade', 'set null', 'restrict', 'no action', 'set default']);
+// Defaults DBAL writes as SQL expressions instead of strings, by column type
+// (AbstractPlatform::getDefaultValueDeclarationSQL)
+const SQL_DEFAULTS = new Map([
+    ...['datetime', 'datetime_immutable', 'datetimetz', 'datetimetz_immutable', 'datetime_utc', 'datetime_utc_immutable']
+        .map(type => [type, 'CURRENT_TIMESTAMP']),
+    ['date', 'CURRENT_DATE'],
+    ['date_immutable', 'CURRENT_DATE'],
+    ['time', 'CURRENT_TIME'],
+    ['time_immutable', 'CURRENT_TIME'],
+]);
 
 // Doctrine type inferred from the PHP type of a property (ORM's DefaultTypedFieldMapper).
 // Maps, so that class names such as 'Constructor' are not looked up in Object.prototype.
@@ -303,6 +325,15 @@ function readClassBody(unit, cls, start, end) {
             continue;
         }
 
+        // Cases of an enum (allowed values of its columns); the value is undefined when it is not a literal
+        const enumCase = cls.kind === 'enum' && /^\s*case\s+([A-Za-z_]\w*)\s*(=)?/i.exec(head);
+        if (enumCase) {
+            const value = enumCase[2] ? unit.code.slice(statement.start + enumCase[0].length, statement.headEnd) : '';
+            const string = parseStringLiteral(value);
+            cls.cases.push({ name: enumCase[1], value: string === null ? integerValue(value) : string });
+            continue;
+        }
+
         const method = METHOD.exec(head);
         if (!method) {
             // Not $function, nor a namespace segment (?\App\Function\Role $role)
@@ -375,6 +406,7 @@ function readScope(unit, start, end, namespace, classes) {
             mappings: readMappings(unit, classCtx, statement.attrs, statement.start, statement.headEnd),
             properties: [],
             traits: [],
+            cases: [],
         };
         if (!readClassBody(unit, cls, statement.headEnd + 1, statement.blockEnd)) {
             return false;
@@ -478,6 +510,91 @@ function boolValue(raw) {
     return value === 'true' ? true : value === 'false' ? false : null;
 }
 
+// Decimal integer literal (1_000 included), else undefined
+function integerValue(raw) {
+    const text = (raw || '').trim();
+    return /^[+-]?(?:0|[1-9](?:_?\d)*)$/.test(text) ? parseInt(text.replace(/_/g, ''), 10) : undefined;
+}
+
+// Value of a literal argument: string, number, boolean or null; undefined for anything else
+// (constants, expressions). An enum case (Suit::Hearts, Suit::Hearts->value) gives its value.
+function literalValue(mapping, raw, enumCases) {
+    if (raw === undefined) {
+        return undefined;
+    }
+    const text = raw.trim();
+    if (/^["']/.test(text)) {
+        const string = stringValue(mapping, text);
+        return string === null ? undefined : string;
+    }
+    const integer = integerValue(text);
+    if (integer !== undefined) {
+        return integer;
+    }
+    if (/^[+-]?(?:(?:\d+\.\d*|\.\d+)(?:e[+-]?\d+)?|\d+e[+-]?\d+)$/i.test(text)) {
+        return parseFloat(text);
+    }
+    const keyword = text.replace(/^\\/, '').toLowerCase();
+    if (keyword === 'true' || keyword === 'false' || keyword === 'null') {
+        return keyword === 'null' ? null : keyword === 'true';
+    }
+    const enumCase = !mapping.annotation && /^(\\?[A-Za-z_][\w\\]*)\s*::\s*([A-Za-z_]\w*)(?:\s*->\s*value)?$/.exec(text);
+    const cases = enumCase && enumCases.get(resolveClass(enumCase[1], mapping.ctx).toLowerCase());
+    const found = cases && cases.find(c => c.name === enumCase[2]);
+    return found ? found.value : undefined;
+}
+
+// Raw elements of an array argument: [...] or array(...), {...} in annotations; null for anything else
+function listValue(mapping, raw) {
+    if (raw === undefined) {
+        return null;
+    }
+    if (!mapping.annotation) {
+        return parseArrayLiteral(raw);
+    }
+    const text = raw.trim();
+    return text.startsWith('{') && findMatching(text, 0) === text.length - 1 ? splitTopLevel(text.slice(1, -1), ',') : null;
+}
+
+// Strings of an array argument (columns: ['a', 'b']), or null when it is missing or not only strings
+function stringList(mapping, raw) {
+    const list = listValue(mapping, raw);
+    const strings = list && list.map(entry => stringValue(mapping, entry));
+    return strings && !strings.includes(null) ? strings : null;
+}
+
+// Entries of a key/value array argument ('key' => value; "key"=value or "key": value in annotations),
+// as a Map of key → raw value
+function mapValue(mapping, raw) {
+    const map = new Map();
+    for (const entry of listValue(mapping, raw) || []) {
+        const match = mapping.annotation
+            ? /^("(?:[^"]|"")*"|[A-Za-z_]\w*)\s*[=:]\s*([\s\S]*)$/.exec(entry)
+            : /^('(?:[^'\\]|\\[\s\S])*'|"(?:[^"\\]|\\[\s\S])*")\s*=>\s*([\s\S]*)$/.exec(entry);
+        const key = match && (/^["']/.test(match[1]) ? stringValue(mapping, match[1]) : match[1]);
+        if (key !== null) {
+            map.set(key, match[2]);
+        }
+    }
+    return map;
+}
+
+// Mappings of a kind nested in an argument: [new ORM\Index(...), ...], or {@ORM\Index(...), ...} in annotations
+function nestedMappings(mapping, raw, kind) {
+    if (raw === undefined) {
+        return [];
+    }
+    if (mapping.annotation) {
+        return parseAnnotations(raw, mapping.ctx).filter(m => m.kind === kind);
+    }
+    return (parseArrayLiteral(raw) || [raw]).map(entry => {
+        const match = /^new\s+(\\?[A-Za-z_][\w\\]*)\s*\(([\s\S]*)\)$/i.exec(entry.trim());
+        return match && mappingKind(match[1], mapping.ctx) === kind
+            ? { kind, args: parseArgs(match[2]), annotation: false, ctx: mapping.ctx }
+            : null;
+    }).filter(Boolean);
+}
+
 // Class named by 'Foo::class', 'self::class' or a class name string, or null
 function classValue(mapping, raw) {
     if (raw === undefined) {
@@ -547,27 +664,12 @@ function columnType(mapping, property, ctx, enums) {
 
 // Join columns declared on a property: JoinColumn / JoinColumns, or JoinTable(joinColumns: ...)
 function joinColumns(mappings, joinTable) {
-    const nested = (mapping, raw) => {
-        if (raw === undefined) {
-            return [];
-        }
-        if (mapping.annotation) {
-            return parseAnnotations(raw, mapping.ctx).filter(m => m.kind === 'joincolumn');
-        }
-        return (parseArrayLiteral(raw) || [raw]).map(entry => {
-            const match = /^new\s+(\\?[A-Za-z_][\w\\]*)\s*\(([\s\S]*)\)$/i.exec(entry.trim());
-            return match && mappingKind(match[1], mapping.ctx) === 'joincolumn'
-                ? { kind: 'joincolumn', args: parseArgs(match[2]), annotation: false, ctx: mapping.ctx }
-                : null;
-        }).filter(Boolean);
-    };
-
-    const list = joinTable ? nested(joinTable, arg(joinTable, 'joinColumns')) : [];
+    const list = joinTable ? nestedMappings(joinTable, arg(joinTable, 'joinColumns'), 'joincolumn') : [];
     for (const mapping of mappings) {
         if (mapping.kind === 'joincolumn') {
             list.push(mapping);
         } else if (mapping.kind === 'joincolumns' && mapping.args.length > 0) {
-            list.push(...nested(mapping, mapping.args[0].value));
+            list.push(...nestedMappings(mapping, mapping.args[0].value, 'joincolumn'));
         }
     }
 
@@ -575,7 +677,119 @@ function joinColumns(mappings, joinTable) {
         name: unquoteName(stringValue(m, arg(m, 'name'))),
         references: unquoteName(stringValue(m, arg(m, 'referencedColumnName'))),
         nullable: boolValue(arg(m, 'nullable')),
+        unique: boolValue(arg(m, 'unique')),
+        onDelete: stringValue(m, arg(m, 'onDelete')),
+        mapping: m,
     }));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Details (option `details`)
+
+// unsigned, default and comment of the `options` of a Column, DiscriminatorColumn or JoinColumn
+function optionDetails(mapping, type, enumCases) {
+    const details = {};
+    const options = mapping ? mapValue(mapping, arg(mapping, 'options')) : new Map();
+    if (literalValue(mapping, options.get('unsigned'), enumCases) === true) {
+        details.unsigned = true;
+    }
+    if (options.has('default')) {
+        // A key present with null is DEFAULT NULL; constants and expressions are skipped
+        const value = literalValue(mapping, options.get('default'), enumCases);
+        if (value !== undefined && value === SQL_DEFAULTS.get(type)) {
+            details.defaultRaw = value;
+        } else if (value !== undefined) {
+            details.default = value;
+        }
+    }
+    const comment = literalValue(mapping, options.get('comment'), enumCases);
+    if (typeof comment === 'string') {
+        details.comment = comment;
+    }
+    return details;
+}
+
+// Details declared by the mapping of a column: length, precision, scale, options, allowed values and
+// unique. `phpType` and `ctx` (the declaring class) give the enum Doctrine infers from the property type.
+function columnDetails(mapping, phpType, ctx, type, enumCases) {
+    const details = {};
+    for (const name of ['length', 'precision', 'scale']) {
+        const value = mapping ? integerValue(arg(mapping, name)) : undefined;
+        if (value !== undefined && value >= 0) {
+            details[name] = value;
+        }
+    }
+    Object.assign(details, optionDetails(mapping, type, enumCases));
+
+    // The values of a DBAL enum column, else the cases of the backed enum mapped by the column: its
+    // enumType, or its PHP type when the column has no explicit type (Doctrine infers it only then)
+    const values = mapping ? stringList(mapping, mapValue(mapping, arg(mapping, 'options')).get('values')) : null;
+    let enumClass = mapping ? classValue(mapping, arg(mapping, 'enumType')) : null;
+    if (!enumClass && arg(mapping, 'type') === undefined && typeNames(phpType).length === 1) {
+        enumClass = resolveClass(typeNames(phpType)[0], ctx);
+    }
+    const cases = enumClass && enumCases.get(enumClass.toLowerCase());
+    if (values && values.length > 0) {
+        details.values = values;
+    } else if (cases && cases.length > 0 && cases.every(c => c.value !== undefined)) {
+        details.values = cases.map(c => String(c.value));
+    }
+
+    if (mapping && boolValue(arg(mapping, 'unique')) === true) {
+        details.unique = true;
+    }
+    return details;
+}
+
+// ON DELETE of a foreign key: the onDelete of its join columns (the last one wins, as in Doctrine),
+// in lower case; null when none is declared or the action is unknown
+function onDeleteOf(joins) {
+    let action = null;
+    for (const join of joins) {
+        const value = join.onDelete ? join.onDelete.trim().replace(/\s+/g, ' ').toLowerCase() : null;
+        if (ACTIONS.has(value)) {
+            action = value;
+        }
+    }
+    return action;
+}
+
+// Index and UniqueConstraint attributes of a class, and the indexes / uniqueConstraints of its Table
+// (attribute or annotation), in the order of the code: [{ type, name, columns | fields }]
+function classIndexes(cls) {
+    const read = (mapping) => {
+        const flags = (stringList(mapping, arg(mapping, 'flags')) || []).map(flag => flag.toLowerCase());
+        const type = mapping.kind === 'uniqueconstraint' ? 'unique'
+            : flags.includes('fulltext') ? 'fulltext' : flags.includes('spatial') ? 'spatial' : 'index';
+        const columns = stringList(mapping, arg(mapping, 'columns'));
+        return {
+            type,
+            name: unquoteName(stringValue(mapping, arg(mapping, 'name'))),
+            columns: columns && columns.map(unquoteName),
+            fields: stringList(mapping, arg(mapping, 'fields')),
+        };
+    };
+
+    const list = [];
+    for (const mapping of cls.mappings) {
+        if (mapping.kind === 'table') {
+            list.push(...nestedMappings(mapping, arg(mapping, 'indexes'), 'index').map(read));
+            list.push(...nestedMappings(mapping, arg(mapping, 'uniqueConstraints'), 'uniqueconstraint').map(read));
+        } else if ((mapping.kind === 'index' || mapping.kind === 'uniqueconstraint') && !mapping.annotation) {
+            // As annotations, @ORM\Index and @ORM\UniqueConstraint are only allowed inside @ORM\Table
+            list.push(read(mapping));
+        }
+    }
+    return list;
+}
+
+// Adds the details to a column, after its other keys, in the order of DETAIL_KEYS
+function assignDetails(column, details) {
+    for (const key of DETAIL_KEYS) {
+        if (key in details) {
+            column[key] = details[key];
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -587,6 +801,8 @@ function joinColumns(mappings, joinTable) {
 // - gitCache: Map kept between parses, to run git again only once it is cleared
 // - columnSources: true adds the declaration of each column (source: { file, line }), for the
 //   tools that point at a column (not shown in the JSON viewer)
+// - details: true adds the column details (length, default...), the indexes of each table and the
+//   ON DELETE of the relations (docs/pivot-format.md), for exports and tools
 module.exports.parse = function (basePath, options = {}) {
     const entityDir = path.join(basePath, 'src', 'Entity');
     if (!isDirectory(entityDir)) {
@@ -603,11 +819,15 @@ module.exports.parse = function (basePath, options = {}) {
         classes.push(...readFile(file, warnings, options.overrides));
     }
 
-    // Enum backing types, used for enum columns
+    // Enum backing types, used for enum columns, and the cases of the backed enums (details)
     const enums = new Map();
+    const enumCases = new Map();
     for (const cls of classes) {
         if (cls.kind === 'enum') {
             enums.set(cls.fqcn.toLowerCase(), cls.backing || 'string');
+            if (cls.backing) {
+                enumCases.set(cls.fqcn.toLowerCase(), cls.cases);
+            }
         }
     }
 
@@ -724,6 +944,7 @@ module.exports.parse = function (basePath, options = {}) {
         const type = (stringValue(inheritance, arg(inheritance, 'value')) || '').toUpperCase();
         if (type === 'SINGLE_TABLE' || type === 'JOINED') {
             entity.root = root;
+            entity.inSingleTable = type === 'SINGLE_TABLE';
             entity.singleTable = type === 'SINGLE_TABLE' && root !== entity;
             if (entity.singleTable) {
                 entity.table = root.table;
@@ -755,9 +976,15 @@ module.exports.parse = function (basePath, options = {}) {
     };
 
     const foreignKeys = [];
+    // Details of each column (option `details`), added once every column is known so that they come
+    // after the other keys
+    const detailsOf = new Map();
     for (const entity of entities) {
         const { cls } = entity;
         const table = { table: entity.table, columns: [], relations: [] };
+        // Column names of each mapped property, for the indexes declared with `fields`
+        entity.fieldColumns = new Map();
+        entity.extraIndexes = [];
         // The entity class, opened by a click in the diagram
         const source = { file: cls.file.rel, line: cls.lines[0] };
 
@@ -796,7 +1023,18 @@ module.exports.parse = function (basePath, options = {}) {
                 if (boolValue(arg(mapping, 'nullable')) === true || entity.singleTable) {
                     column.nullable = true;
                 }
-                addColumn(column, property, owner);
+                entity.fieldColumns.set(property.name, [column.name]);
+                if (addColumn(column, property, owner) && options.details) {
+                    const details = columnDetails(mapping, property.type, owner.ctx, column.type, enumCases);
+                    const generated = find('generatedvalue');
+                    const strategy = generated && arg(generated, 'strategy') !== undefined
+                        ? (stringValue(generated, arg(generated, 'strategy')) || '').toUpperCase()
+                        : 'AUTO';
+                    if (isId && generated && GENERATED.has(strategy)) {
+                        details.autoIncrement = true;
+                    }
+                    detailsOf.set(column, details);
+                }
                 continue;
             }
 
@@ -833,6 +1071,8 @@ module.exports.parse = function (basePath, options = {}) {
                 const references = join.references || 'id';
                 // Named after the class that maps the field (a mapped superclass maps its own)
                 const ownerName = underscore(source.name);
+                // Doctrine's default join columns cascade
+                const onDelete = joins.length === 0 ? 'cascade' : onDeleteOf(joins);
                 table.relations.push({
                     foreignKey: join.name || `${ownerName}_${joins.length === 0 && selfReferencing ? 'source' : references}`,
                     references,
@@ -840,14 +1080,21 @@ module.exports.parse = function (basePath, options = {}) {
                     type: 'many-to-many',
                     via: unquoteName(stringValue(joinTable, arg(joinTable, 'name')))
                         || `${ownerName}_${underscore(shortName(target))}`,
+                    ...(options.details && onDelete ? { onDelete } : {}),
                 });
                 continue;
             }
 
             const joins = joinColumns(property.mappings, null);
+            const onDelete = onDeleteOf(joins);
+            // An owning one-to-one is unique (one join column) or gets a unique constraint (several),
+            // except in a single-table hierarchy (ClassMetadata::validateAndCompleteOneToOneMapping)
+            const oneToOneUnique = relationKind === 'onetoone' && !entity.inSingleTable;
+            const names = [];
             for (const join of joins.length > 0 ? joins : [{}]) {
                 const column = { name: join.name || `${underscore(property.name)}_id`, type: null };
                 const references = join.references || 'id';
+                names.push(column.name);
                 if (isId) {
                     column.primary = true;
                 } else if (join.nullable !== false) {
@@ -855,13 +1102,25 @@ module.exports.parse = function (basePath, options = {}) {
                 }
                 if (addColumn(column, property, owner)) {
                     foreignKeys.push({ column, targetEntity, references });
+                    if (options.details) {
+                        const details = optionDetails(join.mapping, null, enumCases);
+                        if (join.unique === true || (oneToOneUnique && joins.length <= 1 && !isId)) {
+                            details.unique = true;
+                        }
+                        detailsOf.set(column, details);
+                    }
                 }
                 table.relations.push({
                     foreignKey: column.name,
                     references,
                     on: targetTable,
                     type: relationKind === 'manytoone' ? 'many-to-one' : 'one-to-one',
+                    ...(options.details && onDelete ? { onDelete } : {}),
                 });
+            }
+            entity.fieldColumns.set(property.name, names);
+            if (oneToOneUnique && names.length > 1) {
+                entity.extraIndexes.push({ type: 'unique', name: `${property.name}_uniq`, columns: names });
             }
         }
         table.source = source;
@@ -880,6 +1139,9 @@ module.exports.parse = function (basePath, options = {}) {
         };
         setStatus(column, statusOf(root.cls, ...root.cls.lines));
         root.output.columns.push(column);
+        if (options.details) {
+            detailsOf.set(column, columnDetails(mapping, '', root.cls.ctx, column.type, enumCases));
+        }
     }
     for (const entity of entities.filter(e => e.root && e.root !== e)) {
         const { root } = entity;
@@ -896,20 +1158,42 @@ module.exports.parse = function (basePath, options = {}) {
         const keys = root.output.columns.filter(c => c.primary).map(c => {
             const key = { ...c, type: null };
             setStatus(key, statusOf(entity.cls, ...entity.cls.lines));
+            // Same mapping as the root key, but not auto-incremented (SchemaTool)
+            if (detailsOf.has(c)) {
+                const details = { ...detailsOf.get(c) };
+                delete details.autoIncrement;
+                detailsOf.set(key, details);
+            }
             return key;
         });
         entity.output.columns.unshift(...keys);
-        entity.output.relations.unshift(...keys.map(c => ({ foreignKey: c.name, references: c.name, on: root.table, type: 'one-to-one' })));
+        // Doctrine deletes the child row with the root row
+        entity.output.relations.unshift(...keys.map(c => ({
+            foreignKey: c.name,
+            references: c.name,
+            on: root.table,
+            type: 'one-to-one',
+            ...(options.details ? { onDelete: 'cascade' } : {}),
+        })));
         foreignKeys.push(...keys.map(column => ({ column, targetEntity: root, references: column.name })));
     }
 
-    // Foreign key columns take the type of the column they reference (which may be a foreign key too)
+    // Foreign key columns take the type of the column they reference (which may be a foreign key too),
+    // and its length, precision, scale and unsigned (details) unless their JoinColumn sets them
     let pending = foreignKeys;
     while (pending.length > 0) {
         const next = pending.filter(fk => {
             const target = fk.targetEntity && fk.targetEntity.columns.find(c => c.name === fk.references);
             if (target && target.type) {
                 fk.column.type = target.type;
+                if (options.details) {
+                    const inherited = detailsOf.get(target) || {};
+                    const details = detailsOf.get(fk.column) || {};
+                    for (const key of KEY_DETAILS.filter(k => k in inherited && !(k in details))) {
+                        details[key] = inherited[key];
+                    }
+                    detailsOf.set(fk.column, details);
+                }
                 return false;
             }
             return true;
@@ -928,5 +1212,49 @@ module.exports.parse = function (basePath, options = {}) {
     for (const entity of tables) {
         setStatus(entity.output, tableStatus(statusOf(entity.cls, ...entity.cls.lines), entity.output.columns.map(c => c.git)));
     }
+
+    if (options.details) {
+        for (const entity of tables) {
+            addIndexes(entity, classMap, byClass, detailsOf);
+            for (const column of entity.output.columns) {
+                assignDetails(column, detailsOf.get(column) || {});
+            }
+        }
+    }
     return { tables: tables.map(e => e.output), warnings };
 };
+
+// Indexes of an entity table (option `details`). The declarations of the entity come first, then its
+// one-to-one unique constraints, then those of its mapped superclasses, nearest first (a name declared
+// nearer wins, as in ClassMetadataFactory::addInheritedIndexes). Plain parent classes are skipped, an
+// entity parent ends the chain. Single-table children are not tables: SchemaTool reads the indexes of
+// the root entity only. One-column unique constraints become the `unique` detail of their column.
+function addIndexes(entity, classMap, byClass, detailsOf) {
+    const declarations = [...classIndexes(entity.cls), ...entity.extraIndexes];
+    const visited = new Set();
+    const parentClass = (cls) => cls.parent && classMap.get(cls.parent.toLowerCase());
+    for (let cls = parentClass(entity.cls); cls && !byClass.has(cls.fqcn.toLowerCase()) && !visited.has(cls); cls = parentClass(cls)) {
+        visited.add(cls);
+        if (cls.mappings.some(m => m.kind === 'mappedsuperclass')) {
+            declarations.push(...classIndexes(cls).filter(index => !index.name || !declarations.some(d => (
+                d.name === index.name && (d.type === 'unique') === (index.type === 'unique')
+            ))));
+        }
+    }
+
+    const table = entity.output;
+    const indexes = [];
+    for (const index of declarations) {
+        // `fields` are property names: their columns, or the join columns of an association
+        const columns = index.columns || (index.fields || []).flatMap(field => entity.fieldColumns.get(field) || []);
+        const column = columns.length === 1 && index.type === 'unique' && table.columns.find(c => c.name === columns[0]);
+        if (column) {
+            detailsOf.set(column, { ...detailsOf.get(column), unique: true });
+        } else if (columns.length > 0) {
+            indexes.push({ columns, type: index.type, ...(index.name ? { name: index.name } : {}) });
+        }
+    }
+    if (indexes.length > 0) {
+        table.indexes = indexes;
+    }
+}

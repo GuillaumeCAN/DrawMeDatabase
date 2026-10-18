@@ -148,4 +148,8 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - The Export menu points to DrawMeDatabase Pro (SQL, DBML, TypeScript, documentation...) while it is not installed
 - Parser options for tools: `columnSources` (where each column is declared) and, for Laravel, `until` (the schema right after a migration)
 - The `marks` option of the diagram generator: a CSS class per table (`mark`) and a comment per column (`note`), for the tools of other extensions
+- The `details` parser option: lengths, precisions, unsigned, default values, enum values, comments, auto-increments, indexes (unique, full text, spatial) and `ON DELETE` / `ON UPDATE` of the foreign keys, read from Laravel migrations and Doctrine entities (`docs/pivot-format.md`)
+
+### Changed
+- New animation in the README: the live diagram and its git status
 

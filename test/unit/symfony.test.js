@@ -77,12 +77,12 @@ function php(body, namespace = 'App\\Entity') {
 
 const ID = '    #[ORM\\Id]\n    #[ORM\\GeneratedValue]\n    #[ORM\\Column]\n    private ?int $id = null;\n';
 
-function parseEntities(files) {
+function parseEntities(files, options) {
     const entityFiles = {};
     for (const [name, content] of Object.entries(files)) {
         entityFiles[`src/Entity/${name}`] = content;
     }
-    return parse(project(entityFiles));
+    return parse(project(entityFiles), options);
 }
 
 // Runs `fn` with extra environment variables, restored afterwards
@@ -1665,6 +1665,709 @@ describe('symfony parser: options for tools', () => {
         const article = tables.find(t => t.table === 'blog_article');
         assert.deepEqual(article.columns.find(c => c.name === 'headline_text').source, { file: 'src/Entity/Blog/BlogArticle.php', line: 18 });
         assert.ok(parser.parse(FIXTURE, { git: false }).tables.every(t => t.columns.every(c => c.source === undefined)));
+    });
+});
+
+describe('symfony parser: details', () => {
+    const DETAILS = { git: false, details: true };
+    const columnsOf = (result, name) => table(result, name).columns;
+    const DETAIL_KEYS = ['length', 'precision', 'scale', 'unsigned', 'default', 'defaultRaw', 'values', 'unique', 'autoIncrement', 'comment'];
+    // The columns and relations without their details: what the parser gives without the option
+    const withoutDetails = (tables) => tables.map(t => {
+        const copy = {
+            ...t,
+            columns: t.columns.map(c => Object.fromEntries(Object.entries(c).filter(([key]) => !DETAIL_KEYS.includes(key)))),
+            relations: t.relations.map(r => Object.fromEntries(Object.entries(r).filter(([key]) => key !== 'onDelete'))),
+        };
+        delete copy.indexes;
+        return copy;
+    });
+
+    it('reads the column details of attributes: length, precision, scale, options, unique, positional arguments', () => {
+        const result = parseEntities({
+            'Product.php': php(`#[ORM\\Entity]\nclass Product\n{\n${ID}
+    #[ORM\\Column(length: 120, unique: true, options: ['comment' => 'Shown in the shop', 'default' => 'New product'])]
+    private ?string $name = null;
+
+    #[ORM\\Column(type: 'decimal', precision: 10, scale: 2, options: ['unsigned' => true, 'default' => '0.00'])]
+    private ?string $price = null;
+
+    #[ORM\\Column(options: ['unsigned' => true, 'default' => 0])]
+    private int $stock = 0;
+
+    #[ORM\\Column(options: ['default' => -1.5])]
+    private float $ratio = 0;
+
+    #[ORM\\Column(options: ['default' => true, 'unsigned' => false])]
+    private bool $active = true;
+
+    // A key present with null is DEFAULT NULL
+    #[ORM\\Column(nullable: true, options: ['default' => null])]
+    private ?string $note = null;
+
+    #[ORM\\Column(options: ['default' => 'CURRENT_TIMESTAMP'])]
+    private ?\\DateTimeImmutable $createdAt = null;
+
+    #[ORM\\Column(type: 'date', options: ['default' => 'CURRENT_DATE'])]
+    private ?\\DateTimeInterface $day = null;
+
+    // DBAL quotes CURRENT_TIMESTAMP for a string column: a plain default
+    #[ORM\\Column(options: ['default' => 'CURRENT_TIMESTAMP'])]
+    private ?string $label = null;
+
+    // Constants and expressions are not literals
+    #[ORM\\Column(length: self::CODE_LENGTH, options: ['default' => self::DEFAULT_CODE, 'comment' => 'a' . 'b'])]
+    private ?string $code = null;
+
+    #[ORM\\Column('sku_code', 'string', 32, null, null, true)]
+    private ?string $sku = null;
+}`),
+        }, DETAILS);
+
+        assert.deepEqual(columnsOf(result, 'product'), [
+            { name: 'id', type: 'integer', primary: true, autoIncrement: true },
+            { name: 'name', type: 'string', length: 120, default: 'New product', unique: true, comment: 'Shown in the shop' },
+            { name: 'price', type: 'decimal', precision: 10, scale: 2, unsigned: true, default: '0.00' },
+            { name: 'stock', type: 'integer', unsigned: true, default: 0 },
+            { name: 'ratio', type: 'float', default: -1.5 },
+            { name: 'active', type: 'boolean', default: true },
+            { name: 'note', type: 'string', nullable: true, default: null },
+            { name: 'created_at', type: 'datetime_immutable', defaultRaw: 'CURRENT_TIMESTAMP' },
+            { name: 'day', type: 'date', defaultRaw: 'CURRENT_DATE' },
+            { name: 'label', type: 'string', default: 'CURRENT_TIMESTAMP' },
+            { name: 'code', type: 'string' },
+            { name: 'sku_code', type: 'string', length: 32, unique: true },
+        ]);
+        assert.deepEqual(result.warnings, []);
+    });
+
+    it('reads the column details of annotations, options={...} with = or :', () => {
+        const result = parseEntities({
+            'LegacyProduct.php': php(`/**
+ * @ORM\\Entity
+ * @ORM\\Table(name="legacy_product")
+ */
+class LegacyProduct
+{
+    /**
+     * @ORM\\Id
+     * @ORM\\GeneratedValue(strategy="IDENTITY")
+     * @ORM\\Column(type="integer", options={"unsigned"=true})
+     */
+    private $id;
+
+    /**
+     * @ORM\\Column(type="string", length=120, unique=true, options={"comment"="The ""public"" name", "default"="New"})
+     */
+    private $name;
+
+    /**
+     * @ORM\\Column(type="decimal", precision=10, scale=2, nullable=true, options={"default": 0})
+     */
+    private $price;
+
+    /**
+     * @ORM\\Column(type="datetime", options={"default"="CURRENT_TIMESTAMP"})
+     */
+    private $createdAt;
+
+    /**
+     * @ORM\\Column(type="boolean", options={"default"=false})
+     */
+    private $active;
+}`),
+        }, DETAILS);
+
+        assert.deepEqual(columnsOf(result, 'legacy_product'), [
+            { name: 'id', type: 'integer', primary: true, unsigned: true, autoIncrement: true },
+            { name: 'name', type: 'string', length: 120, default: 'New', unique: true, comment: 'The "public" name' },
+            { name: 'price', type: 'decimal', nullable: true, precision: 10, scale: 2, default: 0 },
+            { name: 'created_at', type: 'datetime', defaultRaw: 'CURRENT_TIMESTAMP' },
+            { name: 'active', type: 'boolean', default: false },
+        ]);
+    });
+
+    it('marks the ids generated by the database (GeneratedValue without strategy, AUTO, IDENTITY, SEQUENCE) as autoIncrement', () => {
+        const entity = (name, generated) => php(`#[ORM\\Entity]\nclass ${name}\n{\n    #[ORM\\Id]\n${generated}    #[ORM\\Column]\n    private ?int $id = null;\n}`);
+        const result = parseEntities({
+            'A.php': entity('A', '    #[ORM\\GeneratedValue]\n'),
+            'B.php': entity('B', "    #[ORM\\GeneratedValue(strategy: 'IDENTITY')]\n"),
+            'C.php': entity('C', "    #[ORM\\GeneratedValue('SEQUENCE')]\n"),
+            'D.php': entity('D', "    #[ORM\\GeneratedValue(strategy: 'AUTO')]\n"),
+            'E.php': entity('E', "    #[ORM\\GeneratedValue(strategy: 'NONE')]\n"),
+            'F.php': entity('F', "    #[ORM\\GeneratedValue(strategy: 'CUSTOM')]\n    #[ORM\\CustomIdGenerator(class: 'doctrine.uuid_generator')]\n"),
+            'G.php': entity('G', ''),
+            // Doctrine only generates ids
+            'H.php': php(`#[ORM\\Entity]\nclass H\n{\n${ID}\n    #[ORM\\GeneratedValue]\n    #[ORM\\Column]\n    private ?int $counter = null;\n}`),
+        }, DETAILS);
+
+        const generated = Object.fromEntries(result.tables.flatMap(t => t.columns.map(c => [`${t.table}.${c.name}`, c.autoIncrement === true])));
+        assert.deepEqual(generated, {
+            'a.id': true, 'b.id': true, 'c.id': true, 'd.id': true, 'e.id': false, 'f.id': false, 'g.id': false, 'h.id': true, 'h.counter': false,
+        });
+    });
+
+    it('gives the case values of the backed enums of src/Entity, and enum cases as defaults', () => {
+        const result = parseEntities({
+            'Enum/Suit.php': php("enum Suit: string\n{\n    case Hearts = 'H';\n    case Spades = 'S';\n}", 'App\\Entity\\Enum'),
+            'Enum/Level.php': php('enum Level: int\n{\n    case Low = 1;\n    case High = 10;\n}', 'App\\Entity\\Enum'),
+            'Enum/Computed.php': php("enum Computed: string\n{\n    const PREFIX = 'x';\n\n    case A = self::PREFIX . 'a';\n    case B = 'b';\n}", 'App\\Entity\\Enum'),
+            'Card.php': `<?php
+
+namespace App\\Entity;
+
+use App\\Entity\\Enum\\Computed;
+use App\\Entity\\Enum\\Level;
+use App\\Entity\\Enum\\Suit;
+use App\\Enum\\Outside;
+use Doctrine\\ORM\\Mapping as ORM;
+
+#[ORM\\Entity]
+class Card
+{
+${ID}
+    #[ORM\\Column]
+    private ?Suit $suit = null;
+
+    #[ORM\\Column(length: 1, enumType: Suit::class, options: ['default' => Suit::Spades])]
+    private ?string $suitCode = null;
+
+    #[ORM\\Column(options: ['default' => Level::High->value])]
+    private ?Level $level = null;
+
+    #[ORM\\Column(enumType: Suit::class)]
+    private array $suits = [];
+
+    // With an explicit type, Doctrine does not infer the enum from the property type
+    #[ORM\\Column(type: 'string')]
+    private ?Suit $typed = null;
+
+    // A case value that is not a literal: the values are unknown
+    #[ORM\\Column]
+    private ?Computed $computed = null;
+
+    // Declared outside src/Entity: unknown
+    #[ORM\\Column]
+    private ?Outside $outside = null;
+
+    #[ORM\\Column(type: 'enum', options: ['values' => ['small', 'large']])]
+    private ?string $size = null;
+}`,
+        }, DETAILS);
+
+        assert.deepEqual(columnsOf(result, 'card').slice(1), [
+            { name: 'suit', type: 'string', values: ['H', 'S'] },
+            { name: 'suit_code', type: 'string', length: 1, default: 'S', values: ['H', 'S'] },
+            // Integer cases are given as strings, like every allowed value
+            { name: 'level', type: 'integer', default: 10, values: ['1', '10'] },
+            { name: 'suits', type: 'json', values: ['H', 'S'] },
+            { name: 'typed', type: 'string' },
+            { name: 'computed', type: 'string' },
+            { name: 'outside', type: 'string' },
+            { name: 'size', type: 'enum', values: ['small', 'large'] },
+        ]);
+    });
+
+    it('reads the Index and UniqueConstraint attributes: columns, fields, flags, names, in the order of the code', () => {
+        const result = parseEntities({
+            'Article.php': php(`#[ORM\\Entity]
+#[ORM\\Index(columns: ['title', 'published_at'], name: 'idx_title_date')]
+#[ORM\\Index(fields: ['author', 'createdAt'])]
+#[ORM\\UniqueConstraint(name: 'uniq_slug_site', columns: ['slug', 'site'])]
+#[ORM\\Index(name: 'idx_body', columns: ['body'], flags: ['fulltext'])]
+#[ORM\\Index(columns: ['area'], flags: ['SPATIAL'])]
+#[ORM\\UniqueConstraint(fields: ['code'])]
+#[ORM\\UniqueConstraint(name: 'uniq_ref', columns: ['ref_number'])]
+#[ORM\\Index(columns: ['title'])]
+#[ORM\\Index(fields: ['unknown'])]
+class Article
+{
+${ID}
+    #[ORM\\Column]
+    private ?string $title = null;
+
+    #[ORM\\Column(nullable: true)]
+    private ?\\DateTimeImmutable $publishedAt = null;
+
+    #[ORM\\Column]
+    private ?\\DateTimeImmutable $createdAt = null;
+
+    #[ORM\\Column]
+    private ?string $slug = null;
+
+    #[ORM\\Column]
+    private ?int $site = null;
+
+    #[ORM\\Column(type: 'text')]
+    private ?string $body = null;
+
+    #[ORM\\Column(type: 'geometry')]
+    private $area;
+
+    #[ORM\\Column(length: 10)]
+    private ?string $code = null;
+
+    #[ORM\\Column(name: 'ref_number')]
+    private ?string $reference = null;
+
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(name: 'writer_id')]
+    private ?Author $author = null;
+}`),
+            'Author.php': php(`#[ORM\\Entity]\nclass Author\n{\n${ID}}`),
+        }, DETAILS);
+
+        // Fields are property names (an association gives its join columns); unknown ones are skipped,
+        // as by Doctrine. One-column unique constraints are the `unique` of their column.
+        assert.deepEqual(table(result, 'article').indexes, [
+            { columns: ['title', 'published_at'], type: 'index', name: 'idx_title_date' },
+            { columns: ['writer_id', 'created_at'], type: 'index' },
+            { columns: ['slug', 'site'], type: 'unique', name: 'uniq_slug_site' },
+            { columns: ['body'], type: 'fulltext', name: 'idx_body' },
+            { columns: ['area'], type: 'spatial' },
+            { columns: ['title'], type: 'index' },
+        ]);
+        const unique = columnsOf(result, 'article').filter(c => c.unique).map(c => c.name);
+        assert.deepEqual(unique, ['code', 'ref_number']);
+        assert.equal(table(result, 'author').indexes, undefined);
+    });
+
+    it('reads the indexes and uniqueConstraints of the Table attribute and annotation', () => {
+        const result = parseEntities({
+            'Order.php': php(`#[ORM\\Entity]
+#[ORM\\Table(
+    name: 'shop_order',
+    indexes: [new ORM\\Index(name: 'idx_status', columns: ['status']), new ORM\\Index(columns: ['customer_id', 'placed_at'])],
+    uniqueConstraints: [new ORM\\UniqueConstraint(name: 'uniq_number', columns: ['number']), new ORM\\UniqueConstraint(columns: ['customer_id', 'number'])],
+)]
+class Order
+{
+${ID}
+    #[ORM\\Column(length: 20)]
+    private ?string $status = null;
+
+    #[ORM\\Column(length: 20)]
+    private ?string $number = null;
+
+    #[ORM\\Column]
+    private ?\\DateTimeImmutable $placedAt = null;
+
+    #[ORM\\ManyToOne]
+    private ?Customer $customer = null;
+}`),
+            'Customer.php': php(`#[ORM\\Entity]\nclass Customer\n{\n${ID}}`),
+            'LegacyOrder.php': php(`/**
+ * @ORM\\Entity
+ * @ORM\\Table(name="legacy_order", indexes={
+ *     @ORM\\Index(name="idx_ref", columns={"ref"}),
+ *     @ORM\\Index(name="idx_notes", columns={"notes"}, flags={"fulltext"})
+ * }, uniqueConstraints={@ORM\\UniqueConstraint(name="uniq_ref_year", columns={"ref", "year"}), @ORM\\UniqueConstraint(columns={"code"})})
+ * @ORM\\Index(name="not_on_a_class", columns={"year"})
+ */
+class LegacyOrder
+{
+    /** @ORM\\Id @ORM\\GeneratedValue @ORM\\Column(type="integer") */
+    private $id;
+
+    /** @ORM\\Column(type="string") */
+    private $ref;
+
+    /** @ORM\\Column(type="text") */
+    private $notes;
+
+    /** @ORM\\Column(type="smallint") */
+    private $year;
+
+    /** @ORM\\Column(type="string") */
+    private $code;
+}`),
+        }, DETAILS);
+
+        assert.deepEqual(table(result, 'shop_order').indexes, [
+            { columns: ['status'], type: 'index', name: 'idx_status' },
+            { columns: ['customer_id', 'placed_at'], type: 'index' },
+            { columns: ['customer_id', 'number'], type: 'unique' },
+        ]);
+        assert.equal(columnsOf(result, 'shop_order').find(c => c.name === 'number').unique, true);
+        // As annotations, Index and UniqueConstraint count inside @ORM\Table only (Doctrine refuses them elsewhere)
+        assert.deepEqual(table(result, 'legacy_order').indexes, [
+            { columns: ['ref'], type: 'index', name: 'idx_ref' },
+            { columns: ['notes'], type: 'fulltext', name: 'idx_notes' },
+            { columns: ['ref', 'year'], type: 'unique', name: 'uniq_ref_year' },
+        ]);
+        assert.deepEqual(columnsOf(result, 'legacy_order').filter(c => c.unique).map(c => c.name), ['code']);
+    });
+
+    it('reads onDelete of the join columns, lower-cased, and the cascade of the default many-to-many join columns', () => {
+        const result = parseEntities({
+            'Comment.php': php(`#[ORM\\Entity]\nclass Comment\n{\n${ID}
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    private ?Post $post = null;
+
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(onDelete: 'SET NULL')]
+    private ?User $author = null;
+
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(onDelete: 'NO ACTION')]
+    private ?User $editor = null;
+
+    // Not a referential action: DBAL would refuse it
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(onDelete: 'SOMETIMES')]
+    private ?User $reviewer = null;
+
+    #[ORM\\ManyToOne]
+    private ?Post $origin = null;
+
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(unique: true)]
+    private ?User $pinnedBy = null;
+}`),
+            'Post.php': php(`use Doctrine\\Common\\Collections\\Collection;\n\n#[ORM\\Entity]\nclass Post\n{\n${ID}
+    #[ORM\\ManyToMany(targetEntity: Tag::class)]
+    private Collection $tags;
+
+    #[ORM\\ManyToMany(targetEntity: User::class)]
+    #[ORM\\JoinTable(name: 'post_readers')]
+    private Collection $readers;
+
+    #[ORM\\ManyToMany(targetEntity: User::class)]
+    #[ORM\\JoinTable(name: 'post_editors', joinColumns: [new ORM\\JoinColumn(name: 'edited_post_id')])]
+    private Collection $editors;
+
+    #[ORM\\ManyToMany(targetEntity: User::class)]
+    #[ORM\\JoinTable(name: 'post_owners')]
+    #[ORM\\JoinColumn(name: 'owned_post_id', onDelete: 'RESTRICT')]
+    private Collection $owners;
+}`),
+            'Tag.php': php(`#[ORM\\Entity]\nclass Tag\n{\n${ID}}`),
+            'User.php': php(`#[ORM\\Entity]\nclass User\n{\n${ID}}`),
+            'Vote.php': php(`/** @ORM\\Entity */
+class Vote
+{
+    /** @ORM\\Id @ORM\\Column(type="integer") */
+    private $id;
+
+    /**
+     * @ORM\\ManyToOne(targetEntity="Post")
+     * @ORM\\JoinColumn(name="post_ref", onDelete="restrict")
+     */
+    private $post;
+
+    /**
+     * @ORM\\ManyToMany(targetEntity="User")
+     * @ORM\\JoinTable(name="vote_voters", joinColumns={@ORM\\JoinColumn(name="vote_ref", onDelete="SET DEFAULT")})
+     */
+    private $voters;
+}`),
+        }, DETAILS);
+
+        const actions = (name) => table(result, name).relations.map(r => `${r.foreignKey}${r.via ? ` via ${r.via}` : ''}: ${r.onDelete}`);
+        assert.deepEqual(actions('comment'), [
+            'post_id: cascade', 'author_id: set null', 'editor_id: no action', 'reviewer_id: undefined', 'origin_id: undefined', 'pinned_by_id: undefined',
+        ]);
+        // Doctrine's default join columns (no joinColumns, with or without JoinTable) cascade
+        assert.deepEqual(actions('post'), [
+            'post_id via post_tag: cascade',
+            'post_id via post_readers: cascade',
+            'edited_post_id via post_editors: undefined',
+            'owned_post_id via post_owners: restrict',
+        ]);
+        assert.deepEqual(actions('vote'), ['post_ref: restrict', 'vote_ref via vote_voters: set default']);
+        assert.deepEqual(columnsOf(result, 'comment').filter(c => c.unique).map(c => c.name), ['pinned_by_id']);
+        // onUpdate does not exist in Doctrine
+        assert.ok(result.tables.every(t => t.relations.every(r => !('onUpdate' in r))));
+    });
+
+    it('makes owning one-to-one join columns unique, or a <field>_uniq constraint when there are several', () => {
+        const result = parseEntities({
+            'Citizen.php': php(`#[ORM\\Entity]\nclass Citizen\n{\n${ID}
+    #[ORM\\OneToOne]
+    private ?Profile $profile = null;
+
+    #[ORM\\OneToOne]
+    #[ORM\\JoinColumn(name: 'passport_country', referencedColumnName: 'country')]
+    #[ORM\\JoinColumn(name: 'passport_number', referencedColumnName: 'number')]
+    private ?Passport $passport = null;
+}`),
+            'Passport.php': php("#[ORM\\Entity]\nclass Passport\n{\n    #[ORM\\Id, ORM\\Column(length: 2)]\n    private string $country;\n\n    #[ORM\\Id, ORM\\Column(length: 20)]\n    private string $number;\n}"),
+            'Profile.php': php(`#[ORM\\Entity]\nclass Profile\n{\n${ID}}`),
+            // An id is unique already
+            'Seat.php': php('#[ORM\\Entity]\nclass Seat\n{\n    #[ORM\\Id]\n    #[ORM\\OneToOne]\n    private ?Citizen $citizen = null;\n}'),
+        }, DETAILS);
+
+        assert.deepEqual(table(result, 'citizen'), {
+            table: 'citizen',
+            columns: [
+                { name: 'id', type: 'integer', primary: true, autoIncrement: true },
+                { name: 'profile_id', type: 'integer', nullable: true, unique: true },
+                { name: 'passport_country', type: 'string', nullable: true, length: 2 },
+                { name: 'passport_number', type: 'string', nullable: true, length: 20 },
+            ],
+            relations: [
+                { foreignKey: 'profile_id', references: 'id', on: 'profile', type: 'one-to-one' },
+                { foreignKey: 'passport_country', references: 'country', on: 'passport', type: 'one-to-one' },
+                { foreignKey: 'passport_number', references: 'number', on: 'passport', type: 'one-to-one' },
+            ],
+            indexes: [{ columns: ['passport_country', 'passport_number'], type: 'unique', name: 'passport_uniq' }],
+        });
+        assert.deepEqual(columnsOf(result, 'seat'), [{ name: 'citizen_id', type: 'integer', primary: true }]);
+    });
+
+    it('gives foreign key columns the length, precision, scale and unsigned of the referenced column, and the options of their JoinColumn', () => {
+        const result = parseEntities({
+            'Badge.php': php("#[ORM\\Entity]\nclass Badge\n{\n    #[ORM\\Id, ORM\\Column(length: 36)]\n    private string $uuid;\n}"),
+            'Account.php': php(`#[ORM\\Entity]\nclass Account\n{
+    #[ORM\\Id, ORM\\GeneratedValue, ORM\\Column(options: ['unsigned' => true])]
+    private ?int $id = null;
+
+    #[ORM\\Column(type: 'decimal', precision: 12, scale: 4, unique: true, options: ['comment' => 'Not copied'])]
+    private ?string $code = null;
+}`),
+            'Holder.php': php(`#[ORM\\Entity]\nclass Holder\n{\n${ID}
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(referencedColumnName: 'uuid')]
+    private ?Badge $badge = null;
+
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(options: ['comment' => 'Owner account'])]
+    private ?Account $account = null;
+
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(name: 'account_code', referencedColumnName: 'code')]
+    private ?Account $byCode = null;
+}`),
+        }, DETAILS);
+
+        assert.deepEqual(columnsOf(result, 'holder').slice(1), [
+            { name: 'badge_id', type: 'string', nullable: true, length: 36 },
+            { name: 'account_id', type: 'integer', nullable: true, unsigned: true, comment: 'Owner account' },
+            { name: 'account_code', type: 'decimal', nullable: true, precision: 12, scale: 4 },
+        ]);
+    });
+
+    describe('inheritance', () => {
+        it('an entity gets the indexes and the column details of its mapped superclasses, its own names winning', () => {
+            const result = parseEntities({
+                'BaseRecord.php': php(`#[ORM\\MappedSuperclass]
+#[ORM\\Index(name: 'idx_created', columns: ['created_at'])]
+#[ORM\\Index(name: 'idx_shared', columns: ['created_at', 'id'])]
+#[ORM\\UniqueConstraint(fields: ['uuid'])]
+abstract class BaseRecord
+{
+    #[ORM\\Id, ORM\\GeneratedValue(strategy: 'IDENTITY'), ORM\\Column(options: ['unsigned' => true])]
+    protected ?int $id = null;
+
+    #[ORM\\Column(length: 36)]
+    protected ?string $uuid = null;
+
+    #[ORM\\Column(options: ['default' => 'CURRENT_TIMESTAMP'])]
+    protected ?\\DateTime $createdAt = null;
+}`),
+                // Not mapped: Doctrine does not read its attributes, but goes on to its mapped parent
+                'Timestamped.php': php("#[ORM\\Index(name: 'idx_plain', columns: ['uuid'])]\nabstract class Timestamped extends BaseRecord\n{\n}"),
+                'Invoice.php': php("#[ORM\\Entity]\n#[ORM\\Index(name: 'idx_shared', columns: ['title'])]\nclass Invoice extends Timestamped\n{\n    #[ORM\\Column]\n    private ?string $title = null;\n}"),
+            }, DETAILS);
+
+            assert.deepEqual(table(result, 'invoice'), {
+                table: 'invoice',
+                columns: [
+                    { name: 'id', type: 'integer', primary: true, unsigned: true, autoIncrement: true },
+                    { name: 'uuid', type: 'string', length: 36, unique: true },
+                    { name: 'created_at', type: 'datetime', defaultRaw: 'CURRENT_TIMESTAMP' },
+                    { name: 'title', type: 'string' },
+                ],
+                relations: [],
+                indexes: [
+                    { columns: ['title'], type: 'index', name: 'idx_shared' },
+                    { columns: ['created_at'], type: 'index', name: 'idx_created' },
+                ],
+            });
+        });
+
+        it('single-table children add their column details to the root table, not their indexes (SchemaTool reads the root only)', () => {
+            const result = parseEntities({
+                'Person.php': php(`#[ORM\\Entity]
+#[ORM\\InheritanceType('SINGLE_TABLE')]
+#[ORM\\DiscriminatorColumn(name: 'kind', type: 'string', length: 20)]
+#[ORM\\Index(name: 'idx_name', columns: ['name'])]
+class Person
+{
+${ID.replace('private', 'protected')}
+    #[ORM\\Column(length: 100)]
+    protected ?string $name = null;
+
+    // Not unique in a single-table hierarchy
+    #[ORM\\OneToOne]
+    private ?Desk $desk = null;
+}`),
+                'Customer.php': php(`#[ORM\\Entity]
+#[ORM\\Index(name: 'idx_ignored', columns: ['card'])]
+#[ORM\\UniqueConstraint(columns: ['card', 'name'])]
+class Customer extends Person
+{
+    #[ORM\\Column(length: 20, unique: true, options: ['comment' => 'Loyalty card'])]
+    private ?string $card = null;
+}`),
+                'Desk.php': php(`#[ORM\\Entity]\nclass Desk\n{\n${ID}}`),
+            }, DETAILS);
+
+            assert.deepEqual(table(result, 'person'), {
+                table: 'person',
+                columns: [
+                    { name: 'id', type: 'integer', primary: true, autoIncrement: true },
+                    { name: 'name', type: 'string', length: 100 },
+                    { name: 'desk_id', type: 'integer', nullable: true },
+                    { name: 'kind', type: 'string', length: 20 },
+                    { name: 'card', type: 'string', nullable: true, length: 20, unique: true, comment: 'Loyalty card' },
+                ],
+                relations: [{ foreignKey: 'desk_id', references: 'id', on: 'desk', type: 'one-to-one' }],
+                indexes: [{ columns: ['name'], type: 'index', name: 'idx_name' }],
+            });
+        });
+
+        it('joined children copy the root key without autoIncrement, cascade on delete and keep their own indexes', () => {
+            const result = parseEntities({
+                'Vehicle.php': php(`#[ORM\\Entity]
+#[ORM\\InheritanceType('JOINED')]
+class Vehicle
+{
+    #[ORM\\Id, ORM\\GeneratedValue, ORM\\Column(type: 'bigint', options: ['unsigned' => true, 'comment' => 'Vehicle number'])]
+    protected ?string $id = null;
+}`),
+                'Car.php': php("#[ORM\\Entity]\n#[ORM\\Index(name: 'idx_doors', columns: ['doors'])]\nclass Car extends Vehicle\n{\n    #[ORM\\Column]\n    private ?int $doors = null;\n}"),
+            }, DETAILS);
+
+            assert.deepEqual(table(result, 'car'), {
+                table: 'car',
+                columns: [
+                    { name: 'id', type: 'bigint', primary: true, unsigned: true, comment: 'Vehicle number' },
+                    { name: 'doors', type: 'integer' },
+                ],
+                relations: [{ foreignKey: 'id', references: 'id', on: 'vehicle', type: 'one-to-one', onDelete: 'cascade' }],
+                indexes: [{ columns: ['doors'], type: 'index', name: 'idx_doors' }],
+            });
+            assert.deepEqual(columnsOf(result, 'vehicle'), [
+                { name: 'id', type: 'bigint', primary: true, unsigned: true, autoIncrement: true, comment: 'Vehicle number' },
+                { name: 'dtype', type: 'string' },
+            ]);
+        });
+
+        it('trait columns resolve their enum with the imports of the trait (inherited fixture)', () => {
+            const result = parse(path.join(__dirname, '..', 'fixtures', 'symfony', 'inherited'), DETAILS);
+            assert.deepEqual(columnsOf(result, 'branch').find(c => c.name === 'level'), { name: 'level', type: 'integer', values: ['1', '2'] });
+            assert.deepEqual(columnsOf(result, 'book').map(c => c.length), [undefined, 255, 20]);
+            assert.deepEqual(withoutDetails(result.tables), parse(path.join(__dirname, '..', 'fixtures', 'symfony', 'inherited'), { git: false }).tables);
+        });
+    });
+
+    it('gives the details of the blog fixture, and nothing else changes', () => {
+        const result = parse(FIXTURE, DETAILS);
+        assert.deepEqual(result.warnings, []);
+        assert.deepEqual(withoutDetails(result.tables), BLOG_TABLES);
+
+        const details = {};
+        for (const t of result.tables) {
+            for (const c of t.columns) {
+                const declared = Object.fromEntries(Object.entries(c).filter(([key]) => DETAIL_KEYS.includes(key)));
+                if (Object.keys(declared).length > 0) {
+                    details[`${t.table}.${c.name}`] = declared;
+                }
+            }
+        }
+        const generated = { autoIncrement: true };
+        assert.deepEqual(details, {
+            'blog_article.id': generated,
+            'blog_article.headline_text': { length: 255 },
+            'category.id': generated,
+            'category.name': { length: 100 },
+            'category.slug': { length: 100, unique: true },
+            'comment.id': generated,
+            // @ORM\GeneratedValue
+            'legacy_note.id': generated,
+            'post.id': generated,
+            'post.title': { length: 255 },
+            // PostStatus is a string enum of src/Entity
+            'post.status': { length: 20, values: ['draft', 'published'] },
+            'profile.id': generated,
+            'tag.id': generated,
+            'tag.name': { length: 50, unique: true },
+            'user.id': generated,
+            // UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email']): one column
+            'user.email': { length: 180, unique: true },
+            // Owning one-to-one
+            'user.profile_id': { unique: true },
+        });
+        // Only the default join columns of the many-to-many relations declare an action
+        const actions = result.tables.flatMap(t => t.relations.filter(r => r.onDelete).map(r => `${t.table}.${r.foreignKey} via ${r.via}: ${r.onDelete}`));
+        assert.deepEqual(actions, ['legacy_note.legacy_note_id via legacy_note_tags: cascade', 'post.post_id via post_tag: cascade']);
+        assert.ok(result.tables.every(t => !('indexes' in t)));
+    });
+
+    it('adds the details after the other keys (git, source), in the order of the pivot format', () => {
+        const dir = project({
+            'src/Entity/Item.php': php(`#[ORM\\Entity]\n#[ORM\\Index(columns: ['code', 'id'])]\nclass Item\n{\n${ID}
+    #[ORM\\Column(length: 10, unique: true, options: ['comment' => 'Code', 'default' => 'A'])]
+    private ?string $code = null;
+
+    #[ORM\\ManyToOne]
+    #[ORM\\JoinColumn(onDelete: 'CASCADE')]
+    private ?Item $parent = null;
+}`),
+        });
+        git(dir, 'init', '-q');
+        commitAll(dir);
+
+        const item = parser.parse(dir, { columnSources: true, details: true }).tables[0];
+        assert.deepEqual(Object.keys(item), ['table', 'columns', 'relations', 'source', 'git', 'indexes']);
+        assert.deepEqual(item.columns.map(c => Object.keys(c)), [
+            ['name', 'type', 'primary', 'git', 'source', 'autoIncrement'],
+            ['name', 'type', 'git', 'source', 'length', 'default', 'unique', 'comment'],
+            ['name', 'type', 'nullable', 'git', 'source'],
+        ]);
+        assert.deepEqual(Object.keys(item.relations[0]), ['foreignKey', 'references', 'on', 'type', 'onDelete']);
+    });
+
+    it('gives no detail without the option', () => {
+        const files = {
+            'src/Entity/Item.php': php(`#[ORM\\Entity]\n#[ORM\\Index(columns: ['code', 'id'])]\n#[ORM\\UniqueConstraint(columns: ['label'])]\nclass Item\n{\n${ID}
+    #[ORM\\Column(length: 10, unique: true, options: ['unsigned' => true, 'comment' => 'Code', 'default' => 'A'])]
+    private ?string $code = null;
+
+    #[ORM\\Column]
+    private ?string $label = null;
+
+    #[ORM\\Column]
+    private ?Size $size = null;
+
+    #[ORM\\OneToOne]
+    #[ORM\\JoinColumn(onDelete: 'CASCADE')]
+    private ?Item $parent = null;
+
+    #[ORM\\ManyToMany(targetEntity: Item::class)]
+    private $related;
+}`),
+            'src/Entity/Size.php': php("enum Size: string\n{\n    case Small = 's';\n}"),
+        };
+        const dir = project(files);
+        const plain = parse(dir, { git: false });
+        assert.deepEqual(plain.tables, [{
+            table: 'item',
+            columns: [
+                { name: 'id', type: 'integer', primary: true },
+                { name: 'code', type: 'string' },
+                { name: 'label', type: 'string' },
+                { name: 'size', type: 'string' },
+                { name: 'parent_id', type: 'integer', nullable: true },
+            ],
+            relations: [
+                { foreignKey: 'parent_id', references: 'id', on: 'item', type: 'one-to-one' },
+                { foreignKey: 'item_source', references: 'id', on: 'item', type: 'many-to-many', via: 'item_item' },
+            ],
+        }]);
+        assert.deepEqual(withoutDetails(parse(dir, DETAILS).tables), plain.tables);
     });
 });
 
