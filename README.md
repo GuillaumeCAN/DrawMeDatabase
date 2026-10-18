@@ -47,6 +47,7 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 DrawMeDatabase is free, and everything it does today stays free. **DrawMeDatabase Pro** is a separate, paid extension that adds tools on top of it:
 
+- **Schema canvas**: a second view where you move the tables and the links by hand, with the git status of every column; the layout is kept and can be shared with your team
 - **Table designer**: draw a table (columns, types, keys, relations) and get the Laravel migration or the Doctrine entity written for you
 - **Schema comparison**: what changed between two branches or commits, and what a migration does, with a report to paste in a pull request
 - **Exports**: SQL (MySQL, PostgreSQL, SQLite), DBML, PlantUML, TypeScript types, and an HTML documentation of the schema
