@@ -1226,3 +1226,64 @@ test('API: the display settings (appearance and language) and their changes', ()
     assert.deepEqual(seen.map(settings => [settings.theme, settings.language]), [['dark', 'en']], 'only the display settings fire');
     subscription.dispose();
 });
+
+test('inspector: a column opens at its line; the sections of other extensions, or the Pro teaser', async () => {
+    const tables = [
+        { table: 'users', columns: [{ name: 'id', type: 'bigIncrements', primary: true, source: { file: 'database/migrations/users.php', line: 14 } }], relations: [], source: { file: 'database/migrations/users.php', line: 12 } },
+        { table: 'outside', columns: [{ name: 'id', type: 'integer', source: { file: '../../etc/passwd', line: 1 } }], relations: [] },
+    ];
+    const ext = activate(() => ({ tables, warnings: [] }));
+    const api = ext.context.api;
+    const dir = folder('inspector', LARAVEL);
+    ext.openFolders(dir);
+    ext.run();
+    assert.equal(ext.state.parseOptions[0].columnSources, true, 'the lines of the columns are read');
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+
+    panel.postFromPage({ type: 'openColumn', table: 'users', column: 'id' });
+    panel.postFromPage({ type: 'openColumn', table: 'users', column: 'nope' });
+    panel.postFromPage({ type: 'openColumn', table: 'outside', column: 'id' });
+    panel.postFromPage({ type: 'openColumn', table: 'users', column: 42 });
+    await flush();
+    assert.deepEqual(ext.state.opened.map(opened => [path.relative(dir, opened.path), opened.options.selection.startLine]), [[path.join('database', 'migrations', 'users.php'), 13]]);
+
+    // No provider: the teaser of DrawMeDatabase Pro
+    panel.postFromPage({ type: 'tableInfo', table: 'users', request: 1 });
+    await flush();
+    assert.deepEqual(panel.sent('tableInfo').at(-1), { type: 'tableInfo', table: 'users', request: 1, sections: [], teaser: true });
+
+    // Providers: their sections, cleaned, with actions run by id only
+    const seen = [];
+    api.registerTableInfoProvider({
+        id: 'pro',
+        provide: (table, schema) => {
+            seen.push([table, schema.tables.length]);
+            return Promise.resolve([
+                { title: 'Details', items: [{ label: 'Index', value: 'email', badge: 'unique', tone: 'accent', extra: 1 }, { label: 3 }], actions: [{ label: 'Add columns…', command: 'DMDBPro.addColumns', args: ['users', { x: 1 }] }] },
+                { title: '' },
+                { title: 'History', items: [], locked: true, note: 'Trial ended' },
+            ]);
+        },
+    });
+    const failing = api.registerTableInfoProvider({ id: 'broken', provide: () => { throw new Error('boom'); } });
+    assert.throws(() => api.registerTableInfoProvider({ id: 'x' }), TypeError);
+    panel.postFromPage({ type: 'tableInfo', table: 'users', request: 2 });
+    await flush();
+    await flush();
+    const info = panel.sent('tableInfo').at(-1);
+    assert.deepEqual(seen, [['users', 2]]);
+    assert.equal(info.teaser, false);
+    assert.deepEqual(info.sections, [
+        { title: 'Details', items: [{ label: 'Index', value: 'email', hint: undefined, badge: 'unique', tone: 'accent' }], actions: [{ id: 'action-1', label: 'Add columns…' }], note: undefined, locked: false },
+        { title: 'History', items: [], actions: [], note: 'Trial ended', locked: true },
+    ]);
+    assert.ok(ext.state.output.some(line => line.includes('boom')), 'a failing provider is written to the output');
+
+    ext.state.executed = [];
+    panel.postFromPage({ type: 'tableAction', id: 'action-1' });
+    panel.postFromPage({ type: 'tableAction', id: 'action-9' });
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.addColumns', args: ['users'] }]);
+    failing.dispose();
+});

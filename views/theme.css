@@ -686,6 +686,12 @@ main {
     stroke: var(--dmdb-accent) !important;
 }
 
+/* The table shown in the inspector */
+.stage .node.selected .outer-path path {
+    stroke: var(--dmdb-accent) !important;
+    stroke-width: 3px !important;
+}
+
 /* Off-screen element where Mermaid measures the text */
 .render-sandbox {
     position: absolute;
@@ -1287,6 +1293,247 @@ pre {
     font-size: 11px;
     line-height: 1.4;
     color: var(--vscode-descriptionForeground);
+}
+
+/* Inspector of a table (inspector.js), in the side panel */
+.inspector-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px 14px;
+    border-bottom: 1px solid var(--dmdb-border);
+}
+
+.inspector-name-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.inspector-name {
+    margin: 0;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.inspector-chip {
+    flex: 0 0 auto;
+    padding: 1px 7px;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.inspector-chip.git-untracked,
+.inspector-dot.git-untracked,
+.inspector-git-line.git-untracked {
+    color: var(--dmdb-git-new);
+}
+
+.inspector-chip.git-modified,
+.inspector-dot.git-modified,
+.inspector-git-line.git-modified {
+    color: var(--dmdb-git-modified);
+}
+
+.inspector-chip.git-unsaved,
+.inspector-dot.git-unsaved,
+.inspector-git-line.git-unsaved {
+    color: var(--dmdb-git-unsaved);
+}
+
+.inspector-summary,
+.inspector-source,
+.inspector-git-line {
+    margin: 0;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.inspector-source {
+    overflow: hidden;
+    font-family: var(--vscode-editor-font-family, monospace);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.inspector-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.inspector-body {
+    gap: 2px;
+}
+
+.inspector-column,
+.inspector-relation {
+    display: grid;
+    align-items: center;
+    width: 100%;
+    min-height: 24px;
+    padding: 2px 6px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    text-align: left;
+    color: var(--vscode-foreground);
+}
+
+.inspector-column {
+    grid-template-columns: 22px minmax(0, 1fr) auto 10px;
+    gap: 6px;
+}
+
+button.inspector-column,
+.inspector-relation {
+    cursor: pointer;
+}
+
+button.inspector-column:hover,
+.inspector-relation:hover {
+    background-color: var(--dmdb-hover);
+}
+
+.inspector-key {
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.inspector-key.pk {
+    color: var(--vscode-charts-yellow, #cca700);
+}
+
+.inspector-key.fk {
+    color: var(--vscode-charts-blue, #3794ff);
+}
+
+.inspector-column-name,
+.inspector-relation-table {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.inspector-column-type,
+.inspector-relation-detail,
+.inspector-relation-type {
+    overflow: hidden;
+    font-size: 11px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--vscode-descriptionForeground);
+}
+
+.inspector-dot::before {
+    content: '\25CF';
+    font-size: 9px;
+}
+
+.inspector-relation {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "table type" "detail detail";
+    column-gap: 8px;
+    padding: 4px 6px;
+}
+
+.inspector-relation-table {
+    grid-area: table;
+    font-weight: 600;
+}
+
+.inspector-relation-type {
+    grid-area: type;
+}
+
+.inspector-relation-detail {
+    grid-area: detail;
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.inspector-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 2px 8px;
+    align-items: baseline;
+    padding: 3px 0;
+}
+
+.inspector-item-label {
+    overflow-wrap: anywhere;
+}
+
+.inspector-item-value {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.inspector-item-badge {
+    padding: 0 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+}
+
+.inspector-item-hint {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.inspector-item.tone-added .inspector-item-label {
+    color: var(--dmdb-git-new);
+}
+
+.inspector-item.tone-modified .inspector-item-label {
+    color: var(--dmdb-git-modified);
+}
+
+.inspector-item.tone-accent .inspector-item-label {
+    color: var(--dmdb-accent);
+}
+
+.inspector-item.tone-muted {
+    opacity: 0.7;
+}
+
+.inspector-locked .panel-section-body {
+    opacity: 0.55;
+}
+
+.inspector-locked .panel-section-title .panel-badge {
+    margin-left: auto;
+}
+
+.inspector-teaser .panel-footer-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.inspector-teaser-list {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--vscode-descriptionForeground);
+}
+
+.inspector-missing,
+.inspector-loading {
+    padding: 12px 14px;
 }
 
 /* Toast */

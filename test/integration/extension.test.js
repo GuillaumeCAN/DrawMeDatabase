@@ -18,9 +18,11 @@ const EXTENSION_ID = 'GuillaumeCancalon.draw-me-database';
 const findTable = (tables, name) => tables.find(table => table.table === name);
 
 // A column without its git status (it depends on the state of the repository the test runs in)
+// and its source line (checked on its own)
 const withoutGit = (column) => {
     const copy = { ...column };
     delete copy.git;
+    delete copy.source;
     return copy;
 };
 const GIT_STATUSES = ['committed', 'modified', 'untracked'];
@@ -78,6 +80,9 @@ suite('DrawMeDatabase extension', () => {
         const users = findTable(tables, 'users');
         assert.deepEqual(withoutGit(users.columns.find(column => column.name === 'id')),
             { name: 'id', type: 'bigIncrements', primary: true });
+        // The line of each column, for the inspector of the page
+        assert.deepEqual(users.columns.find(column => column.name === 'id').source,
+            { file: 'database/migrations/2024_01_01_000000_create_users_table.php', line: 12 });
         // The fixture is in this repository: every table and column has a git status
         assert.ok(GIT_STATUSES.includes(users.git), users.git);
         assert.ok(users.columns.every(column => GIT_STATUSES.includes(column.git)));

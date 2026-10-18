@@ -53,6 +53,7 @@ const SCRIPTS = [
     ['search.js'],
     ['mermaid', 'diagram.js'],
     ['sidepanel.js'],
+    ['inspector.js'],
     ['json', 'json.js'],
     ['app.js'],
 ];

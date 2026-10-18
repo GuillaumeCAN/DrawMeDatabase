@@ -141,6 +141,10 @@ function activate(context) {
     // pro, locked }), and the license of DrawMeDatabase Pro ({ kind, daysLeft, commands } or null)
     const tools = new Map();
     let license = null;
+    // What other extensions show in the inspector of a table (id → provide(table, schema)), and
+    // the commands of the actions they posted to the page (action id → { command, args })
+    const tableProviders = new Map();
+    let tableActions = new Map();
     // API: the appearance and the language of the pages, for the panels of other extensions
     const displayChanged = createEmitter();
     context.subscriptions.push(displayChanged);
@@ -187,6 +191,31 @@ function activate(context) {
             Promise.resolve(vscode.commands.executeCommand(tool.command, ...tool.args)).catch(err => reportUnexpectedError(output, err));
         } else if (PRO_TOOLS.includes(id)) {
             openPro();
+        }
+    };
+    // The sections of the inspector of a table, from the providers (each one at most 10 s), or
+    // the Pro teaser when none is registered
+    const tableInfo = async (name) => {
+        if (tableProviders.size === 0) {
+            return { sections: [], teaser: true };
+        }
+        const schema = publicSchema();
+        const timeout = () => new Promise(resolve => setTimeout(() => resolve([]), 10000));
+        const results = await Promise.all([...tableProviders.values()].map(provide => Promise.race([
+            Promise.resolve().then(() => provide(name, schema)).catch(err => {
+                output.appendLine(`Table info: ${err && err.message ? err.message : err}`);
+                return [];
+            }),
+            timeout(),
+        ])));
+        tableActions = new Map();
+        const sections = results.flat().map(section => cleanSection(section, tableActions)).filter(Boolean);
+        return { sections, teaser: false };
+    };
+    const runTableAction = (id) => {
+        const action = tableActions.get(id);
+        if (action) {
+            Promise.resolve(vscode.commands.executeCommand(action.command, ...action.args)).catch(err => reportUnexpectedError(output, err));
         }
     };
     const runLicenseAction = (action) => {
@@ -250,9 +279,11 @@ function activate(context) {
     };
 
     // Opens the file a table comes from (migration or entity), beside the diagram
-    const openTable = (name) => {
+    // Opens the file of a table, or the line of one of its columns (column: its name)
+    const openTable = (name, columnName) => {
         const table = current && typeof name === 'string' ? current.tables.find(candidate => candidate.table === name) : undefined;
-        const source = table && table.source;
+        const column = table && typeof columnName === 'string' ? (table.columns || []).find(candidate => candidate.name === columnName) : undefined;
+        const source = columnName === undefined ? table && table.source : column && column.source;
         if (!source || typeof source.file !== 'string') {
             return;
         }
@@ -331,6 +362,8 @@ function activate(context) {
         features,
         runTool,
         runLicenseAction,
+        tableInfo,
+        runTableAction,
         schemaFor: (names) => {
             const schema = publicSchema();
             if (schema && Array.isArray(names)) {
@@ -471,6 +504,22 @@ function activate(context) {
                 },
             };
         },
+        // Sections of the inspector of a table: provide(table, schema) returns (or resolves to) a list of
+        // { title, items: [{ label, value, hint, tone, badge }], actions: [{ label, command, args }],
+        // note, locked }. Returns a Disposable
+        registerTableInfoProvider(provider) {
+            if (!provider || typeof provider.id !== 'string' || typeof provider.provide !== 'function') {
+                throw new TypeError('A table info provider needs an id and a provide(table, schema) function');
+            }
+            tableProviders.set(provider.id, provider.provide);
+            return {
+                dispose() {
+                    if (tableProviders.get(provider.id) === provider.provide) {
+                        tableProviders.delete(provider.id);
+                    }
+                },
+            };
+        },
         // The license of DrawMeDatabase Pro, shown at the bottom of the side panel:
         // { kind: 'licensed' | 'trial' | 'expired' | 'development', daysLeft, commands: { buy, enter, manage } },
         // or null (not installed)
@@ -534,7 +583,8 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         }
 
         // Parsing
-        result = PARSERS[framework]().parse(basePath, { overrides, gitCache, git });
+        // columnSources: the line of each column, opened from the inspector of the page
+        result = PARSERS[framework]().parse(basePath, { overrides, gitCache, git, columnSources: true });
     } catch (err) {
         if (err instanceof ParserError) {
             output.appendLine(`Error: ${err.message}`);
@@ -707,9 +757,36 @@ function watchGitRepositories(onChange) {
     };
 }
 
+// A section of the inspector from another extension, kept to the known fields and sizes; its
+// actions are stored in `actions` (id → { command, args }) and posted with their id only
+const SECTION_TONES = ['added', 'modified', 'removed', 'muted', 'accent'];
+function cleanSection(section, actions) {
+    if (!section || typeof section !== 'object' || typeof section.title !== 'string' || !section.title.trim()) {
+        return null;
+    }
+    const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : undefined);
+    const items = (Array.isArray(section.items) ? section.items : []).slice(0, 200)
+        .filter(item => item && typeof item.label === 'string')
+        .map(item => ({
+            label: text(item.label, 200),
+            value: text(item.value, 200),
+            hint: text(item.hint, 300),
+            badge: text(item.badge, 40),
+            tone: SECTION_TONES.includes(item.tone) ? item.tone : undefined,
+        }));
+    const sectionActions = (Array.isArray(section.actions) ? section.actions : []).slice(0, 8)
+        .filter(action => action && typeof action.label === 'string' && typeof action.command === 'string')
+        .map(action => {
+            const id = `action-${actions.size + 1}`;
+            actions.set(id, { command: action.command, args: Array.isArray(action.args) ? action.args.filter(arg => ['string', 'number', 'boolean'].includes(typeof arg)) : [] });
+            return { id, label: text(action.label, 80) };
+        });
+    return { title: text(section.title, 80), items, actions: sectionActions, note: text(section.note, 500), locked: section.locked === true };
+}
+
 // A single webview panel. The page is loaded once: the schema and the settings are posted to it
 // (again when it reloads, after being restored), and it asks for refreshes and exports.
-function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor, features, runTool, runLicenseAction }) {
+function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor, features, runTool, runLicenseAction, tableInfo, runTableAction }) {
     let panel;
     let ready = false;
     // What the page shows: the last schema, or a message when there is none
@@ -853,6 +930,23 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 break;
             case 'open':
                 openTable(message.table);
+                break;
+            case 'openColumn':
+                if (typeof message.column === 'string') {
+                    openTable(message.table, message.column);
+                }
+                break;
+            case 'tableInfo':
+                if (typeof message.table === 'string') {
+                    tableInfo(message.table)
+                        .then(info => post({ type: 'tableInfo', table: message.table, request: message.request, ...info }))
+                        .catch(err => reportUnexpectedError(output, err));
+                }
+                break;
+            case 'tableAction':
+                if (typeof message.id === 'string') {
+                    runTableAction(message.id);
+                }
                 break;
             case 'rendered':
                 lastRender = {

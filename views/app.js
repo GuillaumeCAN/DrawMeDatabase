@@ -94,6 +94,10 @@
         onOpenTable(table) {
             vscode.postMessage({ type: 'open', table });
         },
+        // A click shows the table in the inspector (a double-click opens its file)
+        onSelectTable(table) {
+            showTable(table);
+        },
         t: tr,
     });
     const json = window.DrawMeDatabaseJson.create($('json-output'));
@@ -601,24 +605,96 @@
 
     const sidePanel = window.DrawMeDatabaseSidePanel.create({ element: elements.panel, onChange: onPanelChange, onAction: onPanelAction });
 
+    // The side panel shows the options, or the inspector of a table
+    let panelMode = 'options';
+    // The table in the inspector, and what other extensions add about it ({ sections, loading, teaser })
+    let inspected = null;
+    let inspectedExtras = {};
+    let tableRequest = 0;
+
     function renderPanel() {
-        if (state.panel) {
+        if (!state.panel) {
+            return;
+        }
+        if (panelMode === 'table') {
+            inspector.render(window.DrawMeDatabaseInspector.tableInfo(schema, inspected), t, inspectedExtras);
+        } else {
             sidePanel.render(panelModel());
         }
     }
 
-    function setPanel(open, focusButton) {
+    function setPanel(open, focusButton, mode) {
         state.panel = open;
+        panelMode = mode || 'options';
         persist();
         elements.panel.hidden = !open;
-        elements.panelButton.setAttribute('aria-expanded', String(open));
+        elements.panelButton.setAttribute('aria-expanded', String(open && panelMode === 'options'));
+        if (!open || panelMode !== 'table') {
+            inspected = null;
+            diagram.select(null);
+        }
         if (open) {
             renderPanel();
         } else if (focusButton) {
             elements.panelButton.focus();
         }
     }
-    elements.panelButton.addEventListener('click', () => setPanel(!state.panel));
+    elements.panelButton.addEventListener('click', () => setPanel(!(state.panel && panelMode === 'options')));
+
+    // The inspector of a table: what the page knows at once, then what other extensions add
+    function requestTableInfo() {
+        tableRequest += 1;
+        vscode.postMessage({ type: 'tableInfo', table: inspected, request: tableRequest });
+    }
+
+    function showTable(name, { center = false } = {}) {
+        inspected = name;
+        inspectedExtras = { loading: true };
+        diagram.select(name);
+        setPanel(true, false, 'table');
+        if (center) {
+            // On narrow panels the side panel covers the right of the diagram
+            const covering = getComputedStyle(elements.panel).position === 'absolute' ? elements.panel.offsetWidth : 0;
+            diagram.centerOn(name, covering);
+        }
+        requestTableInfo();
+    }
+
+    // Its neighbours: the tables it references and the ones that reference it
+    function neighboursOf(name) {
+        const names = new Set([name]);
+        (schema ? schema.tables : []).forEach(table => (table.relations || []).forEach(relation => {
+            if (table.table === name) {
+                names.add(relation.on);
+            }
+            if (relation.on === name) {
+                names.add(table.table);
+            }
+        }));
+        return [...names];
+    }
+
+    const inspector = window.DrawMeDatabaseInspector.create({
+        element: elements.panel,
+        onAction(id, value) {
+            if (id === 'close') {
+                setPanel(false);
+            } else if (id === 'open') {
+                vscode.postMessage({ type: 'open', table: inspected });
+            } else if (id === 'openColumn') {
+                vscode.postMessage({ type: 'openColumn', table: inspected, column: value });
+            } else if (id === 'select') {
+                showTable(value, { center: true });
+            } else if (id === 'neighbours') {
+                setFocus({ tables: neighboursOf(inspected), highlight: [inspected], label: t('focus.neighbours', { table: inspected }) });
+                diagram.select(inspected);
+            } else if (id === 'action') {
+                vscode.postMessage({ type: 'tableAction', id: value });
+            } else if (id === 'pro') {
+                vscode.postMessage({ type: 'pro' });
+            }
+        },
+    });
     elements.panel.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
             setPanel(false, true);
@@ -642,6 +718,8 @@
 
     // Messages from the extension
 
+    let tableInfoTimer;
+
     window.addEventListener('message', event => {
         const message = event.data;
         if (!message || typeof message !== 'object') {
@@ -660,6 +738,11 @@
                 // The saved view on the first drawing (reload of the window), then the same place
                 draw(drawn ? 'keep' : state.view);
                 renderPanel();
+                // The inspected table changed too: ask again what the other extensions add
+                if (panelMode === 'table' && inspected) {
+                    clearTimeout(tableInfoTimer);
+                    tableInfoTimer = setTimeout(requestTableInfo, 400);
+                }
                 break;
             case 'settings': {
                 const next = {
@@ -696,6 +779,15 @@
                     items: Array.isArray(message.items) ? message.items.filter(item => item && typeof item.id === 'string') : [],
                     pro: Boolean(message.pro),
                 };
+                break;
+            case 'tableInfo':
+                if (message.request === tableRequest && message.table === inspected) {
+                    inspectedExtras = {
+                        sections: Array.isArray(message.sections) ? message.sections.filter(section => section && typeof section.title === 'string') : [],
+                        teaser: message.teaser === true,
+                    };
+                    renderPanel();
+                }
                 break;
             case 'features': {
                 const list = (items) => (Array.isArray(items) ? items.filter(item => item && typeof item.id === 'string') : []);

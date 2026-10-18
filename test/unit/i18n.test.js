@@ -44,7 +44,7 @@ describe('i18n: strings', () => {
         const page = read('views', 'index.html');
         const attributes = [...page.matchAll(/data-i18n(?:-title|-label|-placeholder)?="([^"]+)"/g)].map(match => match[1]);
         assert.ok(attributes.length > 10);
-        const scripts = ['views/app.js', 'views/mermaid/diagram.js'].map(file => read(file)).join('\n');
+        const scripts = ['views/app.js', 'views/mermaid/diagram.js', 'views/inspector.js'].map(file => read(file)).join('\n');
         const calls = [...scripts.matchAll(/\bt[r]?\('([\w.-]+)'/g)].map(match => match[1]);
         assert.ok(calls.length > 30);
         for (const key of [...attributes, ...calls]) {
@@ -64,6 +64,11 @@ describe('i18n: strings', () => {
             ...['auto', ...i18n.LANGUAGES].map(language => `language.${language}`),
             ...['licensed', 'development', 'trial', 'expired', 'buy', 'enter', 'manage', 'discover'].map(kind => `panel.license.${kind}`),
             ...['svg', 'png', 'mmd', 'md', 'json'].map(format => `format.${format}`),
+            ...['untracked', 'modified', 'unsaved'].map(status => `inspector.git.${status}`),
+            ...['many-to-one', 'one-to-one', 'many-to-many'].map(type => `inspector.relation.${type}`),
+            ...['details', 'history', 'actions'].map(key => `inspector.pro.${key}`),
+            'inspector.open.laravel', 'inspector.open.symfony',
+            ...['columns', 'relations', 'referencedBy'].map(key => `inspector.summary.${key}`),
         ];
         for (const key of keys) {
             assert.ok(t.has(key), key);
