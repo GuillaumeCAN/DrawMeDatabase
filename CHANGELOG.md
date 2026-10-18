@@ -167,3 +167,4 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 
 ### Fixed
 - A column note or a git label holding two '~' (such as the comparisons of DrawMeDatabase Pro, `~ default: a~b`) no longer makes Mermaid reject the whole diagram, and a table name holding '~x~' is no longer drawn as '<x>': the first '~' is written as is, the next ones as the look-alike '∼'
+- A ':' in a table name, a relation name or a column note (the comparisons of DrawMeDatabase Pro) is drawn as ':' instead of '&#58;', and a '#' as the fullwidth '＃' instead of '&#35;'

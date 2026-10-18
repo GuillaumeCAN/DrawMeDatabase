@@ -49,8 +49,11 @@ async function parseWithMermaid(source) {
 }
 
 // The text Mermaid draws: it encodes '#123;' as 'ﬂ°°123¶ß' while parsing, then writes it back
-// as '&#123;' in the SVG markup (decodeEntities), which the page reads as the character
-const shown = (text) => String(text).replace(/ﬂ°°(\d+)¶ß/g, (match, code) => String.fromCharCode(Number(code)));
+// as '&#123;' (decodeEntities), which SVG text labels (htmlLabels off, as in diagram.js) show as is
+const shown = (text) => String(text).replace(/ﬂ°°/g, '&#').replace(/ﬂ°/g, '&').replace(/¶ß/g, ';');
+
+// '#' is written as the fullwidth '＃' in labels and comments
+const drawn = (text) => text.replace(/#/g, '＃');
 
 const lines = (source) => source.split('\n');
 
@@ -152,14 +155,22 @@ test('labels have their quotes stripped', () => {
     assert.ok(lines(percent).includes('  b ||--o{ a : "x__{init}___"'));
 });
 
-test("'#' and ':' are written as Mermaid entity codes", () => {
+// Mermaid entity codes ('#58;') would be drawn as is ('&#58;') in SVG text labels
+test("'#' is written as the fullwidth '＃' and ':' as it is, never as Mermaid entity codes", () => {
     const source = generate([{ table: 'table#x;', columns: [], relations: [{ foreignKey: 'style:#f00;', references: 'id', on: 'b' }] }]);
     assert.deepEqual(lines(source).slice(1), [
-        '  t1["table#35;x;"]',
+        '  t1["table＃x;"]',
         '  b',
-        '  b ||--o{ t1 : "style#58;#35;f00;"',
+        '  b ||--o{ t1 : "style:＃f00;"',
         '',
     ]);
+    const noted = generate([{
+        table: 'a:b#1;',
+        columns: [{ name: 'style', type: 'string', note: '~ default: #fff; → x:#1;' }],
+        relations: [{ foreignKey: 'fk:#2;', references: 'id', on: 'b' }],
+    }], { marks: true });
+    assert.ok(lines(noted).includes('    string style "~ default: ＃fff; → x:＃1;"'));
+    assert.ok(!noted.includes('#'), 'no entity code, no style...:#...; line');
 });
 
 test('"direction LR" in a name is not read as a direction statement', () => {
@@ -413,11 +424,28 @@ test('Mermaid keeps every odd table name, and shows labels as written', { skip }
 
     assert.equal(ids.length, names.length + 2);
     for (const name of names) {
-        assert.deepEqual(entities.get(name).attributes.map(({ type, name: column, keys }) => ({ type, column, keys })),
+        assert.deepEqual(entities.get(drawn(name)).attributes.map(({ type, name: column, keys }) => ({ type, column, keys })),
             [{ type: 'integer', column: 'id', keys: ['PK'] }], name);
-        assert.ok(relationships.some(r => r.entityA === name && r.entityB === 'links' && r.roleA === `${name}_id`), name);
+        assert.ok(relationships.some(r => r.entityA === drawn(name) && r.entityB === 'links' && r.roleA === `${drawn(name)}_id`), name);
     }
-    assert.ok(relationships.some(r => r.entityA === 'end' && r.entityB === 'styles' && r.roleA === 'style:#f00;'));
+    assert.ok(relationships.some(r => r.entityA === 'end' && r.entityB === 'styles' && r.roleA === 'style:＃f00;'));
+});
+
+// Pro's comparison notes ('~ type: int unsigned → int') were drawn 'type&#58; int unsigned'
+test('Mermaid draws the notes and labels holding ":" and "#" as written', { skip }, async () => {
+    const { entities, relationships } = await parseWithMermaid(generateMermaidER([{
+        table: 'orders:archive',
+        columns: [
+            { name: 'total', type: 'integer', note: '~ type: int unsigned → int' },
+            { name: 'style', type: 'string', note: '~ default: #fff; → x:#1;' },
+        ],
+        relations: [{ foreignKey: 'customer:id', references: 'id', on: 'customers' }],
+    }], { marks: true }));
+    const table = entities.get('orders:archive');
+    assert.ok(table, 'the table label');
+    assert.deepEqual(table.attributes.map(attribute => shown(attribute.comment)),
+        ['~ type: int unsigned → int', '~ default: ＃fff; → x:＃1;']);
+    assert.equal(relationships[0].roleA, 'customer:id');
 });
 
 test('Mermaid applies the highlight classes', { skip }, async () => {
@@ -475,7 +503,7 @@ test('the marks option: a CSS class per marked table and a comment per noted col
     ];
     const source = generate(tables, { marks: true });
     const output = lines(source);
-    assert.ok(output.includes('    string email "~ type#58; text → string"'));
+    assert.ok(output.includes('    string email "~ type: text → string"'));
     assert.ok(output.includes('    integer id "+ added"'));
     assert.ok(output.includes('  class users diffChanged'));
     assert.ok(output.includes('  class posts diffAdded'));

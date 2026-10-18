@@ -47,11 +47,12 @@
     const asText = (value) => (value === undefined || value === null ? '' : String(value));
     const asArray = (value) => (Array.isArray(value) ? value : []);
 
-    // Text allowed between double quotes (entity and relationship labels): no quote, '%',
-    // backslash or control char. '#' and ':' are written as Mermaid entity codes, which Mermaid
-    // turns back into the character when it draws: otherwise it reads '#word;' as an entity code
-    // ('#1;' would become U+0001) and drops the ';' of 'style...:#...;'. A line holding
-    // "direction LR" is read as a direction statement wherever it is, hence the '_'. Two '~' are
+    // Text allowed between double quotes (entity and relationship labels, attribute comments): no
+    // quote, '%', backslash or control char. Mermaid reads '#word;' as an entity code ('#1;' would
+    // become U+0001) and drops the ';' of 'style...:#...;', but its entity codes ('#58;') are drawn
+    // as is in SVG text labels (htmlLabels off: 'type&#58; text'). So '#' becomes the fullwidth
+    // '\uff03' (U+FF03, '#' once NFKC-normalized) and ':', harmless without '#', stays as it is. A line
+    // holding "direction LR" is read as a direction statement wherever it is, hence the '_'. Two '~' are
     // read as a generic type (List~T~): in an attribute comment ('~ default: a~b') the lexer takes
     // the quoted text for a type word and rejects the diagram, and labels draw '~x~' as '<x>'.
     // One '~' is harmless, so only the following ones become '\u223c' (U+223C, tilde operator).
@@ -62,7 +63,7 @@
             .trim()
             .replace(/(direction)\s+(TB|BT|RL|LR)/gi, '$1_$2')
             .replace(/(?<=~.*)~/g, '\u223c')
-            .replace(/[#:]/g, char => `#${char.charCodeAt(0)};`);
+            .replace(/#/g, '\uff03');
     }
 
     // One attribute word, never a key word (PK, FK, UK: also when followed by '-', '.', 'é'...)
