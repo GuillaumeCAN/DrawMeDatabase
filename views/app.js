@@ -25,7 +25,7 @@
     };
 
     let schema = null;
-    let settings = { layout: 'dagre', direction: 'TB' };
+    let settings = { layout: 'dagre', direction: 'TB', git: true };
     let drawn = false;
 
     const $ = (id) => document.getElementById(id);
@@ -42,6 +42,8 @@
         jsonView: $('json-view'),
         search: $('search'),
         searchCount: $('search-count'),
+        git: $('git-button'),
+        legend: $('legend'),
     };
 
     let saveTimer;
@@ -142,6 +144,31 @@
         }
         diagram.render(shownTables(), { ...settings, highlight: searching() ? filtered.matches : null }, view);
         drawn = true;
+        showLegend();
+    }
+
+    // Number of tables per git status, under the diagram
+    const LEGEND = [['untracked', 'New'], ['modified', 'Modified'], ['unsaved', 'Unsaved']];
+    function showLegend() {
+        const legend = elements.legend;
+        legend.textContent = '';
+        const tables = shownTables();
+        const counts = LEGEND.map(([status, label]) => [status, label, tables.filter(table => table.git === status).length]);
+        if (!settings.git || counts.every(([, , count]) => count === 0)) {
+            legend.hidden = true;
+            return;
+        }
+        for (const [status, label, count] of counts) {
+            if (count === 0) {
+                continue;
+            }
+            const item = document.createElement('span');
+            item.className = `legend-item git-${status}`;
+            item.textContent = `${label} ${count}`;
+            item.title = `${count} ${count === 1 ? 'table' : 'tables'} ${status === 'untracked' ? 'not in the last commit' : status === 'modified' ? 'changed since the last commit' : 'with changes not saved yet'}`;
+            legend.appendChild(item);
+        }
+        legend.hidden = false;
     }
 
     let searchTimer;
@@ -178,10 +205,15 @@
         elements.direction.title = label;
         elements.direction.setAttribute('aria-label', label);
         elements.direction.classList.toggle('left-to-right', leftToRight);
+        elements.git.setAttribute('aria-pressed', String(settings.git));
+        elements.git.setAttribute('aria-label', settings.git ? 'Hide the git status' : 'Show the git status');
     }
 
     elements.layout.addEventListener('change', () => {
         vscode.postMessage({ type: 'setting', key: 'layout', value: elements.layout.value });
+    });
+    elements.git.addEventListener('click', () => {
+        vscode.postMessage({ type: 'setting', key: 'showGitStatus', value: !settings.git });
     });
     elements.direction.addEventListener('click', () => {
         vscode.postMessage({ type: 'setting', key: 'direction', value: settings.direction === 'LR' ? 'TB' : 'LR' });
@@ -326,11 +358,18 @@
                 draw(drawn ? 'keep' : state.view);
                 break;
             case 'settings': {
-                const changed = message.layout !== settings.layout || message.direction !== settings.direction;
-                settings = { layout: message.layout === 'elk' ? 'elk' : 'dagre', direction: message.direction === 'LR' ? 'LR' : 'TB' };
+                const next = {
+                    layout: message.layout === 'elk' ? 'elk' : 'dagre',
+                    direction: message.direction === 'LR' ? 'LR' : 'TB',
+                    git: message.showGitStatus !== false,
+                };
+                // A new layout or direction moves every table: fit; the git status only recolors
+                const moved = next.layout !== settings.layout || next.direction !== settings.direction;
+                const recolored = next.git !== settings.git;
+                settings = next;
                 showSettings();
-                if (schema && changed && drawn) {
-                    draw('fit');
+                if (schema && drawn && (moved || recolored)) {
+                    draw(moved ? 'fit' : 'keep');
                 }
                 break;
             }

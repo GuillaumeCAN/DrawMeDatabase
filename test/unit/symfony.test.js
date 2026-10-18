@@ -7,10 +7,11 @@ const childProcess = require('child_process');
 
 const parser = require('../../parsers/symfony');
 
-// The tables without their source location (file and line of the table, tested on their own)
+// The tables without their source location and table status (tested on their own)
 const withoutSource = (table) => {
     const copy = { ...table };
     delete copy.source;
+    delete copy.git;
     return copy;
 };
 const withoutSources = (result) => ({ ...result, tables: result.tables.map(withoutSource) });

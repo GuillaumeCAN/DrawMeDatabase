@@ -3,7 +3,7 @@
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "icon": "images/logo_128.png",
   "engines": {
     "vscode": "^1.96.0"
@@ -80,7 +80,12 @@
         "DrawMeDatabase.autoRefresh": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Refresh the open diagram when a migration (Laravel) or an entity (Symfony) is saved, created or deleted."
+          "markdownDescription": "Refresh the open diagram while you edit a migration (Laravel) or an entity (Symfony), before saving, and when one is created, deleted or committed."
+        },
+        "DrawMeDatabase.showGitStatus": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the git status in the diagram: tables and columns new (not in the last commit), modified, or changed in an editor and not saved yet. Also available in the toolbar of the diagram."
         }
       }
     },

@@ -408,3 +408,36 @@ test('Mermaid names entity nodes "entity-<id>-<n>" (a click on a table opens its
     assert.match(entities.get('posts').id, /^entity-posts-\d+$/);
     assert.match(entities.get('my table').id, /^entity-t1-\d+$/);
 });
+
+const GIT_TABLES = [
+    {
+        table: 'users',
+        git: 'modified',
+        columns: [{ name: 'id', type: 'integer', primary: true, git: 'committed' }, { name: 'email', type: 'string', git: 'unsaved' }],
+        relations: [],
+    },
+    { table: 'posts', git: 'untracked', columns: [{ name: 'id', type: 'integer', git: 'untracked' }], relations: [] },
+    { table: 'tags', git: 'committed', columns: [{ name: 'id', type: 'integer', git: 'committed' }], relations: [] },
+];
+
+test('the git option adds the status of the tables (classes) and of the uncommitted columns (comments)', () => {
+    const { gitLabel } = require('../../views/mermaid/generator');
+    const source = generate(GIT_TABLES, { git: true });
+    const output = lines(source);
+    assert.ok(output.includes(`    string email "${gitLabel('unsaved')}"`));
+    assert.ok(output.includes(`    integer id "${gitLabel('untracked')}"`));
+    assert.ok(output.includes('    integer id PK'), 'committed columns have no comment');
+    assert.ok(output.includes('  class posts gitNew'));
+    assert.ok(output.includes('  class users gitModified'));
+    assert.ok(!source.includes('tags git'), 'committed tables have no class');
+    assert.ok(!generate(GIT_TABLES).includes(gitLabel('unsaved')), 'off by default (exports)');
+});
+
+test('Mermaid reads the git comments, and a table keeps both its search and git classes', { skip }, async () => {
+    const { gitLabel } = require('../../views/mermaid/generator');
+    const { entities } = await parseWithMermaid(generateMermaidER(GIT_TABLES, { git: true, highlight: ['posts'] }));
+    assert.equal(entities.get('users').attributes[1].comment, gitLabel('unsaved'));
+    assert.match(entities.get('posts').cssClasses, /\bmatch\b/);
+    assert.match(entities.get('posts').cssClasses, /\bgitNew\b/);
+    assert.match(entities.get('users').cssClasses, /\bdimmed\b.*\bgitModified\b|\bgitModified\b.*\bdimmed\b/);
+});

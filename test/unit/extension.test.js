@@ -59,6 +59,9 @@ function createVscode(state) {
         return Promise.resolve(state.answer);
     };
     const onConfiguration = emitter();
+    const onChangeDocument = emitter();
+    const onSaveDocument = emitter();
+    const onCloseDocument = emitter();
 
     function createPanel(viewType, title, column, options) {
         const onMessage = emitter();
@@ -163,6 +166,12 @@ function createVscode(state) {
                 },
             }),
             onDidChangeConfiguration: onConfiguration,
+            get textDocuments() {
+                return state.documents;
+            },
+            onDidChangeTextDocument: onChangeDocument,
+            onDidSaveTextDocument: onSaveDocument,
+            onDidCloseTextDocument: onCloseDocument,
             createFileSystemWatcher(pattern) {
                 const events = { change: emitter(), create: emitter(), delete: emitter() };
                 const watcher = {
@@ -186,6 +195,9 @@ function createVscode(state) {
                 },
             },
         },
+        extensions: {
+            getExtension: (id) => (id === 'vscode.git' ? state.gitExtension : undefined),
+        },
         env: {
             clipboard: {
                 writeText: (text) => {
@@ -206,6 +218,10 @@ function createVscode(state) {
         },
         // Fires a configuration change of the given settings
         changeConfiguration: (...names) => onConfiguration.fire({ affectsConfiguration: (name) => names.includes(name) }),
+        // Editor events: an edit (not saved), a save, the closing of an editor
+        editDocument: (document) => onChangeDocument.fire({ document, contentChanges: [{ text: 'x' }] }),
+        saveDocument: (document) => onSaveDocument.fire(document),
+        closeDocument: (document) => onCloseDocument.fire(document),
         createPanel,
     };
 }
@@ -230,8 +246,9 @@ test.after(() => {
     Module._load = originalLoad;
 });
 
-// Activates a fresh copy of extension.js. parse(basePath) is the stubbed parser of both frameworks.
-function activate(parse = () => ({ tables: TABLES, warnings: [] })) {
+// Activates a fresh copy of extension.js. parse(basePath) is the stubbed parser of both frameworks,
+// initial overrides the initial state (e.g. gitExtension, read when the extension activates).
+function activate(parse = () => ({ tables: TABLES, warnings: [] }), initial = {}) {
     const state = {
         answer: undefined,
         activeTextEditor: undefined,
@@ -254,11 +271,16 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] })) {
         executed: [],
         opened: [],
         watchers: [],
+        documents: [],
+        gitExtension: undefined,
+        parseOptions: [],
+        ...initial,
     };
     const parser = {
-        parse: (basePath) => {
+        parse: (basePath, options) => {
             state.parsed.push(basePath);
-            return parse(basePath);
+            state.parseOptions.push(options);
+            return parse(basePath, options);
         },
     };
     mocks = { vscode: createVscode(state), parsers: { './parsers/laravel': parser, './parsers/symfony': parser } };
@@ -350,7 +372,7 @@ test('draws the schema in one panel: the page once, then the settings and the sc
     assert.deepEqual(panel.posted, []);
     panel.postFromPage({ type: 'ready' });
     assert.deepEqual(panel.posted, [
-        { type: 'settings', layout: 'elk', direction: 'TB' },
+        { type: 'settings', layout: 'elk', direction: 'TB', showGitStatus: true },
         {
             type: 'schema',
             tables: TABLES,
@@ -428,7 +450,7 @@ test('the settings come from the configuration, the toolbar changes them globall
     ext.run();
     const panel = ext.state.panels[0];
     panel.postFromPage({ type: 'ready' });
-    assert.deepEqual(panel.sent('settings'), [{ type: 'settings', layout: 'dagre', direction: 'TB' }]);
+    assert.deepEqual(panel.sent('settings'), [{ type: 'settings', layout: 'dagre', direction: 'TB', showGitStatus: true }]);
 
     panel.postFromPage({ type: 'setting', key: 'direction', value: 'LR' });
     panel.postFromPage({ type: 'setting', key: 'layout', value: 'elk' });
@@ -441,8 +463,8 @@ test('the settings come from the configuration, the toolbar changes them globall
     ext.vscode.changeConfiguration('DrawMeDatabase.direction');
     ext.vscode.changeConfiguration('DrawMeDatabase.frameworkPath');
     assert.deepEqual(panel.sent('settings'), [
-        { type: 'settings', layout: 'dagre', direction: 'TB' },
-        { type: 'settings', layout: 'elk', direction: 'LR' },
+        { type: 'settings', layout: 'dagre', direction: 'TB', showGitStatus: true },
+        { type: 'settings', layout: 'elk', direction: 'LR', showGitStatus: true },
     ]);
 
     // The frameworkPath change scheduled a refresh: deactivation cancels it
@@ -576,6 +598,7 @@ test('auto-refresh: a change of the migrations redraws the open diagram, quietly
     const warningsShown = ext.state.warnings.length;
 
     // Several changes in a row: one refresh, without warning popup nor bringing the panel to the front
+    result = () => ({ tables: TABLES.slice(0, 1), warnings: ['w'] });
     watcher.fire('change');
     watcher.fire('create');
     watcher.fire('delete');
@@ -599,6 +622,96 @@ test('auto-refresh: a change of the migrations redraws the open diagram, quietly
     // Closing the panel stops watching
     panel.dispose();
     assert.equal(watcher.disposed, true);
+});
+
+// An editor of a file: { uri, isDirty, getText }
+const editor = (filePath, text, isDirty = true) => ({ uri: Object.assign(Uri.file(filePath), { scheme: 'file' }), isDirty, getText: () => text });
+
+test('live diagram: an unsaved edit of a migration is drawn, with the git status kept in cache', async () => {
+    const ext = activate();
+    const dir = folder('live', LARAVEL);
+    ext.openFolders(dir);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    const migration = path.join(dir, 'database', 'migrations', '2024_01_01_000000_create_users_table.php');
+    const first = ext.state.parseOptions[0];
+    assert.ok(first.gitCache instanceof Map);
+    assert.equal(first.git, true);
+    assert.deepEqual([...first.overrides], []);
+
+    // The git status of the last parse, cached
+    first.gitCache.set('repo', 'status');
+    const typed = editor(migration, '<?php // typing');
+    ext.state.documents = [typed, editor(path.join(dir, 'README.md'), 'not a migration'), editor(path.join(dir, 'app', 'User.php'), 'no')];
+    ext.vscode.editDocument(typed);
+    ext.vscode.editDocument(ext.state.documents[1]);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2);
+    const live = ext.state.parseOptions[1];
+    assert.deepEqual([...live.overrides], [[path.resolve(migration), '<?php // typing']], 'only the watched migrations');
+    assert.equal(live.gitCache.get('repo'), 'status', 'typing does not run git again');
+    assert.equal(panel.reveals, 0);
+    // Same tables: the page is not asked to draw again
+    assert.equal(panel.sent('schema').length, 1);
+
+    // Saving reads the git status again
+    ext.vscode.saveDocument(typed);
+    await settle();
+    assert.equal(ext.state.parsed.length, 3);
+    assert.equal(ext.state.parseOptions[2].gitCache.has('repo'), false);
+
+    // Edits of other files are ignored
+    ext.vscode.editDocument(ext.state.documents[1]);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 3);
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('a commit or a checkout (built-in Git extension) refreshes the git status of the diagram', async () => {
+    const onState = emitter();
+    const onRepository = emitter();
+    const gitExtension = {
+        isActive: true,
+        exports: { enabled: true, getAPI: () => ({ repositories: [{ state: { onDidChange: onState } }], onDidOpenRepository: onRepository }) },
+    };
+    const ext = activate(undefined, { gitExtension });
+    ext.openFolders(folder('commit', LARAVEL));
+    ext.run();
+    await flush();
+    assert.equal(onState.count(), 1);
+    assert.equal(onRepository.count(), 1);
+
+    ext.state.parseOptions[0].gitCache.set('repo', 'status');
+    onState.fire();
+    await settle();
+    assert.equal(ext.state.parsed.length, 2);
+    assert.equal(ext.state.parseOptions[1].gitCache.has('repo'), false, 'git runs again');
+
+    ext.context.subscriptions.forEach(item => item.dispose());
+    assert.equal(onState.count(), 0, 'the listeners are disposed');
+});
+
+test('the git status can be hidden: no git for the parser, and the setting is posted', async () => {
+    const ext = activate();
+    ext.openFolders(folder('no-git', LARAVEL));
+    ext.state.settings[''] = { 'DrawMeDatabase.showGitStatus': false };
+    ext.run();
+    assert.equal(ext.state.parseOptions[0].git, false);
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.equal(panel.sent('settings')[0].showGitStatus, false);
+
+    panel.postFromPage({ type: 'setting', key: 'showGitStatus', value: true });
+    panel.postFromPage({ type: 'setting', key: 'showGitStatus', value: 'yes' });
+    assert.deepEqual(ext.state.updates, [{ key: 'DrawMeDatabase.showGitStatus', value: true, target: 1 }]);
+
+    ext.state.settings[''] = {};
+    ext.vscode.changeConfiguration('DrawMeDatabase.showGitStatus');
+    await settle();
+    assert.equal(ext.state.parsed.length, 2);
+    assert.equal(ext.state.parseOptions[1].git, true);
+    ext.context.subscriptions.forEach(item => item.dispose());
 });
 
 test('auto-refresh can be turned off; a new frameworkPath redraws the diagram', async () => {

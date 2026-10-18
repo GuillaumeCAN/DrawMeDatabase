@@ -125,3 +125,19 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 
 ### Changed
 - VS Code 1.96 is still the oldest supported version (`engines.vscode` stays `^1.96.0`): CI now runs the integration test, which draws the diagram in the real webview with the ELK and Dagre layouts, on VS Code 1.96.0 as well as on the latest version. Locally: `VSCODE_TEST_VERSION=1.96.0 npm test`
+
+## [v1.4.0] - 2026-10-18
+
+### Added
+- **Live diagram**: the diagram follows what you type in a migration or an entity, before you save it (300 ms after you stop typing)
+- **Git status in the diagram**, for Laravel and Symfony, in the colors of the git decorations of VS Code:
+  - tables not in the last commit (new), changed since the last commit (modified), or changed in an editor and not saved yet (unsaved) get a colored outline and header
+  - their uncommitted columns are marked `● new`, `● modified` or `● unsaved`
+  - a legend counts the tables of each status, and the **Git** button of the toolbar (or the `DrawMeDatabase.showGitStatus` setting) hides or shows the status
+- The diagram is refreshed after a commit, a checkout or a stage (through the built-in Git extension)
+- The JSON output has the `git` status of each table, and of each column for Laravel too (it was Symfony only)
+
+### Changed
+- An automatic refresh that changes nothing is not drawn again, and while a large schema is being drawn, only the last edit is drawn next
+- git runs only when files change on disk or in the repository, not while you type
+

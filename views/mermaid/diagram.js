@@ -83,11 +83,14 @@
         const zoom = window.DrawMeDatabaseZoom.attach(viewport, stage, onViewChange);
         let renders = 0;
         let queue = Promise.resolve();
+        let drawing = false;
         let last = null;
         let size = null;
         let background = '#ffffff';
         // Table of each drawn entity, by the id Mermaid gives its node ('dmdb-svg-3-entity-users-0')
         let tablesByNode = new Map();
+        // What the stage shows, to skip drawing it again
+        let lastKey = '';
 
         const report = (result) => {
             if (onRendered) {
@@ -134,9 +137,20 @@
             const { source, entities } = window.DrawMeDatabaseMermaid.buildDiagram(tables, {
                 direction: settings.direction,
                 highlight: settings.highlight,
+                git: settings.git,
             });
             const theme = mermaidTheme();
             background = theme.background;
+            // Same drawing (an edit that changes no table, a refresh without change): nothing to do
+            const key = JSON.stringify([source, settings.layout, theme.themeVariables]);
+            if (key === lastKey && stage.querySelector('svg')) {
+                last = { tables, settings };
+                hideMessage();
+                if (view !== 'keep' && view !== null) {
+                    zoom.setContent(size, view === 'fit' ? null : view);
+                }
+                return;
+            }
             // Natural size: the stage zooms. htmlLabels off: plain SVG text, so the export opens
             // in any SVG editor and can be drawn on a canvas (PNG). maxTextSize: the default
             // (50 000 characters) is reached by schemas of about 150 tables.
@@ -189,6 +203,8 @@
             element.setAttribute('height', String(size.height));
             element.style.maxWidth = 'none';
             markOpenableTables(element, svgId, entities, tables);
+            markGitLabels(element);
+            lastKey = key;
             hideMessage();
             last = { tables, settings };
             zoom.setContent(size, view === 'keep' ? zoom.view : view === 'fit' ? null : view);
@@ -223,6 +239,17 @@
                 const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
                 title.textContent = `${table}\n${source.file}:${source.line}\nClick to open`;
                 node.insertBefore(title, node.firstChild);
+            });
+        }
+
+        // Comments of uncommitted columns ('● new'...), colored like the git decorations of VS Code
+        function markGitLabels(element) {
+            const labels = new Map(['untracked', 'modified', 'unsaved'].map(status => [window.DrawMeDatabaseMermaid.gitLabel(status), status]));
+            element.querySelectorAll('text').forEach(text => {
+                const status = labels.get(text.textContent.trim());
+                if (status) {
+                    text.classList.add('git-label', `git-${status}`);
+                }
             });
         }
 
@@ -276,13 +303,32 @@
             }
         }
 
-        return {
-            // One render at a time (initialize() changes the global Mermaid configuration)
-            render(tables, settings, view) {
-                queue = queue.then(() => draw({ tables, settings, view })).catch(err => {
+        // One drawing at a time (initialize() changes the global Mermaid configuration), and only the
+        // last one asked for: while a large schema is drawn, live edits replace each other
+        let pending = null;
+        async function run() {
+            drawing = true;
+            while (pending) {
+                const job = pending;
+                pending = null;
+                try {
+                    await draw(job);
+                } catch (err) {
                     showMessage('The diagram could not be drawn.', errorText(err));
                     report({ ok: false, error: `The diagram could not be drawn: ${errorText(err)}` });
-                });
+                }
+            }
+            drawing = false;
+        }
+
+        return {
+            render(tables, settings, view) {
+                // A replaced 'fit' or saved view still applies
+                const replacedView = pending && pending.view !== 'keep' ? pending.view : null;
+                pending = { tables, settings, view: view === 'keep' && replacedView ? replacedView : view };
+                if (!drawing) {
+                    queue = run();
+                }
                 return queue;
             },
             // Draws the last diagram again, for example in the colors of a new theme

@@ -7,7 +7,10 @@ parse(basePath, options) // → { tables, warnings }
 ```
 
 - `basePath`: the framework root (the workspace folder, or the `DrawMeDatabase.frameworkPath` folder).
-- `options` (Symfony only): `{ git: false }` skips the git status of the columns.
+- `options`:
+  - `git: false` skips the git status;
+  - `overrides`: a `Map` of absolute file path → text of an editor not saved yet, read instead of the file (live diagram);
+  - `gitCache`: a `Map` kept between parses: git runs again only once it is cleared (the extension clears it when files change on disk or in the repository, not while the user types).
 - A missing migrations or entities folder, or a folder without PHP files, throws a `ParserError` (`parsers/errors.js`), whose message is shown to the user as is.
 
 ## `tables`
@@ -34,6 +37,7 @@ One object per table, in the order of the code (migrations by file name, entitie
 | `table` | string | Table name, as in the database |
 | `columns` | array | The columns, in the order of the code |
 | `relations` | array | The foreign keys of this table |
+| `git` | string, optional | Git status of the table: `unsaved` (its declaration or a column changed in an editor and not saved), `untracked` (declaration not in HEAD: new, ignored or staged-new), `modified` (a column changed since HEAD), `committed`. Missing outside a git repository, or with `git: false`, unless an editor is not saved |
 | `source` | object, optional | Where the table is declared: `file` relative to `basePath` (with `/`), `line` from 1. Laravel: the `Schema::create()` (or the first `Schema::table()` of a table no migration creates). Symfony: the entity class. A click on the table in the diagram opens this file; the extension only opens files inside `basePath`. |
 
 ### Columns
@@ -44,7 +48,7 @@ One object per table, in the order of the code (migrations by file name, entitie
 | `type` | string | Laravel: the Blueprint method (`string`, `foreignId`...). Symfony: the Doctrine type (`string`, `datetime_immutable`...) |
 | `primary` | `true`, optional | Part of the primary key |
 | `nullable` | `true`, optional | Accepts `NULL` (drawn as `type?`) |
-| `git` | string, optional | Symfony in a git repository: `committed`, `modified` or `untracked` |
+| `git` | string, optional | Status of the lines that declare the column (Laravel: the statement that created, changed or renamed it last; Symfony: the property): `committed`, `modified`, `untracked` or `unsaved`, like the table |
 
 ### Relations
 

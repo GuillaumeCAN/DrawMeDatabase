@@ -17,6 +17,14 @@ const EXTENSION_ID = 'GuillaumeCancalon.draw-me-database';
 
 const findTable = (tables, name) => tables.find(table => table.table === name);
 
+// A column without its git status (it depends on the state of the repository the test runs in)
+const withoutGit = (column) => {
+    const copy = { ...column };
+    delete copy.git;
+    return copy;
+};
+const GIT_STATUSES = ['committed', 'modified', 'untracked'];
+
 const drawMeDatabaseTabs = () => vscode.window.tabGroups.all
     .flatMap(group => group.tabs)
     .filter(tab => tab.input instanceof vscode.TabInputWebview && tab.label === 'DrawMeDatabase');
@@ -68,13 +76,16 @@ suite('DrawMeDatabase extension', () => {
         assert.deepEqual(tables.map(table => table.table).sort(), ['posts', 'users']);
 
         const users = findTable(tables, 'users');
-        assert.deepEqual(users.columns.find(column => column.name === 'id'),
+        assert.deepEqual(withoutGit(users.columns.find(column => column.name === 'id')),
             { name: 'id', type: 'bigIncrements', primary: true });
+        // The fixture is in this repository: every table and column has a git status
+        assert.ok(GIT_STATUSES.includes(users.git), users.git);
+        assert.ok(users.columns.every(column => GIT_STATUSES.includes(column.git)));
         assert.deepEqual(users.columns.map(column => column.name), ['id', 'name', 'email', 'currency']);
         assert.deepEqual(users.relations, []);
 
         const posts = findTable(tables, 'posts');
-        assert.deepEqual(posts.columns.find(column => column.name === 'user_id'),
+        assert.deepEqual(withoutGit(posts.columns.find(column => column.name === 'user_id')),
             { name: 'user_id', type: 'unsignedBigInteger' });
         assert.deepEqual(posts.relations,
             [{ foreignKey: 'user_id', references: 'id', on: 'users', type: 'many-to-one' }]);
@@ -132,5 +143,28 @@ suite('DrawMeDatabase extension', () => {
         }
         const removed = await rendered(extension, render => render.ok && render.entities === 2);
         assert.equal(removed && removed.entities, 2, `after its deletion: ${JSON.stringify(removed)}`);
+    });
+
+    test('an unsaved edit of a migration is drawn live, and reverting it removes it', async function () {
+        this.timeout(60000);
+        const extension = vscode.extensions.getExtension(EXTENSION_ID);
+        const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        const file = path.join(workspace, 'backend', 'database', 'migrations', '2024_01_02_000000_create_posts_table.php');
+        const document = await vscode.workspace.openTextDocument(file);
+        await vscode.window.showTextDocument(document, vscode.ViewColumn.Beside);
+        const offset = document.getText().indexOf("Schema::create('posts'");
+        assert.ok(offset > 0);
+
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(document.uri, document.positionAt(offset), "Schema::create('live_tags', function (Blueprint $table) {\n            $table->id();\n        });\n        ");
+        assert.ok(await vscode.workspace.applyEdit(edit));
+        assert.equal(document.isDirty, true, 'not saved');
+        const typed = await rendered(extension, render => render.ok && render.entities === 3);
+        assert.equal(typed && typed.entities, 3, `while typing: ${JSON.stringify(typed)}`);
+
+        await vscode.commands.executeCommand('workbench.action.files.revert');
+        const reverted = await rendered(extension, render => render.ok && render.entities === 2);
+        assert.equal(reverted && reverted.entities, 2, `after the revert: ${JSON.stringify(reverted)}`);
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
     });
 });
