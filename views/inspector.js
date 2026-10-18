@@ -182,9 +182,11 @@
             return card;
         }
 
-        // info: tableInfo(), with extras: { sections, loading, teaser } (the sections of other
-        // extensions, still loading, or the Pro teaser)
+        // info: tableInfo(), with extras: { sections, loading, teaser, gitColumnsLocked } (the
+        // sections of other extensions, still loading, the Pro teaser, and a note that the git
+        // status of the columns comes with Pro)
         function render(info, t, extras) {
+            const more = extras || {};
             const scroll = container.querySelector('.panel-content');
             const scrollTop = scroll && container.dataset.table === (info && info.table) ? scroll.scrollTop : 0;
             container.textContent = '';
@@ -232,9 +234,15 @@
             content.appendChild(head);
 
             // Columns, with their keys, types and git status (a click opens the line of the column)
-            content.appendChild(section('columns', t('inspector.columns'), info.columns.length > 0
+            const columns = info.columns.length > 0
                 ? info.columns.map(column => columnRow(column, info, t))
-                : [element('p', { className: 'panel-note', text: t('inspector.none.columns') })]));
+                : [element('p', { className: 'panel-note', text: t('inspector.none.columns') })];
+            if (more.gitColumnsLocked && info.columns.length > 0) {
+                const badge = element('button', { type: 'button', className: 'panel-badge panel-badge-button', title: t('panel.pro.missing'), text: t('panel.pro') });
+                badge.addEventListener('click', () => action('pro'));
+                columns.push(element('div', { className: 'inspector-locked-note' }, [element('span', { text: t('inspector.gitColumns') }), badge]));
+            }
+            content.appendChild(section('columns', t('inspector.columns'), columns));
 
             // Relations, both ways (a click shows the other table)
             const relations = [];
@@ -252,7 +260,6 @@
             content.appendChild(section('relations', t('inspector.relations'), relations));
 
             // Sections of other extensions, or what DrawMeDatabase Pro would add
-            const more = extras || {};
             (more.sections || []).forEach((extra, index) => content.appendChild(extraSection(extra, index, t)));
             if (more.loading) {
                 content.appendChild(element('p', { className: 'panel-note inspector-loading', text: t('inspector.loading') }));

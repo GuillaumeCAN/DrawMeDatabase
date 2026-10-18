@@ -3,7 +3,7 @@
   "command.refresh": "Refresh Diagram",
   "setting.frameworkPath": "Relative path to the framework folder **(leave empty if the framework is at the root of the workspace)** \n\n Example : **`my-project/app/symfony`**",
   "setting.autoRefresh": "Refresh the open diagram while you edit a migration (Laravel) or an entity (Symfony), before saving, and when one is created, deleted or committed.",
-  "setting.showGitStatus": "Show the git status in the diagram: tables and columns new (not in the last commit), modified, or changed in an editor and not saved yet. Also available in the toolbar of the diagram.",
+  "setting.showGitStatus": "Show the git status in the diagram: tables new (not in the last commit), modified, or changed in an editor and not saved yet. Also available in the toolbar of the diagram. The status of each column comes with DrawMeDatabase Pro.",
   "setting.layout.elk": "ELK: compact layout with straight, right-angled links (best for large schemas)",
   "setting.layout.dagre": "Dagre: the classic Mermaid layout with curved links",
   "setting.layout": "How the tables of the diagram are placed. Also available in the toolbar of the diagram.",
@@ -29,5 +29,6 @@
   "setting.font": "Font of the tables of the diagram.",
   "setting.customFont": "Font family used when `DrawMeDatabase.font` is `custom`, for example `Inter`.",
   "setting.fontSize": "Size of the text of the diagram, in pixels.",
-  "setting.grid": "Dotted grid behind the diagram."
+  "setting.grid": "Dotted grid behind the diagram.",
+  "setting.showColumnGitStatus": "Show the git status of each column (new, modified, unsaved) in the diagram. A feature of DrawMeDatabase Pro."
 }

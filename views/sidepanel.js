@@ -20,6 +20,8 @@
 //          state: 'available', 'missing' (greyed, PRO badge) or 'locked' (greyed, lock)
 //        { type: 'button', id, label, primary }
 //        { type: 'heading', label } and { type: 'note', text }
+//        A control with locked: true (a feature of DrawMeDatabase Pro) is disabled, with a PRO
+//        badge (item.badge) that calls onAction('pro'); a palette list keeps item.free usable.
 // footer: { title, text, buttons: [{ id, label, primary }] }
 //
 // onChange(id, value, { preview }) for the controls (preview: while a color or a size is being
@@ -100,10 +102,21 @@
             return element('label', { className: 'panel-label', for: forId, text });
         }
 
+        // The PRO badge of a locked control: a button that tells how to get it
+        function proBadge(item) {
+            if (!item.locked) {
+                return null;
+            }
+            const badge = element('button', { type: 'button', className: 'panel-badge panel-badge-button', title: item.lockedTitle, 'data-key': `${item.id}:pro`, text: item.badge || 'PRO' });
+            badge.addEventListener('click', () => action('pro'));
+            return badge;
+        }
+
         function row(item, control, controlId) {
-            const wrapper = element('div', { className: `panel-row panel-row-${item.type}` });
+            const wrapper = element('div', { className: `panel-row panel-row-${item.type}${item.locked ? ' locked' : ''}` });
             if (item.label) {
-                wrapper.appendChild(controlId ? label(item.label, controlId) : element('span', { className: 'panel-label', text: item.label }));
+                const text = controlId ? label(item.label, controlId) : element('span', { className: 'panel-label', text: item.label });
+                wrapper.appendChild(item.locked ? element('div', { className: 'panel-label-line' }, [text, proBadge(item)]) : text);
             }
             wrapper.appendChild(control);
             if (item.hint) {
@@ -132,7 +145,7 @@
             },
             select(item) {
                 const id = nextId('select');
-                const select = element('select', { id, className: 'panel-select', 'data-key': item.id });
+                const select = element('select', { id, className: 'panel-select', 'data-key': item.id, disabled: item.locked });
                 item.options.forEach(option => select.appendChild(element('option', { value: option.value, text: option.label })));
                 select.value = item.value;
                 select.addEventListener('change', () => change(item.id, select.value));
@@ -140,11 +153,11 @@
             },
             toggle(item) {
                 const id = nextId('toggle');
-                const input = element('input', { id, type: 'checkbox', role: 'switch', className: 'panel-switch', checked: Boolean(item.value), 'data-key': item.id });
+                const input = element('input', { id, type: 'checkbox', role: 'switch', className: 'panel-switch', checked: Boolean(item.value), 'data-key': item.id, disabled: item.locked });
                 input.addEventListener('change', () => change(item.id, input.checked));
-                const wrapper = element('div', { className: 'panel-row panel-toggle' }, [
+                const wrapper = element('div', { className: `panel-row panel-toggle${item.locked ? ' locked' : ''}` }, [
                     element('label', { className: 'panel-toggle-label', for: id }, [
-                        element('span', { className: 'panel-label', text: item.label }),
+                        element('span', { className: 'panel-label-line' }, [element('span', { className: 'panel-label', text: item.label }), proBadge(item)]),
                         item.hint ? element('span', { className: 'panel-hint', text: item.hint }) : null,
                     ]),
                     input,
@@ -177,6 +190,7 @@
                 const grid = element('div', { className: 'panel-palettes', role: 'radiogroup', 'aria-label': item.label });
                 item.options.forEach(option => {
                     const selected = option.value === item.value;
+                    const locked = Boolean(item.locked && option.value !== item.free);
                     const dots = element('span', { className: 'panel-palette-dots', 'aria-hidden': 'true' });
                     (option.colors || []).slice(0, 4).forEach(color => {
                         const dot = element('span', { className: 'panel-palette-dot' });
@@ -187,10 +201,12 @@
                         type: 'button',
                         role: 'radio',
                         'aria-checked': String(selected),
-                        className: `panel-palette${selected ? ' selected' : ''}`,
+                        'aria-disabled': locked ? 'true' : null,
+                        title: locked ? item.lockedTitle : null,
+                        className: `panel-palette${selected ? ' selected' : ''}${locked ? ' locked' : ''}`,
                         'data-key': `${item.id}:${option.value}`,
                     }, [dots, element('span', { className: 'panel-palette-name', text: option.label })]);
-                    button.addEventListener('click', () => change(item.id, option.value));
+                    button.addEventListener('click', () => (locked ? action('pro') : change(item.id, option.value)));
                     grid.appendChild(button);
                 });
                 return row(item, grid);
@@ -199,7 +215,7 @@
                 const list = element('div', { className: 'panel-colors' });
                 item.items.forEach(color => {
                     const id = nextId('color');
-                    const input = element('input', { id, type: 'color', value: color.value, className: 'panel-color', 'data-key': `${item.id}:${color.key}` });
+                    const input = element('input', { id, type: 'color', value: color.value, className: 'panel-color', 'data-key': `${item.id}:${color.key}`, disabled: item.locked });
                     input.addEventListener('input', () => change(item.id, { key: color.key, value: input.value }, true));
                     input.addEventListener('change', () => change(item.id, { key: color.key, value: input.value }));
                     const reset = element('button', {
@@ -208,7 +224,7 @@
                         title: item.resetLabel,
                         'aria-label': `${item.resetLabel}: ${color.label}`,
                         'data-key': `${item.id}:${color.key}:reset`,
-                        hidden: !color.custom,
+                        hidden: !color.custom || item.locked,
                     }, [icon('reset')]);
                     reset.addEventListener('click', () => change(item.id, { key: color.key, value: null }));
                     list.appendChild(element('div', { className: `panel-color-row${color.custom ? ' custom' : ''}` }, [
@@ -388,9 +404,13 @@
         ].map(toHex);
     }
 
-    // Items of the Appearance section: theme, palette, custom colors, font, text size, reset
-    function appearanceItems(appearance, t) {
+    // Items of the Appearance section: theme, palette, custom colors, font, text size, reset.
+    // locked: the palettes, custom colors and fonts are features of DrawMeDatabase Pro (the
+    // VS Code palette, the theme and the text size stay free); the effective values are shown.
+    function appearanceItems(appearance, t, { locked = false } = {}) {
         const Appearance = window.DrawMeDatabaseAppearance;
+        const lock = locked ? { locked: true, badge: t('panel.pro'), lockedTitle: t('panel.pro.missing') } : {};
+        const shown = locked ? { ...appearance, palette: 'vscode', colors: {}, font: 'default', customFont: '' } : appearance;
         const items = [
             {
                 type: 'choice',
@@ -404,19 +424,22 @@
                 type: 'palettes',
                 id: 'palette',
                 label: t('panel.palette'),
-                value: appearance.palette,
-                options: Object.keys(Appearance.PALETTES).map(name => ({ value: name, label: t(`palette.${name}`), colors: paletteSwatch(appearance, name) })),
+                value: shown.palette,
+                free: 'vscode',
+                options: Object.keys(Appearance.PALETTES).map(name => ({ value: name, label: t(`palette.${name}`), colors: paletteSwatch(shown, name) })),
+                ...lock,
             },
-            { type: 'colors', id: 'colors', label: t('panel.colors'), resetLabel: t('panel.colors.reset'), items: currentColors(appearance, t) },
+            { type: 'colors', id: 'colors', label: t('panel.colors'), resetLabel: t('panel.colors.reset'), items: currentColors(shown, t), ...lock },
             {
                 type: 'select',
                 id: 'font',
                 label: t('panel.font'),
-                value: appearance.font,
+                value: shown.font,
                 options: Appearance.FONTS.map(font => ({ value: font, label: t(`font.${font}`) })),
+                ...lock,
             },
         ];
-        if (appearance.font === 'custom') {
+        if (shown.font === 'custom') {
             items.push({ type: 'text', id: 'customFont', label: t('panel.customFont'), value: appearance.customFont, placeholder: t('panel.customFont.placeholder') });
         }
         items.push(

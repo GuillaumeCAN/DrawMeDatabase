@@ -283,8 +283,8 @@
         }
 
         // Moves the view so that a table is in the middle, at the current zoom (at least 60 %);
-        // rightInset: the width hidden on the right (a panel over the viewport)
-        function centerOn(table, rightInset = 0) {
+        // left, right: the widths hidden on each side (panels over the viewport)
+        function centerOn(table, { left = 0, right = 0 } = {}) {
             const node = nodeOf(table);
             const element = stage.querySelector('svg');
             if (!node || !element || !size) {
@@ -297,7 +297,7 @@
             const scale = Math.max(current, 0.6);
             const x = ((box.left + box.width / 2 - drawing.left) / current) * scale;
             const y = ((box.top + box.height / 2 - drawing.top) / current) * scale;
-            zoom.setContent(size, { scale, x: Math.max(0, viewport.clientWidth - rightInset) / 2 - x, y: viewport.clientHeight / 2 - y });
+            zoom.setContent(size, { scale, x: left + Math.max(0, viewport.clientWidth - left - right) / 2 - x, y: viewport.clientHeight / 2 - y });
         }
 
         // The SVG as a standalone file, on the background of the theme it was drawn with

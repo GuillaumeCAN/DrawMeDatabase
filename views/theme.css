@@ -784,6 +784,12 @@ pre {
     font-size: 12px;
 }
 
+/* The inspector of a table: its own panel, on the left of the diagram */
+.side-panel.table-panel {
+    border-left: none;
+    border-right: 1px solid var(--dmdb-border);
+}
+
 /* Narrow panels: over the diagram instead of next to it */
 @media (max-width: 720px) {
     .side-panel {
@@ -794,6 +800,12 @@ pre {
         z-index: 15;
         width: min(300px, 92vw);
         box-shadow: -2px 0 10px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+    }
+
+    .side-panel.table-panel {
+        right: auto;
+        left: 0;
+        box-shadow: 2px 0 10px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
     }
 }
 
@@ -882,6 +894,46 @@ pre {
 
 .panel-label {
     color: var(--vscode-foreground);
+}
+
+.panel-label-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Features of DrawMeDatabase Pro in the free version: greyed, the PRO badge tells how to get them */
+.panel-row.locked .panel-select,
+.panel-row.locked .panel-colors,
+.panel-toggle.locked .panel-switch,
+.panel-palette.locked {
+    opacity: 0.45;
+}
+
+.panel-row.locked .panel-color,
+.panel-row.locked .panel-select,
+.panel-toggle.locked .panel-switch {
+    cursor: not-allowed;
+}
+
+.panel-badge-button {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.panel-badge-button:hover {
+    filter: brightness(1.15);
+}
+
+.inspector-locked-note {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
 }
 
 .panel-hint,

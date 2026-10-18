@@ -30,6 +30,8 @@ const SETTINGS = {
     layout: { values: ['elk', 'dagre'] },
     direction: { values: ['TB', 'LR'] },
     showGitStatus: { values: [true, false] },
+    // The git status of each column: a feature of DrawMeDatabase Pro
+    showColumnGitStatus: { values: [true, false] },
     keysOnly: { values: [false, true] },
     relationLabels: { values: [true, false] },
     autoRefresh: { values: [true, false] },
@@ -364,6 +366,8 @@ function activate(context) {
         runLicenseAction,
         tableInfo,
         runTableAction,
+        // Its trial or license is on
+        proUnlocked: () => Boolean(license && license.kind !== 'expired'),
         schemaFor: (names) => {
             const schema = publicSchema();
             if (schema && Array.isArray(names)) {
@@ -396,6 +400,9 @@ function activate(context) {
         vscode.workspace.onDidChangeConfiguration(event => {
             if (Object.keys(SETTINGS).some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
                 viewer.settingsChanged();
+            }
+            if (event.affectsConfiguration('DrawMeDatabase.showColumnGitStatus')) {
+                viewer.schemaDisplayChanged();
             }
             if ([...APPEARANCE_SETTINGS, 'language'].some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
                 displayChanged.fire(displaySettings());
@@ -535,7 +542,7 @@ function activate(context) {
             } else {
                 license = null;
             }
-            viewer.featuresChanged();
+            viewer.licenseChanged();
         },
         // Shows these tables only (with the relations between them), the highlighted ones standing
         // out, and a label to go back to the whole schema: { tables, highlight, label }
@@ -786,7 +793,7 @@ function cleanSection(section, actions) {
 
 // A single webview panel. The page is loaded once: the schema and the settings are posted to it
 // (again when it reloads, after being restored), and it asks for refreshes and exports.
-function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor, features, runTool, runLicenseAction, tableInfo, runTableAction }) {
+function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor, features, runTool, runLicenseAction, tableInfo, runTableAction, proUnlocked }) {
     let panel;
     let ready = false;
     // What the page shows: the last schema, or a message when there is none
@@ -829,7 +836,32 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
             message[key] = readSetting(config, key);
         }
         message.languageResolved = i18n.resolveLanguage(message.language, vscode.env && vscode.env.language);
+        // The features of DrawMeDatabase Pro (git status of the columns, palettes, colors, fonts)
+        message.pro = proUnlocked();
         return message;
+    };
+
+    // The schema as the page gets it: without the git status of the columns unless DrawMeDatabase
+    // Pro is there and the setting shows it (the tables keep theirs)
+    const pageSchema = () => {
+        const showColumns = proUnlocked() && vscode.workspace.getConfiguration('DrawMeDatabase').get('showColumnGitStatus', true) !== false;
+        if (!schema || showColumns) {
+            return schema;
+        }
+        return {
+            ...schema,
+            tables: schema.tables.map(table => ({
+                ...table,
+                columns: (table.columns || []).map(column => {
+                    if (!column || column.git === undefined) {
+                        return column;
+                    }
+                    const copy = { ...column };
+                    delete copy.git;
+                    return copy;
+                }),
+            })),
+        };
     };
 
     const updateSetting = (key, value) => Promise.resolve(vscode.workspace.getConfiguration('DrawMeDatabase')
@@ -849,7 +881,7 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 post(exportersMessage());
                 post({ type: 'features', ...features() });
                 if (schema) {
-                    post(schema);
+                    post(pageSchema());
                 } else if (emptyText) {
                     post({ type: 'empty', text: emptyText });
                 }
@@ -1051,7 +1083,7 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                     panel.reveal();
                 }
                 if (!same || reveal) {
-                    post(schema);
+                    post(pageSchema());
                 }
                 return;
             }
@@ -1075,6 +1107,20 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
         },
         settingsChanged() {
             post(settingsMessage());
+        },
+        // DrawMeDatabase Pro was activated, or its trial ended: its features follow
+        licenseChanged() {
+            post(settingsMessage());
+            post({ type: 'features', ...features() });
+            if (schema) {
+                post(pageSchema());
+            }
+        },
+        // The git status of the columns was shown or hidden
+        schemaDisplayChanged() {
+            if (schema) {
+                post(pageSchema());
+            }
         },
         toast,
         isOpen: () => Boolean(panel),

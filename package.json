@@ -64,6 +64,12 @@
           "markdownDescription": "%setting.showGitStatus%",
           "order": 2
         },
+        "DrawMeDatabase.showColumnGitStatus": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%setting.showColumnGitStatus%",
+          "order": 2
+        },
         "DrawMeDatabase.layout": {
           "type": "string",
           "enum": [

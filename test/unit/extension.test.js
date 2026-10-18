@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
     layout: 'elk',
     direction: 'TB',
     showGitStatus: true,
+    showColumnGitStatus: true,
     keysOnly: false,
     relationLabels: true,
     autoRefresh: true,
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS = {
     customFont: '',
     colors: {},
     languageResolved: 'en',
+    pro: false,
 };
 const EXTENSION = path.join(ROOT, 'extension.js');
 const WEBVIEW_ROOT = 'https://webview.test/';
@@ -1286,4 +1288,40 @@ test('inspector: a column opens at its line; the sections of other extensions, o
     await flush();
     assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.addColumns', args: ['users'] }]);
     failing.dispose();
+});
+
+test('free version: the page gets the git status of the tables, the columns come with DrawMeDatabase Pro', async () => {
+    const tables = [{
+        table: 'users',
+        git: 'modified',
+        columns: [{ name: 'id', type: 'bigIncrements', primary: true, git: 'committed' }, { name: 'email', type: 'string', git: 'unsaved' }],
+        relations: [],
+    }];
+    const ext = activate(() => ({ tables, warnings: [] }));
+    const api = ext.context.api;
+    ext.openFolders(folder('free-git', LARAVEL));
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    const free = panel.sent('schema').at(-1).tables[0];
+    assert.equal(free.git, 'modified', 'the status of the table stays');
+    assert.deepEqual(free.columns.map(column => column.git), [undefined, undefined]);
+    assert.equal(panel.sent('settings').at(-1).pro, false);
+    assert.equal(api.getSchema().tables[0].columns[1].git, 'unsaved', 'other extensions get everything');
+
+    // The trial of Pro: the columns get their status, the page knows it
+    api.setLicenseStatus({ kind: 'trial', daysLeft: 14 });
+    assert.equal(panel.sent('settings').at(-1).pro, true);
+    assert.deepEqual(panel.sent('schema').at(-1).tables[0].columns.map(column => column.git), ['committed', 'unsaved']);
+
+    // Pro can hide them (setting), and they go away when its trial ends
+    ext.state.settings[''] = { 'DrawMeDatabase.showColumnGitStatus': false };
+    ext.vscode.changeConfiguration('DrawMeDatabase.showColumnGitStatus');
+    assert.deepEqual(panel.sent('schema').at(-1).tables[0].columns.map(column => column.git), [undefined, undefined]);
+    ext.state.settings[''] = {};
+    ext.vscode.changeConfiguration('DrawMeDatabase.showColumnGitStatus');
+    assert.equal(panel.sent('schema').at(-1).tables[0].columns[1].git, 'unsaved');
+    api.setLicenseStatus({ kind: 'expired' });
+    assert.equal(panel.sent('settings').at(-1).pro, false);
+    assert.equal(panel.sent('schema').at(-1).tables[0].columns[1].git, undefined);
 });

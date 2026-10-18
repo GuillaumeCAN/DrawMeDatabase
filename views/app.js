@@ -38,7 +38,13 @@
         autoRefresh: true,
         language: 'auto',
         appearance: Appearance.sanitize({}),
+        // DrawMeDatabase Pro is there (trial or license): git status of the columns, palettes,
+        // custom colors and fonts
+        pro: false,
+        showColumnGitStatus: true,
     };
+    // The appearance in use: without Pro, the VS Code palette, no custom color, the default font
+    const effectiveAppearance = (appearance) => (settings.pro ? appearance : { ...appearance, palette: 'vscode', colors: {}, font: 'default', customFont: '' });
     // Texts of the page; tr() always uses the current language
     let t = I18n.translator('en');
     const tr = (key, params) => t(key, params);
@@ -70,6 +76,7 @@
         focusLabel: $('focus-label'),
         panel: $('side-panel'),
         panelButton: $('panel-button'),
+        tablePanel: $('table-panel'),
     };
 
     let saveTimer;
@@ -475,7 +482,8 @@
 
     function panelModel() {
         const appearance = settings.appearance;
-        const appearanceItems = window.DrawMeDatabaseSidePanel.appearanceItems(appearance, t);
+        const appearanceItems = window.DrawMeDatabaseSidePanel.appearanceItems(appearance, t, { locked: !settings.pro });
+        const proLock = settings.pro ? {} : { locked: true, badge: t('panel.pro'), lockedTitle: t('panel.pro.missing') };
 
         const builtIn = [...EXPORTS.diagram, ...EXPORTS.json].map(item => ({ id: `export:${item.id}`, label: t(item.label), icon: item.icon, state: schema ? 'available' : 'locked' }));
         const others = features.exports.map(item => ({
@@ -498,6 +506,7 @@
                         { type: 'choice', id: 'layout', label: t('panel.layout'), value: settings.layout, options: [{ value: 'elk', label: 'ELK' }, { value: 'dagre', label: 'Dagre' }] },
                         { type: 'choice', id: 'direction', label: t('panel.direction'), value: settings.direction, options: ['TB', 'LR'].map(value => ({ value, label: t(`panel.direction.${value}`) })) },
                         { type: 'toggle', id: 'git', label: t('panel.git'), hint: t('panel.git.hint'), value: settings.git },
+                        { type: 'toggle', id: 'gitColumns', label: t('panel.gitColumns'), hint: t('panel.gitColumns.hint'), value: settings.pro && settings.showColumnGitStatus, ...proLock },
                         { type: 'toggle', id: 'keysOnly', label: t('panel.keysOnly'), hint: t('panel.keysOnly.hint'), value: settings.keysOnly },
                         { type: 'toggle', id: 'relationLabels', label: t('panel.relationLabels'), hint: t('panel.relationLabels.hint'), value: settings.relationLabels },
                         { type: 'toggle', id: 'grid', label: t('panel.grid'), value: appearance.grid },
@@ -549,12 +558,12 @@
     }
 
     // Settings of the page; the appearance settings are applied here at once (then saved)
-    const SETTING_KEYS = { git: 'showGitStatus', layout: 'layout', direction: 'direction', keysOnly: 'keysOnly', relationLabels: 'relationLabels', language: 'language', autoRefresh: 'autoRefresh' };
+    const SETTING_KEYS = { git: 'showGitStatus', gitColumns: 'showColumnGitStatus', layout: 'layout', direction: 'direction', keysOnly: 'keysOnly', relationLabels: 'relationLabels', language: 'language', autoRefresh: 'autoRefresh' };
 
     let previewTimer;
     function previewAppearance(next) {
         settings.appearance = Appearance.sanitize(next);
-        Appearance.apply(settings.appearance);
+        Appearance.apply(effectiveAppearance(settings.appearance));
         clearTimeout(previewTimer);
         previewTimer = setTimeout(() => diagram.redraw(), 120);
     }
@@ -574,9 +583,21 @@
         }
     }
 
+    // A feature of DrawMeDatabase Pro: its page, or the purchase once its trial has ended
+    function askPro() {
+        const license = features.license || {};
+        if (license.kind === 'expired' && (license.actions || []).includes('buy')) {
+            vscode.postMessage({ type: 'license', action: 'buy' });
+        } else {
+            vscode.postMessage({ type: 'pro' });
+        }
+    }
+
     function onPanelAction(id) {
         if (id === 'panel:close') {
             setPanel(false, true);
+        } else if (id === 'pro') {
+            askPro();
         } else if (id === 'resetAppearance') {
             vscode.postMessage({ type: 'resetAppearance' });
         } else if (id.startsWith('tool:')) {
@@ -605,43 +626,41 @@
 
     const sidePanel = window.DrawMeDatabaseSidePanel.create({ element: elements.panel, onChange: onPanelChange, onAction: onPanelAction });
 
-    // The side panel shows the options, or the inspector of a table
-    let panelMode = 'options';
-    // The table in the inspector, and what other extensions add about it ({ sections, loading, teaser })
-    let inspected = null;
-    let inspectedExtras = {};
-    let tableRequest = 0;
-
     function renderPanel() {
-        if (!state.panel) {
-            return;
-        }
-        if (panelMode === 'table') {
-            inspector.render(window.DrawMeDatabaseInspector.tableInfo(schema, inspected), t, inspectedExtras);
-        } else {
+        if (state.panel) {
             sidePanel.render(panelModel());
         }
     }
 
-    function setPanel(open, focusButton, mode) {
+    function setPanel(open, focusButton) {
         state.panel = open;
-        panelMode = mode || 'options';
         persist();
         elements.panel.hidden = !open;
-        elements.panelButton.setAttribute('aria-expanded', String(open && panelMode === 'options'));
-        if (!open || panelMode !== 'table') {
-            inspected = null;
-            diagram.select(null);
-        }
+        elements.panelButton.setAttribute('aria-expanded', String(open));
         if (open) {
             renderPanel();
         } else if (focusButton) {
             elements.panelButton.focus();
         }
     }
-    elements.panelButton.addEventListener('click', () => setPanel(!(state.panel && panelMode === 'options')));
+    elements.panelButton.addEventListener('click', () => setPanel(!state.panel));
 
-    // The inspector of a table: what the page knows at once, then what other extensions add
+    // The inspector of a table, in its own panel on the left: what the page knows at once, then
+    // what other extensions add ({ sections, loading, teaser })
+    let inspected = null;
+    let inspectedExtras = {};
+    let tableRequest = 0;
+
+    function renderInspector() {
+        if (inspected !== null) {
+            inspector.render(window.DrawMeDatabaseInspector.tableInfo(schema, inspected), t, {
+                ...inspectedExtras,
+                // Without Pro, a note that the git status of the columns comes with it
+                gitColumnsLocked: !settings.pro && settings.git,
+            });
+        }
+    }
+
     function requestTableInfo() {
         tableRequest += 1;
         vscode.postMessage({ type: 'tableInfo', table: inspected, request: tableRequest });
@@ -651,13 +670,21 @@
         inspected = name;
         inspectedExtras = { loading: true };
         diagram.select(name);
-        setPanel(true, false, 'table');
+        elements.tablePanel.hidden = false;
+        renderInspector();
         if (center) {
-            // On narrow panels the side panel covers the right of the diagram
-            const covering = getComputedStyle(elements.panel).position === 'absolute' ? elements.panel.offsetWidth : 0;
-            diagram.centerOn(name, covering);
+            // On narrow panels the side panels cover part of the diagram
+            const covering = (panel) => (!panel.hidden && getComputedStyle(panel).position === 'absolute' ? panel.offsetWidth : 0);
+            diagram.centerOn(name, { left: covering(elements.tablePanel), right: covering(elements.panel) });
         }
         requestTableInfo();
+    }
+
+    function closeTable() {
+        inspected = null;
+        elements.tablePanel.hidden = true;
+        elements.tablePanel.textContent = '';
+        diagram.select(null);
     }
 
     // Its neighbours: the tables it references and the ones that reference it
@@ -675,10 +702,10 @@
     }
 
     const inspector = window.DrawMeDatabaseInspector.create({
-        element: elements.panel,
+        element: elements.tablePanel,
         onAction(id, value) {
             if (id === 'close') {
-                setPanel(false);
+                closeTable();
             } else if (id === 'open') {
                 vscode.postMessage({ type: 'open', table: inspected });
             } else if (id === 'openColumn') {
@@ -691,13 +718,18 @@
             } else if (id === 'action') {
                 vscode.postMessage({ type: 'tableAction', id: value });
             } else if (id === 'pro') {
-                vscode.postMessage({ type: 'pro' });
+                askPro();
             }
         },
     });
     elements.panel.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
             setPanel(false, true);
+        }
+    });
+    elements.tablePanel.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            closeTable();
         }
     });
 
@@ -707,6 +739,7 @@
         document.documentElement.lang = t.language;
         I18n.translateDocument(document, t);
         elements.panel.setAttribute('aria-label', t('panel.title'));
+        renderInspector();
         showSettings();
         showSummary();
         if (schema) {
@@ -738,8 +771,9 @@
                 // The saved view on the first drawing (reload of the window), then the same place
                 draw(drawn ? 'keep' : state.view);
                 renderPanel();
+                renderInspector();
                 // The inspected table changed too: ask again what the other extensions add
-                if (panelMode === 'table' && inspected) {
+                if (inspected !== null) {
                     clearTimeout(tableInfoTimer);
                     tableInfoTimer = setTimeout(requestTableInfo, 400);
                 }
@@ -754,18 +788,21 @@
                     autoRefresh: message.autoRefresh !== false,
                     language: ['auto', ...I18n.LANGUAGES].includes(message.language) ? message.language : 'auto',
                     appearance: Appearance.sanitize(message),
+                    pro: message.pro === true,
+                    showColumnGitStatus: message.showColumnGitStatus !== false,
                 };
                 // A new layout, direction or set of columns moves every table: fit; the rest only
                 // redraws in place (git status, language, colors, font)
                 const moved = next.layout !== settings.layout || next.direction !== settings.direction || next.keysOnly !== settings.keysOnly;
                 const languageChanged = message.languageResolved !== t.language;
                 settings = next;
-                Appearance.apply(settings.appearance);
+                Appearance.apply(effectiveAppearance(settings.appearance));
                 if (languageChanged) {
                     applyLanguage(message.languageResolved);
                 }
                 showSettings();
                 renderPanel();
+                renderInspector();
                 if (schema && drawn) {
                     draw(moved ? 'fit' : 'keep');
                 }
@@ -786,7 +823,7 @@
                         sections: Array.isArray(message.sections) ? message.sections.filter(section => section && typeof section.title === 'string') : [],
                         teaser: message.teaser === true,
                     };
-                    renderPanel();
+                    renderInspector();
                 }
                 break;
             case 'features': {
@@ -832,13 +869,13 @@
         const next = document.body.className.replace(/\s*dmdb-no-grid/, '');
         if (next !== theme) {
             theme = next;
-            Appearance.apply(settings.appearance);
+            Appearance.apply(effectiveAppearance(settings.appearance));
             diagram.redraw();
             renderPanel();
         }
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
-    Appearance.apply(settings.appearance);
+    Appearance.apply(effectiveAppearance(settings.appearance));
     showViewer(state.viewer);
     showSettings();
     setPanel(state.panel);
