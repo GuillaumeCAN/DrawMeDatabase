@@ -2,7 +2,7 @@
 
 DrawMeDatabase is released from a version tag:
 
-- [`ci.yml`](../.github/workflows/ci.yml) runs on every pull request and on every push to `main`: lint, unit tests, the integration test in VS Code (under `xvfb-run`) and `npm run package`. The `.vsix` it builds is kept as an artifact of the run (*Summary* page, *Artifacts* section).
+- [`ci.yml`](../.github/workflows/ci.yml) runs on every pull request and on every push to `main`: lint, unit tests, the integration test in VS Code (under `xvfb-run`, on the latest VS Code and on the oldest version allowed by `engines.vscode`) and `npm run package`. The `.vsix` it builds is kept as an artifact of the run (*Summary* page, *Artifacts* section).
 - [`release.yml`](../.github/workflows/release.yml) runs when a `v*` tag is pushed. It checks that the tag matches `package.json` and that `CHANGELOG.md` has a section for this version, runs `ci.yml`, creates a GitHub Release with the `.vsix` attached, then publishes that same `.vsix` to [Open VSX](https://open-vsx.org) (the registry of VSCodium, Cursor, Windsurf, Gitpod…).
 - The **VS Code Marketplace** is not automated: the `.vsix` of the GitHub Release is uploaded by hand (see [Marketplace](#vs-code-marketplace)).
 - [Dependabot](../.github/dependabot.yml) opens weekly update pull requests for the npm devDependencies and for the actions of the workflows. Mermaid is pinned to an exact version and only changes through these pull requests; its major versions, `@types/vscode` (which must not get ahead of `engines.vscode`) and the major versions of `@types/node` are left out and upgraded by hand.

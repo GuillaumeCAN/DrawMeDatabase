@@ -91,10 +91,11 @@ npm install            # also copies the bundled Mermaid library into views/vend
 npm run lint
 npm run test:unit      # parsers and viewers, no VS Code needed
 npm test               # lint + unit tests + integration tests in VS Code (on Linux: xvfb-run -a npm test)
+VSCODE_TEST_VERSION=1.96.0 npm test   # the same on another VS Code version (default: stable)
 npm run package        # builds builds/draw-me-database-<version>.vsix
 ```
 
-GitHub Actions runs these checks on every pull request and keeps the `.vsix` as an artifact. Releases are published from a version tag to GitHub Releases and Open VSX; the VS Code Marketplace is updated by hand. See [docs/publishing.md](docs/publishing.md).
+GitHub Actions runs these checks on every pull request, the integration tests also on the oldest VS Code version allowed by `engines.vscode`, and keeps the `.vsix` as an artifact. Releases are published from a version tag to GitHub Releases and Open VSX; the VS Code Marketplace is updated by hand. See [docs/publishing.md](docs/publishing.md).
 
 ## Changelog
 

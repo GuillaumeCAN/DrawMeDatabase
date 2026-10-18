@@ -4,7 +4,12 @@ import { defineConfig } from '@vscode/test-cli';
 // otherwise open its window on the Wayland session of the desktop
 const useX11 = process.platform === 'linux' && Boolean(process.env.DISPLAY);
 
+// VS Code to test with: stable by default, or a version such as 1.96.0 (CI also tests the
+// oldest version allowed by engines.vscode)
+const version = process.env.VSCODE_TEST_VERSION || 'stable';
+
 export default defineConfig({
+	version,
 	files: 'test/integration/**/*.test.js',
 	// Workspace with a tiny Laravel app in a subfolder (see its .vscode/settings.json)
 	workspaceFolder: 'test/fixtures/integration/workspace',
