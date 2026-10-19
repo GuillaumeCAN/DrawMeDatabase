@@ -51,13 +51,17 @@
     // backslash or control char. '#' and ':' are written as Mermaid entity codes, which Mermaid
     // turns back into the character when it draws: otherwise it reads '#word;' as an entity code
     // ('#1;' would become U+0001) and drops the ';' of 'style...:#...;'. A line holding
-    // "direction LR" is read as a direction statement wherever it is, hence the '_'.
+    // "direction LR" is read as a direction statement wherever it is, hence the '_'. Two '~' are
+    // read as a generic type (List~T~): in an attribute comment ('~ default: a~b') the lexer takes
+    // the quoted text for a type word and rejects the diagram, and labels draw '~x~' as '<x>'.
+    // One '~' is harmless, so only the following ones become '\u223c' (U+223C, tilde operator).
     function quotableText(value) {
         return asText(value)
             .replace(/"/g, '')
             .replace(/[%\\\u0000-\u001f\u007f\u2028\u2029]/g, '_')
             .trim()
             .replace(/(direction)\s+(TB|BT|RL|LR)/gi, '$1_$2')
+            .replace(/(?<=~.*)~/g, '\u223c')
             .replace(/[#:]/g, char => `#${char.charCodeAt(0)};`);
     }
 

@@ -172,6 +172,31 @@ test('"direction LR" in a name is not read as a direction statement', () => {
     ]);
 });
 
+// Two '~' are read as a generic type (List~T~): the lexer took '"~ default: a~b"' for a type word
+test("only the first '~' of a text is written as is, the next ones as the look-alike '∼'", () => {
+    const { gitLabel } = require('../../views/mermaid/generator');
+    const source = generate([{
+        table: 'a~b~c',
+        columns: [
+            { name: 'email', type: 'string', note: '~ default a~b' },
+            { name: 'name', type: 'List~T~', note: 'x ~y~ z~' },
+            { name: 'title', type: 'string', note: '~ one tilde' },
+        ],
+        relations: [{ foreignKey: 'k~1~', references: 'id', on: 'b' }],
+    }], { marks: true });
+    assert.deepEqual(lines(source).slice(1), [
+        '  t1["a~b∼c"] {',
+        '    string email "~ default a∼b"',
+        '    List_T_ name "x ~y∼ z∼"',
+        '    string title "~ one tilde"',
+        '  }',
+        '  b',
+        '  b ||--o{ t1 : "k~1∼"',
+        '',
+    ]);
+    assert.equal(gitLabel('unsaved', { unsaved: '~non~ enregistré~' }), '● ~non∼ enregistré∼');
+});
+
 test('identical edges are emitted once', () => {
     const relation = { foreignKey: 'user_id', references: 'id', on: 'users', type: 'many-to-one' };
     const source = generate([USERS, { table: 'posts', columns: [], relations: [relation, { ...relation }, { foreignKey: 'user_id', references: 'id', on: 'users' }] }]);
@@ -456,6 +481,26 @@ test('the marks option: a CSS class per marked table and a comment per noted col
     assert.ok(output.includes('  class posts diffAdded'));
     assert.ok(!source.includes('bad mark'), 'only plain class names');
     assert.ok(!generate(tables).includes('diffAdded'), 'off by default');
+});
+
+// Pro's comparison notes start with '~': a default value or a type holding another '~' made
+// Mermaid reject the whole diagram ("Expecting 'ATTRIBUTE_WORD', '?', got 'BLOCK_STOP'")
+test("Mermaid reads the notes and labels holding two '~', and shows them", { skip }, async () => {
+    const { entities, relationships } = await parseWithMermaid(generateMermaidER([{
+        table: 'a~b~c',
+        columns: [
+            { name: 'email', type: 'string', note: '~ default: a~b' },
+            { name: 'path', type: 'string', note: '~ default: ~/a → ~/b' },
+            { name: 'name', type: 'string', note: 'x ~y~ z' },
+        ],
+        relations: [{ foreignKey: 'k~1~', references: 'id', on: 'b' }],
+    }], { marks: true }));
+    const table = entities.get('a~b∼c');
+    assert.ok(table, 'the table label');
+    // One '~' left: Mermaid draws '~x~' as '<x>' (parseGenericTypes), never a single '~'
+    assert.deepEqual(table.attributes.map(attribute => shown(attribute.comment)),
+        ['~ default: a∼b', '~ default: ∼/a → ∼/b', 'x ~y∼ z']);
+    assert.equal(relationships[0].roleA, 'k~1∼');
 });
 
 test('the keysOnly option keeps the primary and foreign keys of each table', () => {
