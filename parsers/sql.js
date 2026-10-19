@@ -43,6 +43,14 @@ const stat = (filePath) => {
 };
 const isFile = (filePath) => Boolean(stat(filePath)?.isFile());
 const isDirectory = (filePath) => Boolean(stat(filePath)?.isDirectory());
+// The path of a file once its symbolic links are followed, null when it cannot be read
+const realPath = (filePath) => {
+    try {
+        return fs.realpathSync(filePath);
+    } catch {
+        return null;
+    }
+};
 const list = (dir) => {
     try {
         return fs.readdirSync(dir).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
@@ -2913,11 +2921,21 @@ function layoutFiles(layout, folderName, folder, overrides, quick) {
             .map(name => ({ path: path.join(folder, name, layout.nested), name }));
     } else {
         const recursive = layout.recursive && folderName !== '.';
+        // A folder reached again through symbolic links is read once, and a link to the folder
+        // itself or to a parent of it (a loop) is not followed
+        const root = recursive ? realPath(folder) || path.resolve(folder) : null;
+        const seen = new Set([root]);
+        const inLoop = (real) => !real || seen.has(real) || root.startsWith(real.endsWith(path.sep) ? real : real + path.sep);
         const walk = (dir, depth) => {
             for (const name of list(dir)) {
                 const entry = path.join(dir, name);
                 const info = stat(entry);
                 if (info && info.isDirectory() && recursive && depth < 8 && !name.startsWith('.')) {
+                    const real = realPath(entry);
+                    if (inLoop(real)) {
+                        continue;
+                    }
+                    seen.add(real);
                     walk(entry, depth + 1);
                 } else if (info && info.isFile() && layout.file.test(name) && !(layout.exclude && layout.exclude.test(name))) {
                     files.push({ path: entry, name });

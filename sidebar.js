@@ -14,6 +14,9 @@
 //   decoration: { git } or { state }, the color (and letter) of the label, see DECORATIONS
 //   command: { id, args }, run by a click
 
+// The text that opens the file of a table, as the inspector of the diagram says it
+const { openKey } = require('./views/inspector');
+
 const CONTAINER_ID = 'drawMeDatabase';
 const VIEWS = { schema: 'DMDB.schema', tools: 'DMDB.tools', exports: 'DMDB.exports', license: 'DMDB.license' };
 // What the welcome content of the Schema view shows (context key drawMeDatabase.schemaState)
@@ -113,8 +116,8 @@ function tableNode(table, t, { git, columnGit, framework }) {
     const relations = list(table.relations).filter(relation => relation && typeof relation.on === 'string');
     const status = gitStatus(table.git, git);
     const file = table.source && typeof table.source.file === 'string' ? table.source.file : '';
-    // 'Open the migration' (inspector.open.laravel), else 'Open the file'
-    const open = typeof framework === 'string' && t.has && t.has(`inspector.open.${framework}`) ? `inspector.open.${framework}` : 'inspector.open';
+    // 'Open the migration' (inspector.open.laravel), 'Open the SQL file' for a schema dump...
+    const open = openKey(framework, file, t);
     return {
         id: `table:${table.table}`,
         table: table.table,

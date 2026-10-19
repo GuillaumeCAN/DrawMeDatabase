@@ -306,6 +306,17 @@ describe('sql parser: where the SQL files are, in the order of each tool', () =>
         }
     });
 
+    it('Flyway: a folder reached through symbolic links is read once, and a link back to a parent folder is not followed', () => {
+        const dir = project({ 'db/migration/V1__a.sql': TABLE('a'), 'shared/V2__b.sql': TABLE('b') });
+        // 'junction': a link to a folder that Windows creates without the administrator rights
+        fs.symlinkSync(path.join(dir, 'db'), path.join(dir, 'db', 'migration', 'loop'), 'junction');
+        fs.symlinkSync(path.join(dir, 'shared'), path.join(dir, 'db', 'migration', 'common'), 'junction');
+        fs.symlinkSync(path.join(dir, 'shared'), path.join(dir, 'db', 'migration', 'common-again'), 'junction');
+        assert.deepEqual(layoutOf(dir), { layout: 'flyway', files: ['db/migration/V1__a.sql', 'db/migration/common/V2__b.sql'] });
+        assert.deepEqual(parser.parse(dir, { git: false }).warnings, [], 'no migration replayed twice');
+        assert.deepEqual(tables(dir), ['a', 'b']);
+    });
+
     it('dbmate: db/migrations with -- migrate:up, by name, only the up section; without the markers, the files are numbered migrations', () => {
         const dbmate = project({
             'db/migrations/20240102000000_b.sql': '-- migrate:up\nCREATE TABLE b (id int);\n\n-- migrate:down\nDROP TABLE a;\n',

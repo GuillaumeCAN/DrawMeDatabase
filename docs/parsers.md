@@ -94,7 +94,7 @@ The extension and its API (`detectFramework`, `parseSchema`, `getFrameworks`, `g
 1. `parsers/<id>.js` with the GPL header, exporting the contract above. Shared helpers: `parsers/git.js` (git status, unsaved editors), `parsers/errors.js` (`ParserError`), `parsers/composer.js` (PHP projects). `parsers/php-utils.js` scans PHP code only; `parsers/ts-utils.js` reads TypeScript and JavaScript (tokens, expressions, the imports, exports and declarations of a module) without running it; `parsers/sql.js` replays SQL (`scanStatements()`, `replay()`, and `readDump()` for a stack that keeps a dump of its schema, as Laravel does).
 2. A line in `MODULES` of `parsers/registry.js`, after the existing ones (they win the ties).
 3. `package.json`: the id in the `enum` of `DrawMeDatabase.framework`, its `enumDescriptions` in `package.nls.json` and `package.nls.fr.json` (`setting.framework.<id>`: what it reads). A unit test checks that the enum lists `auto` and every parser.
-4. Optionally the text of the button that opens the file of a table, `inspector.open.<id>` in `views/i18n.js` (English and French; `Open the file` otherwise).
+4. Optionally the text of the button that opens the file of a table, `inspector.open.<id>` in `views/i18n.js` (English and French; `Open the file` otherwise). A table whose source is a `.sql` or `.dump` file (a Laravel schema dump) says `Open the SQL file` whatever the stack (`openKey()` of `views/inspector.js`, used by the Schema view too).
 5. Fixtures in `test/fixtures/<id>/` and unit tests `test/unit/<id>.test.js` (tables, relations, warnings with their text, details, git status, unsaved editors), plus the detection in `test/unit/registry.test.js`.
 6. README: the stack in *Features* and its limits in *Known limitations*; CHANGELOG.
 

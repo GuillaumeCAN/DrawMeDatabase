@@ -102,6 +102,23 @@ describe('sidebar: Schema view', () => {
         assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: 'rails' }, t)[1].tooltip, /\nOpen the file$/);
         assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: undefined }, t)[1].tooltip, /\nOpen the file$/);
     });
+
+    it('a table read from a SQL file (a Laravel schema dump) opens "the SQL file", in the tree and in the inspector', () => {
+        const dumped = (file) => ({ framework: 'laravel', tables: [{ table: 'articles', columns: [], relations: [], source: { file, line: 3 } }] });
+        assert.equal(sidebar.schemaNodes(dumped('database/schema/mysql-schema.sql'), t)[0].tooltip, 'articles\ndatabase/schema/mysql-schema.sql\nOpen the SQL file');
+        assert.match(sidebar.schemaNodes(dumped('database/schema/pgsql-schema.dump'), fr)[0].tooltip, /\nOuvrir le fichier SQL$/);
+        assert.match(sidebar.schemaNodes(dumped('database/migrations/0001_create_articles_table.php'), t)[0].tooltip, /\nOpen the migration$/);
+        // The button of the inspector says the same
+        const { openKey } = require('../../views/inspector');
+        assert.deepEqual([
+            openKey('laravel', 'database/schema/mysql-schema.sql', t),
+            openKey('laravel', 'database/migrations/0001_create_articles_table.php', t),
+            openKey('sql', 'supabase/migrations/1_init.sql', t),
+            openKey('prisma', 'prisma/schema.prisma', t),
+            openKey('rails', 'db/structure.rb', t),
+            openKey(undefined, undefined, t),
+        ], ['inspector.open.sql', 'inspector.open.laravel', 'inspector.open.sql', 'inspector.open.prisma', 'inspector.open', 'inspector.open']);
+    });
 });
 
 describe('sidebar: Tools, Exports and License views', () => {
