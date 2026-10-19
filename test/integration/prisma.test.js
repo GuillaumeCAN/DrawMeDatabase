@@ -27,6 +27,33 @@ const withoutGit = (column) => {
     return copy;
 };
 
+// Waits until test() is true (at most `ms`)
+async function waitFor(test, ms = 2000) {
+    for (let waited = 0; !test() && waited < ms; waited += 50) {
+        await sleep(50);
+    }
+    return test();
+}
+
+// The tab of a text document, in any editor group; whether it is the active tab
+const shows = (tab, document) => Boolean(tab) && tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === document.uri.toString();
+const tabOf = (document) => vscode.window.tabGroups.all.flatMap(group => group.tabs).find(tab => shows(tab, document));
+const isActive = (document) => shows(vscode.window.tabGroups.activeTabGroup.activeTab, document);
+
+// Reverts an unsaved document with workbench.action.files.revert, which reverts the active editor:
+// VS Code 1.96 can give the focus back to the diagram right after showTextDocument(), so the
+// editor is shown again, and checked to be active, before each try. Returns whether it reverted.
+async function revert(document) {
+    for (let attempt = 0; attempt < 10 && document.isDirty; attempt++) {
+        await vscode.window.showTextDocument(document, { preview: false, preserveFocus: false });
+        if (await waitFor(() => isActive(document), 1000)) {
+            await vscode.commands.executeCommand('workbench.action.files.revert');
+        }
+        await waitFor(() => !document.isDirty, 1000);
+    }
+    return !document.isDirty;
+}
+
 // The drawing reported by the webview (exported by the extension): waits for one that matches
 async function rendered(extension, matches) {
     for (let i = 0; i < 300; i++) {
@@ -131,9 +158,12 @@ suite('DrawMeDatabase extension: a Prisma project', () => {
         const draft = findTable(extension.exports.getSchema().tables, 'Draft');
         assert.equal(draft && draft.git, 'unsaved');
 
-        await vscode.commands.executeCommand('workbench.action.files.revert');
+        assert.equal(await revert(document), true, 'the editor is reverted');
         const reverted = await rendered(extension, r => r.ok && r.entities === 3);
         assert.equal(reverted && reverted.entities, 3, `after the revert: ${JSON.stringify(reverted)}`);
-        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        const tab = tabOf(document);
+        if (tab) {
+            await vscode.window.tabGroups.close(tab);
+        }
     });
 });
