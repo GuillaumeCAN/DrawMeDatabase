@@ -74,6 +74,7 @@ DrawMeDatabase is free, and everything it does today stays free. **DrawMeDatabas
 - **Schema canvas**: a second view where you move the tables and the links by hand, with the git status of every column; the layout is kept and can be shared with your team
 - **Table designer**: draw a table (columns, types, keys, relations) and get the Laravel migration or the Doctrine entity written for you
 - **Schema comparison**: what changed between two branches or commits, and what a migration does, with a report to paste in a pull request
+- **Database drift**: the code compared with a real MySQL, MariaDB, PostgreSQL or SQLite database — the migrations never run, the columns changed by hand, the indexes and foreign keys that differ (read only)
 - **Exports**: SQL (MySQL, PostgreSQL, SQLite), DBML, PlantUML, TypeScript types, and an HTML documentation of the schema
 - **Schema checks** in the Problems panel: missing primary or foreign keys, mismatched types, naming...
 - **Large schemas**: the path between two tables, saved views shared with your team

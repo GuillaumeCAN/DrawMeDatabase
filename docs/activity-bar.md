@@ -117,8 +117,8 @@ it in its `package.json`, keyed by the container id:
   `drawMeDatabase.schemaState` (`loading`, `noFolder`, `noProject`, `noTables`, `error`, `ready`)
   and `drawMeDatabase.license` (`free`, `trial`, `expired`, `licensed`, `development`).
 - The views of other extensions come after the ones of the core; users can reorder them.
-- Planned in DrawMeDatabase Pro: *Database connections* (for the comparison with a live database)
-  and *Saved views*.
+- DrawMeDatabase Pro adds two views this way: *Database Connections* (`DMDBPro.connections`, the
+  connections of the comparison with a live database) and *Saved Views* (`DMDBPro.savedViews`).
 - No new API member is needed: the container id and the context keys are documented in
   [api.md](api.md).
 
