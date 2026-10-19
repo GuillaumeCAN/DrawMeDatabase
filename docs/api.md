@@ -22,7 +22,7 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 | `getSchema()` | The schema on screen: `{ tables, framework, basePath, project: { name, folder } }` (`framework` is the id of the parser that read it, see `getFrameworks()`; `folder` is the URI of the workspace folder as a string), or `null` before the first drawing. A copy: changing it changes nothing |
 | `onDidChangeSchema(listener)` | Event fired with the new schema after each drawing (command, refresh, live edit). Returns a `Disposable` |
 | `showDiagram()` | Draws the schema of the workspace, like the DrawMeDatabase command. Resolves to the parsed tables |
-| `detectFramework(basePath, options)` | The id of the stack of a framework root (`'laravel'`, `'symfony'`, see `getFrameworks()`), or `'Unknown'` for an unsupported folder. 1.8.0: `options.framework`, an id that wins over the detection, like the `DrawMeDatabase.framework` setting (the API does not read the setting: `getSchema().framework` follows it) |
+| `detectFramework(basePath, options)` | The id of the stack of a framework root (`'laravel'`, `'symfony'`, `'prisma'`, see `getFrameworks()`), or `'Unknown'` for an unsupported folder. 1.8.0: `options.framework`, an id that wins over the detection, like the `DrawMeDatabase.framework` setting (the API does not read the setting: `getSchema().framework` follows it) |
 | `parseSchema(basePath, framework, options)` | Parses a framework folder with the parser `framework` (an id of `getFrameworks()`): `{ tables, warnings }`. Options: `git`, `overrides`, `gitCache`, `columnSources`, `until` (Laravel), `details` (lengths, defaults, indexes, ON DELETE...), see [pivot-format.md](pivot-format.md). Throws a `ParserError` for a missing folder or an unknown framework |
 | `viewsUri`, `viewScripts` | The folder of the page files and the scripts that draw a diagram, in loading order (`vendor/mermaid.min.js`, `i18n.js`, `appearance.js`, `mermaid/generator.js`, `mermaid/zoom.js`, `exporters.js`, `search.js`, `mermaid/diagram.js`, `sidepanel.js`), with `theme.css`. Add `viewsUri` to the `localResourceRoots` of your panel to reuse them, see [Pages](#pages) |
 | `registerExporter({ id, label, extension, export, pro })` | Adds an item to the Export menu of the diagram and to the Exports view of the sidebar (1.6.0: the Export section of the side panel). `export(schema)` gets the tables on screen (the search result when there is one) and returns the text of the file (or a promise), saved with the Save dialog. `pro: true`: locked in the Exports view once the trial of DrawMeDatabase Pro has ended. Returns a `Disposable` |
@@ -43,11 +43,11 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 
 ## Version 3 (DrawMeDatabase 1.8.0)
 
-The parsers are pluggable ([parsers.md](parsers.md)): a stack is an id (`framework` everywhere in the API) with its label and its sources. More stacks will follow: code that branches on `framework` keeps a default for the ids it does not know (for example, no Laravel migration written for a stack that is not `laravel`).
+The parsers are pluggable ([parsers.md](parsers.md)): a stack is an id (`framework` everywhere in the API) with its label and its sources. More stacks will follow: code that branches on `framework` keeps a default for the ids it does not know (for example, no Laravel migration written for a stack that is not `laravel`, and no Doctrine entity for `prisma`).
 
 | Member | Description |
 |--------|-------------|
-| `getFrameworks()` | The supported stacks, in the order of detection (the first one wins a tie): `[{ id, label }]`, today `[{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }]` |
+| `getFrameworks()` | The supported stacks, in the order of detection (the first one wins a tie): `[{ id, label }]`, today `[{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }]` |
 | `getSources(basePath, framework)` | What the parser of a stack reads in a framework root: `{ folders: [{ path, recursive }], files, extensions }`, absolute paths (`recursive`: its sub-folders too; `extensions`: of the files of the folders, `['.php']`; `files`: single files, whatever their extension). For example the files to copy for a version of the schema, or to watch. Throws a `ParserError` for an unknown framework |
 
 ## Sidebar (DrawMeDatabase 1.7.0)

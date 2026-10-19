@@ -189,15 +189,23 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 ### Fixed
 - A button of DrawMeDatabase Pro (PRO badge, Discover, a Pro tool or export) no longer fails with "Extension not found" while Pro is not on the Marketplace: a message tells that it is not published yet, or that VS Code is offline
 
-## [v1.8.0] - 2026-10-19
+## [v1.8.0] - Unreleased
 
 ### Added
+- Prisma: the tables of the Prisma schema (Prisma ORM 5 to 7), found where the Prisma CLI looks for it (`schema.prisma`, `prisma/schema.prisma`, the schema of `prisma.config.ts`, read without running it, or of the `prisma` section of `package.json`) or in a multi-file schema folder (`prisma/schema/`). PostgreSQL, MySQL, SQLite, SQL Server and CockroachDB
+  - Models with their `@@map` / `@map` names and `@@schema`, the Prisma types (scalars, enums, `Unsupported("...")`), optional fields and scalar lists, primary keys (`@id`, `@@id`), unique columns, indexes (`@@index`, `@@unique`, `@@fulltext`), defaults and native types (`@db.*`) in the details
+  - Relations from `@relation(fields, references)`: many-to-one or one-to-one (unique fields), composite and self relations, the join tables of the implicit many-to-many relations (`_AToB`, `_Name`), and the `onDelete` / `onUpdate` that `prisma migrate` writes
+  - The live diagram, the git status of the tables and columns, the Schema view and the click on a table (the line of the model) work as for Laravel and Symfony, on every file of a multi-file schema
+  - Views and composite types are skipped with a warning; a MongoDB schema draws nothing, with a warning
+  - Checked against `prisma migrate diff` on real schemas (Cal.diy, Dub, Umami, Hoppscotch, Prisma's examples), kept as test fixtures
 - Pluggable parsers: each framework is a parser module with an id, a label, a detection score, the files it reads (`sources()`) and its `parse()`, listed in `parsers/registry.js` (`docs/parsers.md`). The file watcher, the live refresh of the unsaved editors and the git status follow the files each parser declares, instead of the PHP files of two fixed folders
-- `DrawMeDatabase.framework` setting: `auto` (the default) detects the framework, `laravel` or `symfony` chooses it for a project that matches several of them. The output lists the frameworks found, with their score
+- `DrawMeDatabase.framework` setting: `auto` (the default) detects the framework, `laravel`, `symfony` or `prisma` chooses it for a project that matches several of them. The output lists the frameworks found, with their score
 - API version 3 (`docs/api.md`): `getFrameworks()` (the supported stacks, `{ id, label }`), `getSources(basePath, framework)` (what a parser reads), and an `options.framework` for `detectFramework()`
+- The `nativeType` detail of the columns (`docs/pivot-format.md`): the native type declared for the database (Prisma `@db.VarChar(255)` gives `VarChar(255)`)
 
 ### Changed
 - The messages and the Schema view no longer name Laravel and Symfony only: the message of a folder without a supported project lists the supported frameworks, and the output names the files read when no table is found
 - The Markdown export names the framework from the label given by the extension
+- The description and the keywords of the extension name the supported stacks
 
-Laravel and Symfony projects are read as before: same tables, warnings and git status, and Laravel still wins when a project is both.
+Laravel and Symfony projects are read as before: same tables, warnings and git status, and Laravel still wins when a project is both. Laravel and Symfony also win a tie with Prisma (a PHP project with a Prisma schema); `DrawMeDatabase.framework` chooses Prisma there.

@@ -6,6 +6,7 @@ DrawMeDatabase reads the schema of the database from the code of a project. Each
 |----|-------|-------|-------------|
 | `laravel` | Laravel | `database/migrations/*.php`, in file name order (not the sub-folders) | `artisan` and `laravel/framework` in the `require` of `composer.json` |
 | `symfony` | Symfony | `src/Entity/**/*.php` (Doctrine entities) | `bin/console` and `symfony/framework-bundle` (or another `symfony/*` package except the polyfills) in the `require` of `composer.json` |
+| `prisma` | Prisma | The Prisma schema where the Prisma CLI looks for it: the `schema` of `prisma.config.ts` (read, not run), else `prisma.schema` of `package.json`, else `schema.prisma`, `prisma/schema.prisma`, then the multi-file folder `prisma/schema/` (`**/*.prisma`). Also `package.json` and the config file, which can move it | A schema and `prisma` or `@prisma/client` in the `dependencies` or `devDependencies` of `package.json`, or a Prisma config file (100); one of them only (50) |
 
 ## The contract
 
@@ -30,13 +31,13 @@ module.exports = {
 
 ### `detect(basePath)` → score
 
-A number: `0` (or anything that is not a positive finite number) when the folder is not a project of this stack, else how sure the parser is. The registry asks every parser and keeps the best score; on a tie, the first parser of the registry wins (Laravel before Symfony, as before 1.8.0, then the parsers added later).
+A number: `0` (or anything that is not a positive finite number) when the folder is not a project of this stack, else how sure the parser is. The registry asks every parser and keeps the best score; on a tie, the first parser of the registry wins (Laravel before Symfony, as before 1.8.0, then the parsers added later: Prisma).
 
 | Score | Meaning | Examples |
 |-------|---------|----------|
-| `100` | The marker file of the stack and its main package | `artisan` + `laravel/framework`; `bin/console` + `symfony/framework-bundle` |
+| `100` | The marker file of the stack and its main package | `artisan` + `laravel/framework`; `bin/console` + `symfony/framework-bundle`; a Prisma schema + `prisma` in `package.json` |
 | `80` | The marker file and a package of the family | `bin/console` + `symfony/console` |
-| `50` | Only the package, or only the schema file | a package in `package.json`, a `schema.prisma` without it |
+| `50` | Only the package, or only the schema file | `prisma` in `package.json`, a `schema.prisma` without it |
 | `1`-`49` | A weak hint | |
 
 - Keep it fast: the registry calls it for every parser before each reading of the schema (small files only, no recursive scan of the project).

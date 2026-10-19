@@ -140,6 +140,29 @@ test('composer.json with a UTF-8 BOM is read', () => {
     assert.equal(detectFramework(symfony), 'symfony');
 });
 
+const PRISMA_SCHEMA = 'datasource db {\n  provider = "postgresql"\n}\n\nmodel User {\n  id Int @id\n}\n';
+
+test('detects Prisma: a schema and prisma or @prisma/client in package.json, or the schema alone', () => {
+    const app = project('prisma-app', { 'package.json': JSON.stringify({ devDependencies: { prisma: '^7.10.1' } }), 'prisma/schema.prisma': PRISMA_SCHEMA });
+    assert.deepEqual(registry.detect(app), { framework: 'prisma', forced: false, matches: [{ id: 'prisma', label: 'Prisma', score: 100 }] });
+    assert.equal(detectFramework(project('prisma-schema-only', { 'schema.prisma': PRISMA_SCHEMA })), 'prisma');
+    assert.equal(detectFramework(project('prisma-folder', { 'prisma/schema/user.prisma': PRISMA_SCHEMA })), 'prisma');
+    assert.equal(detectFramework(project('prisma-package-only', { 'package.json': JSON.stringify({ dependencies: { '@prisma/client': '6.19.1' } }) })), 'prisma');
+    assert.equal(detectFramework(project('node-app', { 'package.json': JSON.stringify({ dependencies: { express: '^5.0.0' } }) })), 'Unknown');
+});
+
+test('Laravel and Symfony win a tie with Prisma, a stronger Prisma wins over a weaker Symfony; both are listed', () => {
+    const prisma = { 'package.json': JSON.stringify({ devDependencies: { prisma: '^7.10.1' } }), 'prisma/schema.prisma': PRISMA_SCHEMA };
+    const laravel = project('laravel-prisma', { artisan: '', 'composer.json': composer({ 'laravel/framework': '^12.0' }), ...prisma });
+    assert.deepEqual(registry.detect(laravel).matches.map(match => [match.id, match.score]), [['laravel', 100], ['prisma', 100]]);
+    assert.equal(detectFramework(laravel), 'laravel');
+    assert.equal(detectFramework(laravel, { framework: 'prisma' }), 'prisma', 'the setting chooses Prisma');
+    const symfony = project('symfony-console-prisma', { 'bin/console': '', 'composer.json': composer({ 'symfony/console': '^7.4' }), ...prisma });
+    assert.deepEqual(registry.detect(symfony).matches.map(match => [match.id, match.score]), [['prisma', 100], ['symfony', 80]]);
+    // An invalid composer.json does not hide a Prisma project
+    assert.equal(detectFramework(project('prisma-bad-composer', { artisan: '', 'composer.json': '{,}', ...prisma })), 'prisma');
+});
+
 test('artisan must be a file', () => {
     const dir = project('artisan-dir', {
         'artisan/readme.txt': '',
@@ -170,8 +193,8 @@ const BOTH = {
 
 test('every parser follows the contract: id, label, detect(), sources(), parse()', () => {
     const parsers = registry.getParsers();
-    assert.deepEqual(parsers.map(parser => parser.id), ['laravel', 'symfony'], 'Laravel first: it wins the ties');
-    assert.deepEqual(registry.labels(), ['Laravel', 'Symfony']);
+    assert.deepEqual(parsers.map(parser => parser.id), ['laravel', 'symfony', 'prisma'], 'Laravel first: it wins the ties');
+    assert.deepEqual(registry.labels(), ['Laravel', 'Symfony', 'Prisma']);
     const missing = path.join(tmpRoot, 'does-not-exist');
     for (const parser of parsers) {
         assert.match(parser.id, /^[a-z][a-z0-9-]*$/, parser.id);
@@ -294,6 +317,20 @@ test('the sources of Laravel and Symfony: database/migrations and src/Entity (wi
     assert.deepEqual(registry.getSources('laravel', base), { folders: [{ path: path.join(base, 'database', 'migrations'), recursive: false }], files: [], extensions: ['.php'] });
     assert.deepEqual(registry.getSources('symfony', base), { folders: [{ path: path.join(base, 'src', 'Entity'), recursive: true }], files: [], extensions: ['.php'] });
     assert.equal(registry.getSources('rails', base), undefined);
+});
+
+test('the sources of Prisma: the schema file (or folder), package.json and the config file', () => {
+    const app = project('prisma-sources', { 'prisma/schema.prisma': PRISMA_SCHEMA });
+    assert.deepEqual(registry.getSources('prisma', app), {
+        folders: [],
+        files: [path.join(app, 'prisma', 'schema.prisma'), path.join(app, 'package.json'), path.join(app, 'prisma.config.ts')],
+        extensions: ['.prisma'],
+    });
+    assert.deepEqual(watchPatterns(registry.getSources('prisma', app)), [
+        { base: path.join(app, 'prisma'), pattern: 'schema.prisma' },
+        { base: app, pattern: 'package.json' },
+        { base: app, pattern: 'prisma.config.ts' },
+    ]);
 });
 
 test('getSources() cleans the sources of a parser: absolute paths, recursive or not, extensions with a dot', () => {

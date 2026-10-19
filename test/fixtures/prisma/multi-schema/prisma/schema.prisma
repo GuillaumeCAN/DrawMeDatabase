@@ -1,0 +1,51 @@
+// Hand-made: the tables of several database schemas (@@schema), checked with
+// `prisma migrate diff --from-empty --script` (7.10.1)
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["auth", "public"]
+}
+
+model Account {
+  id      String    @id @db.Uuid
+  email   String    @unique
+  profile Profile?
+  roles   Role[]
+
+  @@map("users")
+  @@schema("auth")
+}
+
+model Role {
+  id       Int       @id
+  accounts Account[]
+
+  @@schema("auth")
+}
+
+// Same table name as the one of the auth schema
+model Profile {
+  id        Int     @id @default(autoincrement())
+  accountId String  @unique @map("account_id") @db.Uuid
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  posts     Post[]
+
+  @@map("users")
+  @@schema("public")
+}
+
+model Post {
+  id       Int       @id
+  authorId Int
+  author   Profile   @relation(fields: [authorId], references: [id])
+  topics   Topic[]
+
+  @@schema("public")
+}
+
+model Topic {
+  id    Int    @id
+  posts Post[]
+
+  @@schema("public")
+}

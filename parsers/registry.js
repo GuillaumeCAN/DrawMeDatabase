@@ -20,6 +20,7 @@ const UNKNOWN = 'Unknown';
 const MODULES = [
     () => require('./laravel'),
     () => require('./symfony'),
+    () => require('./prisma'),
 ];
 
 const list = (value) => (Array.isArray(value) ? value : []);

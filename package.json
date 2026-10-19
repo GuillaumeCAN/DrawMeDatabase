@@ -2,7 +2,7 @@
   "name": "draw-me-database",
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
-  "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
+  "description": "Visualize the schema of your database from your code: Laravel migrations, Symfony Doctrine entities and Prisma schemas, as a live diagram with its git status",
   "version": "1.8.0",
   "icon": "images/logo_128.png",
   "engines": {
@@ -14,6 +14,25 @@
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "database",
+    "schema",
+    "diagram",
+    "erd",
+    "er diagram",
+    "entity relationship",
+    "mermaid",
+    "laravel",
+    "migrations",
+    "symfony",
+    "doctrine",
+    "prisma",
+    "prisma schema",
+    "orm",
+    "postgresql",
+    "mysql",
+    "sqlite"
   ],
   "activationEvents": [
     "onStartupFinished",
@@ -142,12 +161,14 @@
           "enum": [
             "auto",
             "laravel",
-            "symfony"
+            "symfony",
+            "prisma"
           ],
           "enumDescriptions": [
             "%setting.framework.auto%",
             "%setting.framework.laravel%",
-            "%setting.framework.symfony%"
+            "%setting.framework.symfony%",
+            "%setting.framework.prisma%"
           ],
           "default": "auto",
           "scope": "resource",

@@ -1,0 +1,8 @@
+{
+  "name": "hoppscotch-backend",
+  "private": true,
+  "dependencies": {
+    "@prisma/client": "7.9.1",
+    "prisma": "7.9.1"
+  }
+}

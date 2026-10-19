@@ -1,0 +1,2432 @@
+{
+  "tables": [
+    {
+      "table": "Host",
+      "columns": [
+        {"name":"userId","type":"Int","primary":true,"source":{"file":"schema.prisma","line":63}},
+        {"name":"eventTypeId","type":"Int","primary":true,"source":{"file":"schema.prisma","line":65}},
+        {"name":"isFixed","type":"Boolean","source":{"file":"schema.prisma","line":66},"default":false},
+        {"name":"priority","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":67}},
+        {"name":"weight","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":68}},
+        {"name":"weightAdjustment","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":70}},
+        {"name":"scheduleId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":72}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":73},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"groupId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":75}},
+        {"name":"memberId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":76}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"scheduleId","references":"id","on":"Schedule","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"groupId","references":"id","on":"HostGroup","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"memberId","references":"id","on":"Membership","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":61},
+      "indexes": [
+        {"columns":["memberId"],"type":"index"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["eventTypeId"],"type":"index"},
+        {"columns":["scheduleId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "HostGroup",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":88}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":89}},
+        {"name":"eventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":92}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":93},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":94}}
+      ],
+      "relations": [
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":87},
+      "indexes": [
+        {"columns":["name"],"type":"index"},
+        {"columns":["eventTypeId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "HostLocation",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":101}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":102}},
+        {"name":"eventTypeId","type":"Int","source":{"file":"schema.prisma","line":103}},
+        {"name":"type","type":"String","source":{"file":"schema.prisma","line":105}},
+        {"name":"credentialId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":106}},
+        {"name":"link","type":"String","nullable":true,"source":{"file":"schema.prisma","line":108}},
+        {"name":"address","type":"String","nullable":true,"source":{"file":"schema.prisma","line":109}},
+        {"name":"phoneNumber","type":"String","nullable":true,"source":{"file":"schema.prisma","line":110}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":111},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":112}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"userId","on":"Host","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"eventTypeId","references":"eventTypeId","on":"Host","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"credentialId","references":"id","on":"Credential","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":100},
+      "indexes": [
+        {"columns":["userId","eventTypeId"],"type":"unique"},
+        {"columns":["credentialId"],"type":"index"},
+        {"columns":["eventTypeId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "CalVideoSettings",
+      "columns": [
+        {"name":"eventTypeId","type":"Int","primary":true,"source":{"file":"schema.prisma","line":120}},
+        {"name":"disableRecordingForOrganizer","type":"Boolean","source":{"file":"schema.prisma","line":123},"default":false},
+        {"name":"disableRecordingForGuests","type":"Boolean","source":{"file":"schema.prisma","line":124},"default":false},
+        {"name":"enableAutomaticTranscription","type":"Boolean","source":{"file":"schema.prisma","line":125},"default":false},
+        {"name":"enableAutomaticRecordingForOrganizer","type":"Boolean","source":{"file":"schema.prisma","line":126},"default":false},
+        {"name":"redirectUrlOnExit","type":"String","nullable":true,"source":{"file":"schema.prisma","line":127}},
+        {"name":"disableTranscriptionForGuests","type":"Boolean","source":{"file":"schema.prisma","line":128},"default":false},
+        {"name":"disableTranscriptionForOrganizer","type":"Boolean","source":{"file":"schema.prisma","line":129},"default":false},
+        {"name":"requireEmailForGuests","type":"Boolean","source":{"file":"schema.prisma","line":130},"default":false},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":131},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":132}}
+      ],
+      "relations": [
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":119}
+    },
+    {
+      "table": "VideoCallGuest",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":136}},
+        {"name":"bookingUid","type":"String","source":{"file":"schema.prisma","line":137}},
+        {"name":"email","type":"String","source":{"file":"schema.prisma","line":138}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":139}},
+        {"name":"joinedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":140}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":141},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":142}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":135},
+      "indexes": [
+        {"columns":["bookingUid","email"],"type":"unique"},
+        {"columns":["bookingUid"],"type":"index"},
+        {"columns":["email"],"type":"index"}
+      ]
+    },
+    {
+      "table": "EventType",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":157},"autoIncrement":true},
+        {"name":"title","type":"String","source":{"file":"schema.prisma","line":159}},
+        {"name":"slug","type":"String","source":{"file":"schema.prisma","line":161}},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":162}},
+        {"name":"interfaceLanguage","type":"String","nullable":true,"source":{"file":"schema.prisma","line":163}},
+        {"name":"position","type":"Int","source":{"file":"schema.prisma","line":164},"default":0},
+        {"name":"locations","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":166}},
+        {"name":"length","type":"Int","source":{"file":"schema.prisma","line":168}},
+        {"name":"offsetStart","type":"Int","source":{"file":"schema.prisma","line":169},"default":0},
+        {"name":"hidden","type":"Boolean","source":{"file":"schema.prisma","line":170},"default":false},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":175}},
+        {"name":"profileId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":177}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":181}},
+        {"name":"useEventLevelSelectedCalendars","type":"Boolean","source":{"file":"schema.prisma","line":187},"default":false},
+        {"name":"eventName","type":"String","nullable":true,"source":{"file":"schema.prisma","line":188}},
+        {"name":"parentId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":190}},
+        {"name":"bookingFields","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":194}},
+        {"name":"timeZone","type":"String","nullable":true,"source":{"file":"schema.prisma","line":195}},
+        {"name":"periodType","type":"PeriodType","source":{"file":"schema.prisma","line":196},"default":"unlimited","values":["unlimited","rolling","rolling_window","range"]},
+        {"name":"periodStartDate","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":198}},
+        {"name":"periodEndDate","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":200}},
+        {"name":"periodDays","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":201}},
+        {"name":"periodCountCalendarDays","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":202}},
+        {"name":"lockTimeZoneToggleOnBookingPage","type":"Boolean","source":{"file":"schema.prisma","line":203},"default":false},
+        {"name":"lockedTimeZone","type":"String","nullable":true,"source":{"file":"schema.prisma","line":204}},
+        {"name":"requiresConfirmation","type":"Boolean","source":{"file":"schema.prisma","line":205},"default":false},
+        {"name":"requiresConfirmationWillBlockSlot","type":"Boolean","source":{"file":"schema.prisma","line":206},"default":false},
+        {"name":"requiresConfirmationForFreeEmail","type":"Boolean","source":{"file":"schema.prisma","line":207},"default":false},
+        {"name":"requiresBookerEmailVerification","type":"Boolean","source":{"file":"schema.prisma","line":208},"default":false},
+        {"name":"canSendCalVideoTranscriptionEmails","type":"Boolean","source":{"file":"schema.prisma","line":209},"default":true},
+        {"name":"autoTranslateDescriptionEnabled","type":"Boolean","source":{"file":"schema.prisma","line":211},"default":false},
+        {"name":"autoTranslateInstantMeetingTitleEnabled","type":"Boolean","source":{"file":"schema.prisma","line":212},"default":true},
+        {"name":"recurringEvent","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":214}},
+        {"name":"disableGuests","type":"Boolean","source":{"file":"schema.prisma","line":215},"default":false},
+        {"name":"hideCalendarNotes","type":"Boolean","source":{"file":"schema.prisma","line":216},"default":false},
+        {"name":"hideCalendarEventDetails","type":"Boolean","source":{"file":"schema.prisma","line":217},"default":false},
+        {"name":"minimumBookingNotice","type":"Int","source":{"file":"schema.prisma","line":219},"default":120},
+        {"name":"beforeEventBuffer","type":"Int","source":{"file":"schema.prisma","line":220},"default":0},
+        {"name":"afterEventBuffer","type":"Int","source":{"file":"schema.prisma","line":221},"default":0},
+        {"name":"seatsPerTimeSlot","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":222}},
+        {"name":"onlyShowFirstAvailableSlot","type":"Boolean","source":{"file":"schema.prisma","line":223},"default":false},
+        {"name":"showOptimizedSlots","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":224},"default":false},
+        {"name":"disableCancelling","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":225},"default":false},
+        {"name":"disableRescheduling","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":226},"default":false},
+        {"name":"minimumRescheduleNotice","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":228}},
+        {"name":"seatsShowAttendees","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":229},"default":false},
+        {"name":"seatsShowAvailabilityCount","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":230},"default":true},
+        {"name":"schedulingType","type":"SchedulingType","nullable":true,"source":{"file":"schema.prisma","line":231},"values":["roundRobin","collective","managed"]},
+        {"name":"scheduleId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":233}},
+        {"name":"allowReschedulingCancelledBookings","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":234},"default":false},
+        {"name":"price","type":"Int","source":{"file":"schema.prisma","line":236},"default":0},
+        {"name":"currency","type":"String","source":{"file":"schema.prisma","line":238},"default":"usd"},
+        {"name":"slotInterval","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":239}},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":241}},
+        {"name":"successRedirectUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":243}},
+        {"name":"forwardParamsSuccessRedirect","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":244},"default":true},
+        {"name":"bookingLimits","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":246}},
+        {"name":"durationLimits","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":248}},
+        {"name":"isInstantEvent","type":"Boolean","source":{"file":"schema.prisma","line":249},"default":false},
+        {"name":"instantMeetingExpiryTimeOffsetInSeconds","type":"Int","source":{"file":"schema.prisma","line":250},"default":90},
+        {"name":"instantMeetingScheduleId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":251}},
+        {"name":"instantMeetingParameters","type":"String[]","nullable":true,"source":{"file":"schema.prisma","line":253}},
+        {"name":"assignAllTeamMembers","type":"Boolean","source":{"file":"schema.prisma","line":254},"default":false},
+        {"name":"assignRRMembersUsingSegment","type":"Boolean","source":{"file":"schema.prisma","line":256},"default":false},
+        {"name":"rrSegmentQueryValue","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":258}},
+        {"name":"useEventTypeDestinationCalendarEmail","type":"Boolean","source":{"file":"schema.prisma","line":259},"default":false},
+        {"name":"isRRWeightsEnabled","type":"Boolean","source":{"file":"schema.prisma","line":260},"default":false},
+        {"name":"maxLeadThreshold","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":262}},
+        {"name":"includeNoShowInRRCalculation","type":"Boolean","source":{"file":"schema.prisma","line":263},"default":false},
+        {"name":"allowReschedulingPastBookings","type":"Boolean","source":{"file":"schema.prisma","line":265},"default":false},
+        {"name":"hideOrganizerEmail","type":"Boolean","source":{"file":"schema.prisma","line":266},"default":false},
+        {"name":"maxActiveBookingsPerBooker","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":267}},
+        {"name":"maxActiveBookingPerBookerOfferReschedule","type":"Boolean","source":{"file":"schema.prisma","line":268},"default":false},
+        {"name":"customReplyToEmail","type":"String","nullable":true,"source":{"file":"schema.prisma","line":270}},
+        {"name":"eventTypeColor","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":274}},
+        {"name":"rescheduleWithSameRoundRobinHost","type":"Boolean","source":{"file":"schema.prisma","line":275},"default":false},
+        {"name":"secondaryEmailId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":277}},
+        {"name":"useBookerTimezone","type":"Boolean","source":{"file":"schema.prisma","line":280},"default":false},
+        {"name":"restrictionScheduleId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":281}},
+        {"name":"bookingRequiresAuthentication","type":"Boolean","source":{"file":"schema.prisma","line":285},"default":false},
+        {"name":"rrHostSubsetEnabled","type":"Boolean","source":{"file":"schema.prisma","line":286},"default":false},
+        {"name":"requiresCancellationReason","type":"CancellationReasonRequirement","nullable":true,"source":{"file":"schema.prisma","line":287},"default":"MANDATORY_HOST_ONLY","values":["MANDATORY_BOTH","MANDATORY_HOST_ONLY","MANDATORY_ATTENDEE_ONLY","OPTIONAL_BOTH"]},
+        {"name":"enablePerHostLocations","type":"Boolean","source":{"file":"schema.prisma","line":288},"default":false},
+        {"name":"createdAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":290},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":291}}
+      ],
+      "relations": [
+        {"foreignKey":"A","references":"id","on":"users","type":"many-to-many","via":"_user_eventtype","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"profileId","references":"id","on":"Profile","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"parentId","references":"id","on":"EventType","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"scheduleId","references":"id","on":"Schedule","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"instantMeetingScheduleId","references":"id","on":"Schedule","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"secondaryEmailId","references":"id","on":"SecondaryEmail","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"restrictionScheduleId","references":"id","on":"Schedule","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":156},
+      "indexes": [
+        {"columns":["userId","slug"],"type":"unique"},
+        {"columns":["teamId","slug"],"type":"unique"},
+        {"columns":["userId","parentId"],"type":"unique"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["teamId"],"type":"index"},
+        {"columns":["profileId"],"type":"index"},
+        {"columns":["scheduleId"],"type":"index"},
+        {"columns":["secondaryEmailId"],"type":"index"},
+        {"columns":["parentId"],"type":"index"},
+        {"columns":["parentId","teamId"],"type":"index"},
+        {"columns":["restrictionScheduleId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Credential",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":309},"autoIncrement":true},
+        {"name":"type","type":"String","source":{"file":"schema.prisma","line":311}},
+        {"name":"key","type":"Json","source":{"file":"schema.prisma","line":312}},
+        {"name":"encryptedKey","type":"String","nullable":true,"source":{"file":"schema.prisma","line":313}},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":315}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":317}},
+        {"name":"appId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":320}},
+        {"name":"subscriptionId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":323}},
+        {"name":"paymentStatus","type":"String","nullable":true,"source":{"file":"schema.prisma","line":324}},
+        {"name":"billingCycleStart","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":325}},
+        {"name":"invalid","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":329},"default":false},
+        {"name":"delegationCredentialId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":332}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"appId","references":"slug","on":"App","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"delegationCredentialId","references":"id","on":"DelegationCredential","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":308},
+      "indexes": [
+        {"columns":["appId"],"type":"index"},
+        {"columns":["subscriptionId"],"type":"index"},
+        {"columns":["invalid"],"type":"index"},
+        {"columns":["userId","delegationCredentialId"],"type":"index"},
+        {"columns":["teamId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "DestinationCalendar",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":352},"autoIncrement":true},
+        {"name":"integration","type":"String","source":{"file":"schema.prisma","line":353}},
+        {"name":"externalId","type":"String","source":{"file":"schema.prisma","line":354}},
+        {"name":"primaryEmail","type":"String","nullable":true,"source":{"file":"schema.prisma","line":356}},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":358},"unique":true},
+        {"name":"eventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":361},"unique":true},
+        {"name":"credentialId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":362}},
+        {"name":"createdAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":364},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":365}},
+        {"name":"delegationCredentialId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":367}},
+        {"name":"customCalendarReminder","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":368}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"credentialId","references":"id","on":"Credential","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"delegationCredentialId","references":"id","on":"DelegationCredential","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":351},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["eventTypeId"],"type":"index"},
+        {"columns":["credentialId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "UserPassword",
+      "columns": [
+        {"name":"hash","type":"String","source":{"file":"schema.prisma","line":382}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":383},"unique":true}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":381}
+    },
+    {
+      "table": "TravelSchedule",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":388},"autoIncrement":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":389}},
+        {"name":"timeZone","type":"String","source":{"file":"schema.prisma","line":391}},
+        {"name":"startDate","type":"DateTime","source":{"file":"schema.prisma","line":392}},
+        {"name":"endDate","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":393}},
+        {"name":"prevTimeZone","type":"String","nullable":true,"source":{"file":"schema.prisma","line":394}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":387},
+      "indexes": [
+        {"columns":["startDate"],"type":"index"},
+        {"columns":["endDate"],"type":"index"}
+      ]
+    },
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":402},"autoIncrement":true},
+        {"name":"uuid","type":"String","source":{"file":"schema.prisma","line":403},"unique":true,"nativeType":"Uuid"},
+        {"name":"username","type":"String","nullable":true,"source":{"file":"schema.prisma","line":404}},
+        {"name":"name","type":"String","nullable":true,"source":{"file":"schema.prisma","line":405}},
+        {"name":"email","type":"String","source":{"file":"schema.prisma","line":407},"unique":true},
+        {"name":"emailVerified","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":408}},
+        {"name":"bio","type":"String","nullable":true,"source":{"file":"schema.prisma","line":410}},
+        {"name":"avatarUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":411}},
+        {"name":"timeZone","type":"String","source":{"file":"schema.prisma","line":412},"default":"Europe/London"},
+        {"name":"weekStart","type":"String","source":{"file":"schema.prisma","line":414},"default":"Sunday"},
+        {"name":"bufferTime","type":"Int","source":{"file":"schema.prisma","line":415},"default":0},
+        {"name":"hideBranding","type":"Boolean","source":{"file":"schema.prisma","line":416},"default":false},
+        {"name":"theme","type":"String","nullable":true,"source":{"file":"schema.prisma","line":418}},
+        {"name":"appTheme","type":"String","nullable":true,"source":{"file":"schema.prisma","line":419}},
+        {"name":"created","type":"DateTime","source":{"file":"schema.prisma","line":420},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"trialEndsAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":421}},
+        {"name":"lastActiveAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":422}},
+        {"name":"defaultScheduleId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":428}},
+        {"name":"completedOnboarding","type":"Boolean","source":{"file":"schema.prisma","line":430},"default":false},
+        {"name":"locale","type":"String","nullable":true,"source":{"file":"schema.prisma","line":431}},
+        {"name":"timeFormat","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":432},"default":12},
+        {"name":"twoFactorSecret","type":"String","nullable":true,"source":{"file":"schema.prisma","line":433}},
+        {"name":"twoFactorEnabled","type":"Boolean","source":{"file":"schema.prisma","line":434},"default":false},
+        {"name":"backupCodes","type":"String","nullable":true,"source":{"file":"schema.prisma","line":435}},
+        {"name":"identityProvider","type":"IdentityProvider","source":{"file":"schema.prisma","line":436},"default":"CAL","values":["CAL","GOOGLE","SAML","AZUREAD"]},
+        {"name":"identityProviderId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":437}},
+        {"name":"invitedTo","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":439}},
+        {"name":"brandColor","type":"String","nullable":true,"source":{"file":"schema.prisma","line":441}},
+        {"name":"darkBrandColor","type":"String","nullable":true,"source":{"file":"schema.prisma","line":442}},
+        {"name":"allowDynamicBooking","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":446},"default":true},
+        {"name":"allowSEOIndexing","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":449},"default":true},
+        {"name":"receiveMonthlyDigestEmail","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":452},"default":true},
+        {"name":"requiresBookerEmailVerification","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":454},"default":false},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":457}},
+        {"name":"verified","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":458},"default":false},
+        {"name":"role","type":"UserPermissionRole","source":{"file":"schema.prisma","line":459},"default":"USER","values":["USER","ADMIN"]},
+        {"name":"organizationId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":469}},
+        {"name":"locked","type":"Boolean","source":{"file":"schema.prisma","line":476},"default":false},
+        {"name":"movedToProfileId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":482},"unique":true},
+        {"name":"isPlatformManaged","type":"Boolean","source":{"file":"schema.prisma","line":485},"default":false},
+        {"name":"smsLockState","type":"SMSLockState","source":{"file":"schema.prisma","line":487},"default":"UNLOCKED","values":["LOCKED","UNLOCKED","REVIEW_NEEDED"]},
+        {"name":"smsLockReviewedByAdmin","type":"Boolean","source":{"file":"schema.prisma","line":488},"default":false},
+        {"name":"referralLinkId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":490}},
+        {"name":"creationSource","type":"CreationSource","nullable":true,"source":{"file":"schema.prisma","line":501},"values":["api_v1","api_v2","webapp"]},
+        {"name":"autoOptInFeatures","type":"Boolean","source":{"file":"schema.prisma","line":511},"default":false}
+      ],
+      "relations": [
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"movedToProfileId","references":"id","on":"Profile","type":"one-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":401},
+      "indexes": [
+        {"columns":["email","username"],"type":"unique"},
+        {"columns":["username","organizationId"],"type":"unique"},
+        {"columns":["username"],"type":"index"},
+        {"columns":["emailVerified"],"type":"index"},
+        {"columns":["identityProvider"],"type":"index"},
+        {"columns":["identityProviderId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "NotificationsSubscriptions",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":525},"autoIncrement":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":526}},
+        {"name":"subscription","type":"String","source":{"file":"schema.prisma","line":528}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":524},
+      "indexes": [
+        {"columns":["userId","subscription"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Profile",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":535},"autoIncrement":true},
+        {"name":"uid","type":"String","source":{"file":"schema.prisma","line":537}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":538}},
+        {"name":"organizationId","type":"Int","source":{"file":"schema.prisma","line":540}},
+        {"name":"username","type":"String","source":{"file":"schema.prisma","line":542}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":545},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":546}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":534},
+      "indexes": [
+        {"columns":["userId","organizationId"],"type":"unique"},
+        {"columns":["username","organizationId"],"type":"unique"},
+        {"columns":["uid"],"type":"index"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["organizationId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Team",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":558},"autoIncrement":true},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":560}},
+        {"name":"slug","type":"String","nullable":true,"source":{"file":"schema.prisma","line":564}},
+        {"name":"logoUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":565}},
+        {"name":"calVideoLogo","type":"String","nullable":true,"source":{"file":"schema.prisma","line":566}},
+        {"name":"appLogo","type":"String","nullable":true,"source":{"file":"schema.prisma","line":567}},
+        {"name":"appIconLogo","type":"String","nullable":true,"source":{"file":"schema.prisma","line":568}},
+        {"name":"bio","type":"String","nullable":true,"source":{"file":"schema.prisma","line":569}},
+        {"name":"hideBranding","type":"Boolean","source":{"file":"schema.prisma","line":570},"default":false},
+        {"name":"hideTeamProfileLink","type":"Boolean","source":{"file":"schema.prisma","line":571},"default":false},
+        {"name":"isPrivate","type":"Boolean","source":{"file":"schema.prisma","line":572},"default":false},
+        {"name":"hideBookATeamMember","type":"Boolean","source":{"file":"schema.prisma","line":573},"default":false},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":576},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":578}},
+        {"name":"theme","type":"String","nullable":true,"source":{"file":"schema.prisma","line":579}},
+        {"name":"rrResetInterval","type":"RRResetInterval","nullable":true,"source":{"file":"schema.prisma","line":580},"default":"MONTH","values":["MONTH","DAY"]},
+        {"name":"rrTimestampBasis","type":"RRTimestampBasis","source":{"file":"schema.prisma","line":581},"default":"CREATED_AT","values":["CREATED_AT","START_TIME"]},
+        {"name":"brandColor","type":"String","nullable":true,"source":{"file":"schema.prisma","line":582}},
+        {"name":"darkBrandColor","type":"String","nullable":true,"source":{"file":"schema.prisma","line":583}},
+        {"name":"bannerUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":586}},
+        {"name":"parentId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":587}},
+        {"name":"timeFormat","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":593}},
+        {"name":"timeZone","type":"String","source":{"file":"schema.prisma","line":594},"default":"Europe/London"},
+        {"name":"weekStart","type":"String","source":{"file":"schema.prisma","line":595},"default":"Sunday"},
+        {"name":"isOrganization","type":"Boolean","source":{"file":"schema.prisma","line":599},"default":false},
+        {"name":"pendingPayment","type":"Boolean","source":{"file":"schema.prisma","line":603},"default":false},
+        {"name":"isPlatform","type":"Boolean","source":{"file":"schema.prisma","line":605},"default":false},
+        {"name":"createdByOAuthClientId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":610}},
+        {"name":"smsLockState","type":"SMSLockState","source":{"file":"schema.prisma","line":611},"default":"UNLOCKED","values":["LOCKED","UNLOCKED","REVIEW_NEEDED"]},
+        {"name":"smsLockReviewedByAdmin","type":"Boolean","source":{"file":"schema.prisma","line":614},"default":false},
+        {"name":"bookingLimits","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":626}},
+        {"name":"includeManagedEventsInLimits","type":"Boolean","source":{"file":"schema.prisma","line":627},"default":false},
+        {"name":"autoOptInFeatures","type":"Boolean","source":{"file":"schema.prisma","line":642},"default":false}
+      ],
+      "relations": [
+        {"foreignKey":"parentId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"createdByOAuthClientId","references":"id","on":"PlatformOAuthClient","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":557},
+      "indexes": [
+        {"columns":["slug","parentId"],"type":"unique"},
+        {"columns":["parentId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "CreditBalance",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":653}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":655},"unique":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":658},"unique":true},
+        {"name":"additionalCredits","type":"Int","source":{"file":"schema.prisma","line":659},"default":0},
+        {"name":"limitReachedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":660}},
+        {"name":"warningSentAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":661}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"userId","references":"id","on":"users","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":652}
+    },
+    {
+      "table": "CreditPurchaseLog",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":667}},
+        {"name":"creditBalanceId","type":"String","source":{"file":"schema.prisma","line":668}},
+        {"name":"credits","type":"Int","source":{"file":"schema.prisma","line":670}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":671},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"creditBalanceId","references":"id","on":"CreditBalance","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":666}
+    },
+    {
+      "table": "CreditExpenseLog",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":680}},
+        {"name":"creditBalanceId","type":"String","source":{"file":"schema.prisma","line":681}},
+        {"name":"bookingUid","type":"String","nullable":true,"source":{"file":"schema.prisma","line":683}},
+        {"name":"credits","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":685}},
+        {"name":"creditType","type":"CreditType","source":{"file":"schema.prisma","line":686},"values":["MONTHLY","ADDITIONAL"]},
+        {"name":"date","type":"DateTime","source":{"file":"schema.prisma","line":687}},
+        {"name":"smsSid","type":"String","nullable":true,"source":{"file":"schema.prisma","line":688}},
+        {"name":"smsSegments","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":689}},
+        {"name":"phoneNumber","type":"String","nullable":true,"source":{"file":"schema.prisma","line":690}},
+        {"name":"email","type":"String","nullable":true,"source":{"file":"schema.prisma","line":691}},
+        {"name":"callDuration","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":692}},
+        {"name":"creditFor","type":"CreditUsageType","nullable":true,"source":{"file":"schema.prisma","line":693},"values":["SMS","CAL_AI_PHONE_CALL"]},
+        {"name":"externalRef","type":"String","nullable":true,"source":{"file":"schema.prisma","line":694},"unique":true}
+      ],
+      "relations": [
+        {"foreignKey":"creditBalanceId","references":"id","on":"CreditBalance","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"bookingUid","references":"uid","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":679}
+    },
+    {
+      "table": "OrganizationSettings",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":705},"autoIncrement":true},
+        {"name":"organizationId","type":"Int","source":{"file":"schema.prisma","line":707},"unique":true},
+        {"name":"isOrganizationConfigured","type":"Boolean","source":{"file":"schema.prisma","line":708},"default":false},
+        {"name":"isOrganizationVerified","type":"Boolean","source":{"file":"schema.prisma","line":710},"default":false},
+        {"name":"orgAutoAcceptEmail","type":"String","source":{"file":"schema.prisma","line":713}},
+        {"name":"lockEventTypeCreationForUsers","type":"Boolean","source":{"file":"schema.prisma","line":714},"default":false},
+        {"name":"adminGetsNoSlotsNotification","type":"Boolean","source":{"file":"schema.prisma","line":715},"default":false},
+        {"name":"isAdminReviewed","type":"Boolean","source":{"file":"schema.prisma","line":718},"default":false},
+        {"name":"isAdminAPIEnabled","type":"Boolean","source":{"file":"schema.prisma","line":720},"default":false},
+        {"name":"allowSEOIndexing","type":"Boolean","source":{"file":"schema.prisma","line":721},"default":false},
+        {"name":"orgProfileRedirectsToVerifiedDomain","type":"Boolean","source":{"file":"schema.prisma","line":722},"default":false},
+        {"name":"disablePhoneOnlySMSNotifications","type":"Boolean","source":{"file":"schema.prisma","line":723},"default":false},
+        {"name":"disableAutofillOnBookingPage","type":"Boolean","source":{"file":"schema.prisma","line":724},"default":false},
+        {"name":"orgAutoJoinOnSignup","type":"Boolean","source":{"file":"schema.prisma","line":725},"default":true},
+        {"name":"disableAttendeeConfirmationEmail","type":"Boolean","source":{"file":"schema.prisma","line":727},"default":false},
+        {"name":"disableAttendeeCancellationEmail","type":"Boolean","source":{"file":"schema.prisma","line":728},"default":false},
+        {"name":"disableAttendeeRescheduledEmail","type":"Boolean","source":{"file":"schema.prisma","line":729},"default":false},
+        {"name":"disableAttendeeRequestEmail","type":"Boolean","source":{"file":"schema.prisma","line":730},"default":false},
+        {"name":"disableAttendeeReassignedEmail","type":"Boolean","source":{"file":"schema.prisma","line":731},"default":false},
+        {"name":"disableAttendeeAwaitingPaymentEmail","type":"Boolean","source":{"file":"schema.prisma","line":732},"default":false},
+        {"name":"disableAttendeeRescheduleRequestEmail","type":"Boolean","source":{"file":"schema.prisma","line":733},"default":false},
+        {"name":"disableAttendeeLocationChangeEmail","type":"Boolean","source":{"file":"schema.prisma","line":734},"default":false},
+        {"name":"disableAttendeeNewEventEmail","type":"Boolean","source":{"file":"schema.prisma","line":735},"default":false}
+      ],
+      "relations": [
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":704}
+    },
+    {
+      "table": "Membership",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":745},"autoIncrement":true},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":746}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":747}},
+        {"name":"accepted","type":"Boolean","source":{"file":"schema.prisma","line":748},"default":false},
+        {"name":"role","type":"MembershipRole","source":{"file":"schema.prisma","line":749},"values":["MEMBER","ADMIN","OWNER"]},
+        {"name":"customRoleId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":750}},
+        {"name":"createdAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":755},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":756}}
+      ],
+      "relations": [
+        {"foreignKey":"customRoleId","references":"id","on":"Role","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":744},
+      "indexes": [
+        {"columns":["userId","teamId"],"type":"unique"},
+        {"columns":["teamId"],"type":"index"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["accepted"],"type":"index"},
+        {"columns":["role"],"type":"index"},
+        {"columns":["customRoleId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "VerificationToken",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":768},"autoIncrement":true},
+        {"name":"identifier","type":"String","source":{"file":"schema.prisma","line":769}},
+        {"name":"token","type":"String","source":{"file":"schema.prisma","line":770},"unique":true},
+        {"name":"expires","type":"DateTime","source":{"file":"schema.prisma","line":771}},
+        {"name":"expiresInDays","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":772}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":773},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":774}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":775}},
+        {"name":"secondaryEmailId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":777}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"secondaryEmailId","references":"id","on":"SecondaryEmail","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":767},
+      "indexes": [
+        {"columns":["identifier","token"],"type":"unique"},
+        {"columns":["token"],"type":"index"},
+        {"columns":["teamId"],"type":"index"},
+        {"columns":["secondaryEmailId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "InstantMeetingToken",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":787},"autoIncrement":true},
+        {"name":"token","type":"String","source":{"file":"schema.prisma","line":788},"unique":true},
+        {"name":"expires","type":"DateTime","source":{"file":"schema.prisma","line":789}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":790}},
+        {"name":"bookingId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":792},"unique":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":795},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":796}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":786},
+      "indexes": [
+        {"columns":["token"],"type":"index"}
+      ]
+    },
+    {
+      "table": "BookingReference",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":802},"autoIncrement":true},
+        {"name":"type","type":"String","source":{"file":"schema.prisma","line":804}},
+        {"name":"uid","type":"String","source":{"file":"schema.prisma","line":806}},
+        {"name":"meetingId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":807}},
+        {"name":"thirdPartyRecurringEventId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":808}},
+        {"name":"meetingPassword","type":"String","nullable":true,"source":{"file":"schema.prisma","line":809}},
+        {"name":"meetingUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":810}},
+        {"name":"bookingId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":812}},
+        {"name":"externalCalendarId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":813}},
+        {"name":"deleted","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":814}},
+        {"name":"credentialId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":817}},
+        {"name":"delegationCredentialId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":819}}
+      ],
+      "relations": [
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"credentialId","references":"id","on":"Credential","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"delegationCredentialId","references":"id","on":"DelegationCredential","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":801},
+      "indexes": [
+        {"columns":["bookingId"],"type":"index"},
+        {"columns":["type"],"type":"index"},
+        {"columns":["uid"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Attendee",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":827},"autoIncrement":true},
+        {"name":"email","type":"String","source":{"file":"schema.prisma","line":828}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":829}},
+        {"name":"timeZone","type":"String","source":{"file":"schema.prisma","line":830}},
+        {"name":"phoneNumber","type":"String","nullable":true,"source":{"file":"schema.prisma","line":831}},
+        {"name":"locale","type":"String","nullable":true,"source":{"file":"schema.prisma","line":832},"default":"en"},
+        {"name":"bookingId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":834}},
+        {"name":"noShow","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":836},"default":false}
+      ],
+      "relations": [
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":826},
+      "indexes": [
+        {"columns":["email"],"type":"index"},
+        {"columns":["bookingId"],"type":"index"},
+        {"columns":["email","bookingId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Booking",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":852},"autoIncrement":true},
+        {"name":"uid","type":"String","source":{"file":"schema.prisma","line":853},"unique":true},
+        {"name":"idempotencyKey","type":"String","nullable":true,"source":{"file":"schema.prisma","line":855},"unique":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":857}},
+        {"name":"userPrimaryEmail","type":"String","nullable":true,"source":{"file":"schema.prisma","line":860}},
+        {"name":"eventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":863}},
+        {"name":"title","type":"String","source":{"file":"schema.prisma","line":864}},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":865}},
+        {"name":"customInputs","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":866}},
+        {"name":"responses","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":868}},
+        {"name":"startTime","type":"DateTime","source":{"file":"schema.prisma","line":869}},
+        {"name":"endTime","type":"DateTime","source":{"file":"schema.prisma","line":870}},
+        {"name":"location","type":"String","nullable":true,"source":{"file":"schema.prisma","line":872}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":873},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":874}},
+        {"name":"status","type":"BookingStatus","source":{"file":"schema.prisma","line":875},"default":"accepted","values":["cancelled","accepted","rejected","pending","awaiting_host"]},
+        {"name":"paid","type":"Boolean","source":{"file":"schema.prisma","line":876},"default":false},
+        {"name":"destinationCalendarId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":879}},
+        {"name":"cancellationReason","type":"String","nullable":true,"source":{"file":"schema.prisma","line":880}},
+        {"name":"rejectionReason","type":"String","nullable":true,"source":{"file":"schema.prisma","line":881}},
+        {"name":"reassignReason","type":"String","nullable":true,"source":{"file":"schema.prisma","line":882}},
+        {"name":"reassignById","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":884}},
+        {"name":"dynamicEventSlugRef","type":"String","nullable":true,"source":{"file":"schema.prisma","line":885}},
+        {"name":"dynamicGroupSlugRef","type":"String","nullable":true,"source":{"file":"schema.prisma","line":886}},
+        {"name":"rescheduled","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":887}},
+        {"name":"fromReschedule","type":"String","nullable":true,"source":{"file":"schema.prisma","line":888}},
+        {"name":"recurringEventId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":889}},
+        {"name":"smsReminderNumber","type":"String","nullable":true,"source":{"file":"schema.prisma","line":890}},
+        {"name":"scheduledJobs","type":"String[]","nullable":true,"source":{"file":"schema.prisma","line":891}},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":894}},
+        {"name":"isRecorded","type":"Boolean","source":{"file":"schema.prisma","line":895},"default":false},
+        {"name":"iCalUID","type":"String","nullable":true,"source":{"file":"schema.prisma","line":896},"default":""},
+        {"name":"iCalSequence","type":"Int","source":{"file":"schema.prisma","line":897},"default":0},
+        {"name":"rating","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":899}},
+        {"name":"ratingFeedback","type":"String","nullable":true,"source":{"file":"schema.prisma","line":900}},
+        {"name":"noShowHost","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":901},"default":false},
+        {"name":"oneTimePassword","type":"String","nullable":true,"source":{"file":"schema.prisma","line":903},"unique":true},
+        {"name":"cancelledBy","type":"String","nullable":true,"source":{"file":"schema.prisma","line":905}},
+        {"name":"rescheduledBy","type":"String","nullable":true,"source":{"file":"schema.prisma","line":907}},
+        {"name":"creationSource","type":"CreationSource","nullable":true,"source":{"file":"schema.prisma","line":910},"values":["api_v1","api_v2","webapp"]}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"destinationCalendarId","references":"id","on":"DestinationCalendar","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"reassignById","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":851},
+      "indexes": [
+        {"columns":["eventTypeId"],"type":"index"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["destinationCalendarId"],"type":"index"},
+        {"columns":["recurringEventId"],"type":"index"},
+        {"columns":["uid"],"type":"index"},
+        {"columns":["status"],"type":"index"},
+        {"columns":["startTime","endTime","status"],"type":"index"},
+        {"columns":["fromReschedule"],"type":"index"},
+        {"columns":["userId","endTime"],"type":"index"},
+        {"columns":["userId","status","startTime"],"type":"index"},
+        {"columns":["eventTypeId","status"],"type":"index"},
+        {"columns":["userId","createdAt"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Tracking",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":933},"autoIncrement":true},
+        {"name":"bookingId","type":"Int","source":{"file":"schema.prisma","line":934},"unique":true},
+        {"name":"utm_source","type":"String","nullable":true,"source":{"file":"schema.prisma","line":936}},
+        {"name":"utm_medium","type":"String","nullable":true,"source":{"file":"schema.prisma","line":937}},
+        {"name":"utm_campaign","type":"String","nullable":true,"source":{"file":"schema.prisma","line":938}},
+        {"name":"utm_term","type":"String","nullable":true,"source":{"file":"schema.prisma","line":939}},
+        {"name":"utm_content","type":"String","nullable":true,"source":{"file":"schema.prisma","line":940}}
+      ],
+      "relations": [
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":932}
+    },
+    {
+      "table": "Schedule",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":946},"autoIncrement":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":948}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":952}},
+        {"name":"timeZone","type":"String","nullable":true,"source":{"file":"schema.prisma","line":953}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":945},
+      "indexes": [
+        {"columns":["userId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Availability",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":961},"autoIncrement":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":963}},
+        {"name":"eventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":965}},
+        {"name":"days","type":"Int[]","nullable":true,"source":{"file":"schema.prisma","line":966}},
+        {"name":"startTime","type":"DateTime","source":{"file":"schema.prisma","line":967},"nativeType":"Time"},
+        {"name":"endTime","type":"DateTime","source":{"file":"schema.prisma","line":968},"nativeType":"Time"},
+        {"name":"date","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":969},"nativeType":"Date"},
+        {"name":"scheduleId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":971}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"scheduleId","references":"id","on":"Schedule","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":960},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["eventTypeId"],"type":"index"},
+        {"columns":["scheduleId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "SelectedCalendar",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":979}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":981}},
+        {"name":"integration","type":"String","source":{"file":"schema.prisma","line":982}},
+        {"name":"externalId","type":"String","source":{"file":"schema.prisma","line":983}},
+        {"name":"credentialId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":985}},
+        {"name":"createdAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":986},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":987}},
+        {"name":"googleChannelId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":990}},
+        {"name":"googleChannelKind","type":"String","nullable":true,"source":{"file":"schema.prisma","line":993}},
+        {"name":"googleChannelResourceId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":996}},
+        {"name":"googleChannelResourceUri","type":"String","nullable":true,"source":{"file":"schema.prisma","line":999}},
+        {"name":"googleChannelExpiration","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1002}},
+        {"name":"channelId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1005}},
+        {"name":"channelKind","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1006}},
+        {"name":"channelResourceId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1007}},
+        {"name":"channelResourceUri","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1008}},
+        {"name":"channelExpiration","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1009},"nativeType":"Timestamp(3)"},
+        {"name":"syncSubscribedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1012},"nativeType":"Timestamp(3)"},
+        {"name":"syncSubscribedErrorAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1013},"nativeType":"Timestamp(3)"},
+        {"name":"syncSubscribedErrorCount","type":"Int","source":{"file":"schema.prisma","line":1014},"default":0},
+        {"name":"syncToken","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1015}},
+        {"name":"syncedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1016}},
+        {"name":"syncErrorAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1017}},
+        {"name":"syncErrorCount","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1018},"default":0},
+        {"name":"delegationCredentialId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1021}},
+        {"name":"error","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1023}},
+        {"name":"lastErrorAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1024}},
+        {"name":"watchAttempts","type":"Int","source":{"file":"schema.prisma","line":1025},"default":0},
+        {"name":"unwatchAttempts","type":"Int","source":{"file":"schema.prisma","line":1026},"default":0},
+        {"name":"maxAttempts","type":"Int","source":{"file":"schema.prisma","line":1027},"default":3},
+        {"name":"eventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1029}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"credentialId","references":"id","on":"Credential","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"delegationCredentialId","references":"id","on":"DelegationCredential","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":978},
+      "indexes": [
+        {"columns":["userId","integration","externalId","eventTypeId"],"type":"unique"},
+        {"columns":["googleChannelId","eventTypeId"],"type":"unique"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["externalId"],"type":"index"},
+        {"columns":["eventTypeId"],"type":"index"},
+        {"columns":["credentialId"],"type":"index"},
+        {"columns":["channelId"],"type":"index"},
+        {"columns":["integration","googleChannelExpiration","error","watchAttempts","maxAttempts"],"type":"index"},
+        {"columns":["integration","googleChannelExpiration","error","unwatchAttempts","maxAttempts"],"type":"index"}
+      ]
+    },
+    {
+      "table": "EventTypeCustomInput",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1059},"autoIncrement":true},
+        {"name":"eventTypeId","type":"Int","source":{"file":"schema.prisma","line":1060}},
+        {"name":"label","type":"String","source":{"file":"schema.prisma","line":1062}},
+        {"name":"type","type":"EventTypeCustomInputType","source":{"file":"schema.prisma","line":1063},"values":["text","textLong","number","bool","radio","phone"]},
+        {"name":"options","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":1065}},
+        {"name":"required","type":"Boolean","source":{"file":"schema.prisma","line":1066}},
+        {"name":"placeholder","type":"String","source":{"file":"schema.prisma","line":1067},"default":""}
+      ],
+      "relations": [
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1058},
+      "indexes": [
+        {"columns":["eventTypeId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "ResetPasswordRequest",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1073}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1074},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1075}},
+        {"name":"email","type":"String","source":{"file":"schema.prisma","line":1076}},
+        {"name":"expires","type":"DateTime","source":{"file":"schema.prisma","line":1077}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1072}
+    },
+    {
+      "table": "ReminderMail",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1085},"autoIncrement":true},
+        {"name":"referenceId","type":"Int","source":{"file":"schema.prisma","line":1086}},
+        {"name":"reminderType","type":"ReminderType","source":{"file":"schema.prisma","line":1087},"values":["PENDING_BOOKING_CONFIRMATION"]},
+        {"name":"elapsedMinutes","type":"Int","source":{"file":"schema.prisma","line":1088}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1089},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1084},
+      "indexes": [
+        {"columns":["referenceId"],"type":"index"},
+        {"columns":["reminderType"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Payment",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1096},"autoIncrement":true},
+        {"name":"uid","type":"String","source":{"file":"schema.prisma","line":1097},"unique":true},
+        {"name":"appId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1099}},
+        {"name":"bookingId","type":"Int","source":{"file":"schema.prisma","line":1100}},
+        {"name":"amount","type":"Int","source":{"file":"schema.prisma","line":1102}},
+        {"name":"fee","type":"Int","source":{"file":"schema.prisma","line":1103}},
+        {"name":"currency","type":"String","source":{"file":"schema.prisma","line":1104}},
+        {"name":"success","type":"Boolean","source":{"file":"schema.prisma","line":1105}},
+        {"name":"refunded","type":"Boolean","source":{"file":"schema.prisma","line":1106}},
+        {"name":"data","type":"Json","source":{"file":"schema.prisma","line":1107}},
+        {"name":"externalId","type":"String","source":{"file":"schema.prisma","line":1108},"unique":true},
+        {"name":"paymentOption","type":"PaymentOption","nullable":true,"source":{"file":"schema.prisma","line":1109},"default":"ON_BOOKING","values":["ON_BOOKING","HOLD"]}
+      ],
+      "relations": [
+        {"foreignKey":"appId","references":"slug","on":"App","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1095},
+      "indexes": [
+        {"columns":["bookingId"],"type":"index"},
+        {"columns":["externalId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Webhook",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1143},"unique":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1144}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1145}},
+        {"name":"eventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1146}},
+        {"name":"platformOAuthClientId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1147}},
+        {"name":"subscriberUrl","type":"String","source":{"file":"schema.prisma","line":1149}},
+        {"name":"payloadTemplate","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1150}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1151},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"active","type":"Boolean","source":{"file":"schema.prisma","line":1152},"default":true},
+        {"name":"eventTriggers","type":"WebhookTriggerEvents[]","nullable":true,"source":{"file":"schema.prisma","line":1153},"values":["BOOKING_CREATED","BOOKING_PAYMENT_INITIATED","BOOKING_PAID","BOOKING_RESCHEDULED","BOOKING_REQUESTED","BOOKING_CANCELLED","BOOKING_REJECTED","BOOKING_NO_SHOW_UPDATED","FORM_SUBMITTED","MEETING_ENDED","MEETING_STARTED","RECORDING_READY","RECORDING_TRANSCRIPTION_GENERATED","OOO_CREATED","AFTER_HOSTS_CAL_VIDEO_NO_SHOW","AFTER_GUESTS_CAL_VIDEO_NO_SHOW","FORM_SUBMITTED_NO_EVENT","DELEGATION_CREDENTIAL_ERROR","WRONG_ASSIGNMENT_REPORT"]},
+        {"name":"appId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1159}},
+        {"name":"secret","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1160}},
+        {"name":"platform","type":"Boolean","source":{"file":"schema.prisma","line":1161},"default":false},
+        {"name":"time","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1163}},
+        {"name":"timeUnit","type":"TimeUnit","nullable":true,"source":{"file":"schema.prisma","line":1164},"values":["day","hour","minute"]},
+        {"name":"version","type":"String","source":{"file":"schema.prisma","line":1165},"default":"2021-10-20"}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"platformOAuthClientId","references":"id","on":"PlatformOAuthClient","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"appId","references":"slug","on":"App","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1142},
+      "indexes": [
+        {"columns":["userId","subscriberUrl"],"type":"unique"},
+        {"columns":["platformOAuthClientId","subscriberUrl"],"type":"unique"},
+        {"columns":["active"],"type":"index"}
+      ]
+    },
+    {
+      "table": "ApiKey",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1173},"unique":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1174}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1175}},
+        {"name":"note","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1176}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1177},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"expiresAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1178}},
+        {"name":"lastUsedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1179}},
+        {"name":"hashedKey","type":"String","source":{"file":"schema.prisma","line":1180},"unique":true},
+        {"name":"appId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1184}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"appId","references":"slug","on":"App","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1172},
+      "indexes": [
+        {"columns":["userId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "RateLimit",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1191}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":1192}},
+        {"name":"apiKeyId","type":"String","source":{"file":"schema.prisma","line":1193}},
+        {"name":"ttl","type":"Int","source":{"file":"schema.prisma","line":1194}},
+        {"name":"limit","type":"Int","source":{"file":"schema.prisma","line":1195}},
+        {"name":"blockDuration","type":"Int","source":{"file":"schema.prisma","line":1196}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1197},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1198}}
+      ],
+      "relations": [
+        {"foreignKey":"apiKeyId","references":"id","on":"ApiKey","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1190},
+      "indexes": [
+        {"columns":["apiKeyId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "HashedLink",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1206},"autoIncrement":true},
+        {"name":"link","type":"String","source":{"file":"schema.prisma","line":1207},"unique":true},
+        {"name":"eventTypeId","type":"Int","source":{"file":"schema.prisma","line":1208}},
+        {"name":"expiresAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1210}},
+        {"name":"maxUsageCount","type":"Int","source":{"file":"schema.prisma","line":1211},"default":1},
+        {"name":"usageCount","type":"Int","source":{"file":"schema.prisma","line":1212},"default":0}
+      ],
+      "relations": [
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1205},
+      "indexes": [
+        {"columns":["eventTypeId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Account",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1218}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1219}},
+        {"name":"type","type":"String","source":{"file":"schema.prisma","line":1220}},
+        {"name":"provider","type":"String","source":{"file":"schema.prisma","line":1221}},
+        {"name":"providerAccountId","type":"String","source":{"file":"schema.prisma","line":1222}},
+        {"name":"providerEmail","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1223}},
+        {"name":"refresh_token","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1224},"nativeType":"Text"},
+        {"name":"access_token","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1225},"nativeType":"Text"},
+        {"name":"expires_at","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1226}},
+        {"name":"token_type","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1227}},
+        {"name":"scope","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1228}},
+        {"name":"id_token","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1229},"nativeType":"Text"},
+        {"name":"session_state","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1230}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1217},
+      "indexes": [
+        {"columns":["provider","providerAccountId"],"type":"unique"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["type"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Session",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1240}},
+        {"name":"sessionToken","type":"String","source":{"file":"schema.prisma","line":1241},"unique":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1242}},
+        {"name":"expires","type":"DateTime","source":{"file":"schema.prisma","line":1243}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1239},
+      "indexes": [
+        {"columns":["userId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "App",
+      "columns": [
+        {"name":"slug","type":"String","primary":true,"source":{"file":"schema.prisma","line":1265},"unique":true},
+        {"name":"dirName","type":"String","source":{"file":"schema.prisma","line":1267},"unique":true},
+        {"name":"keys","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":1269}},
+        {"name":"categories","type":"AppCategories[]","nullable":true,"source":{"file":"schema.prisma","line":1271},"values":["calendar","messaging","other","payment","video","web3","automation","analytics","conferencing","crm"]},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1272},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1273}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":1278},"default":false}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1263},
+      "indexes": [
+        {"columns":["enabled"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Feedback",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1284},"autoIncrement":true},
+        {"name":"date","type":"DateTime","source":{"file":"schema.prisma","line":1285},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1286}},
+        {"name":"rating","type":"String","source":{"file":"schema.prisma","line":1288}},
+        {"name":"comment","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1289}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1283},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["rating"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Deployment",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1297},"default":1},
+        {"name":"logo","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1298}},
+        {"name":"theme","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":1300}},
+        {"name":"licenseKey","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1301}},
+        {"name":"signatureTokenEncrypted","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1303}},
+        {"name":"agreedLicenseAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1304}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1295}
+    },
+    {
+      "table": "WebhookScheduledTriggers",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1314},"autoIncrement":true},
+        {"name":"jobName","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1315}},
+        {"name":"subscriberUrl","type":"String","source":{"file":"schema.prisma","line":1316}},
+        {"name":"payload","type":"String","source":{"file":"schema.prisma","line":1317}},
+        {"name":"startAfter","type":"DateTime","source":{"file":"schema.prisma","line":1318}},
+        {"name":"retryCount","type":"Int","source":{"file":"schema.prisma","line":1319},"default":0},
+        {"name":"createdAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1320},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"appId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1321}},
+        {"name":"webhookId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1322}},
+        {"name":"bookingId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1324}}
+      ],
+      "relations": [
+        {"foreignKey":"webhookId","references":"id","on":"Webhook","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1313}
+    },
+    {
+      "table": "BookingSeat",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1331},"autoIncrement":true},
+        {"name":"referenceUid","type":"String","source":{"file":"schema.prisma","line":1332},"unique":true},
+        {"name":"bookingId","type":"Int","source":{"file":"schema.prisma","line":1333}},
+        {"name":"attendeeId","type":"Int","source":{"file":"schema.prisma","line":1335},"unique":true},
+        {"name":"data","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":1338}},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":1339}}
+      ],
+      "relations": [
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"attendeeId","references":"id","on":"Attendee","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1330},
+      "indexes": [
+        {"columns":["bookingId"],"type":"index"},
+        {"columns":["attendeeId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "VerifiedNumber",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1346},"autoIncrement":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1347}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1349}},
+        {"name":"phoneNumber","type":"String","source":{"file":"schema.prisma","line":1351}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1345},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["teamId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "VerifiedEmail",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1358},"autoIncrement":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1359}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1361}},
+        {"name":"email","type":"String","source":{"file":"schema.prisma","line":1363}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1357},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["teamId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Feature",
+      "columns": [
+        {"name":"slug","type":"String","primary":true,"source":{"file":"schema.prisma","line":1371},"unique":true},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":1373},"default":false},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1375}},
+        {"name":"type","type":"FeatureType","nullable":true,"source":{"file":"schema.prisma","line":1377},"default":"RELEASE","values":["RELEASE","EXPERIMENT","OPERATIONAL","KILL_SWITCH","PERMISSION"]},
+        {"name":"stale","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":1379},"default":false},
+        {"name":"lastUsedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1380}},
+        {"name":"createdAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1381},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1382},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedBy","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1383}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1369},
+      "indexes": [
+        {"columns":["enabled"],"type":"index"},
+        {"columns":["stale"],"type":"index"}
+      ]
+    },
+    {
+      "table": "UserFeatures",
+      "columns": [
+        {"name":"userId","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1393}},
+        {"name":"featureId","type":"String","primary":true,"source":{"file":"schema.prisma","line":1395}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":1396}},
+        {"name":"assignedAt","type":"DateTime","source":{"file":"schema.prisma","line":1397},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"assignedBy","type":"String","source":{"file":"schema.prisma","line":1398}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1399}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"featureId","references":"slug","on":"Feature","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1391},
+      "indexes": [
+        {"columns":["userId","featureId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "TeamFeatures",
+      "columns": [
+        {"name":"teamId","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1407}},
+        {"name":"featureId","type":"String","primary":true,"source":{"file":"schema.prisma","line":1409}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":1410}},
+        {"name":"assignedAt","type":"DateTime","source":{"file":"schema.prisma","line":1411},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"assignedBy","type":"String","source":{"file":"schema.prisma","line":1412}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1413}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"featureId","references":"slug","on":"Feature","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1405},
+      "indexes": [
+        {"columns":["teamId","featureId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "SelectedSlots",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1438},"autoIncrement":true},
+        {"name":"eventTypeId","type":"Int","source":{"file":"schema.prisma","line":1439}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1440}},
+        {"name":"slotUtcStartDate","type":"DateTime","source":{"file":"schema.prisma","line":1441}},
+        {"name":"slotUtcEndDate","type":"DateTime","source":{"file":"schema.prisma","line":1442}},
+        {"name":"uid","type":"String","source":{"file":"schema.prisma","line":1443}},
+        {"name":"releaseAt","type":"DateTime","source":{"file":"schema.prisma","line":1444}},
+        {"name":"isSeat","type":"Boolean","source":{"file":"schema.prisma","line":1445},"default":false}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1437},
+      "indexes": [
+        {"columns":["userId","slotUtcStartDate","slotUtcEndDate","uid"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "OAuthClient",
+      "columns": [
+        {"name":"clientId","type":"String","primary":true,"source":{"file":"schema.prisma","line":1462},"unique":true},
+        {"name":"redirectUri","type":"String","source":{"file":"schema.prisma","line":1463}},
+        {"name":"clientSecret","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1464}},
+        {"name":"clientType","type":"OAuthClientType","source":{"file":"schema.prisma","line":1465},"default":"confidential","values":["confidential","public"]},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":1466}},
+        {"name":"purpose","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1467}},
+        {"name":"logo","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1468}},
+        {"name":"websiteUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1469}},
+        {"name":"rejectionReason","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1470}},
+        {"name":"isTrusted","type":"Boolean","source":{"file":"schema.prisma","line":1471},"default":false},
+        {"name":"status","type":"OAuthClientStatus","source":{"file":"schema.prisma","line":1473},"default":"approved","values":["pending","approved","rejected"]},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1474}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1476},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1461},
+      "indexes": [
+        {"columns":["userId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "AccessCode",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1482},"autoIncrement":true},
+        {"name":"code","type":"String","source":{"file":"schema.prisma","line":1483}},
+        {"name":"clientId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1484}},
+        {"name":"expiresAt","type":"DateTime","source":{"file":"schema.prisma","line":1486}},
+        {"name":"scopes","type":"AccessScope[]","nullable":true,"source":{"file":"schema.prisma","line":1487},"values":["READ_BOOKING","READ_PROFILE"]},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1488}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1490}},
+        {"name":"codeChallenge","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1492}},
+        {"name":"codeChallengeMethod","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1493},"default":"S256"}
+      ],
+      "relations": [
+        {"foreignKey":"clientId","references":"clientId","on":"OAuthClient","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1481}
+    },
+    {
+      "table": "BookingDenormalized",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1528},"unique":true},
+        {"name":"uid","type":"String","source":{"file":"schema.prisma","line":1529}},
+        {"name":"eventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1530}},
+        {"name":"title","type":"String","source":{"file":"schema.prisma","line":1531}},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1532}},
+        {"name":"startTime","type":"DateTime","source":{"file":"schema.prisma","line":1533}},
+        {"name":"endTime","type":"DateTime","source":{"file":"schema.prisma","line":1534}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1535}},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1536}},
+        {"name":"location","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1537}},
+        {"name":"paid","type":"Boolean","source":{"file":"schema.prisma","line":1538}},
+        {"name":"status","type":"BookingStatus","source":{"file":"schema.prisma","line":1539},"values":["cancelled","accepted","rejected","pending","awaiting_host"]},
+        {"name":"rescheduled","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":1540}},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1541}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1542}},
+        {"name":"eventLength","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1543}},
+        {"name":"eventParentId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1544}},
+        {"name":"userEmail","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1545}},
+        {"name":"userName","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1546}},
+        {"name":"userUsername","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1547}},
+        {"name":"ratingFeedback","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1548}},
+        {"name":"rating","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1549}},
+        {"name":"noShowHost","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":1550}},
+        {"name":"isTeamBooking","type":"Boolean","source":{"file":"schema.prisma","line":1551}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1527},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["createdAt"],"type":"index"},
+        {"columns":["eventTypeId"],"type":"index"},
+        {"columns":["eventParentId"],"type":"index"},
+        {"columns":["teamId"],"type":"index"},
+        {"columns":["startTime"],"type":"index"},
+        {"columns":["endTime"],"type":"index"},
+        {"columns":["status"],"type":"index"},
+        {"columns":["teamId","isTeamBooking"],"type":"index"},
+        {"columns":["userId","isTeamBooking"],"type":"index"},
+        {"columns":["startTime","endTime"],"type":"index"}
+      ]
+    },
+    {
+      "table": "CalendarCache",
+      "columns": [
+        {"name":"id","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1596}},
+        {"name":"key","type":"String","primary":true,"source":{"file":"schema.prisma","line":1599}},
+        {"name":"value","type":"Json","source":{"file":"schema.prisma","line":1600}},
+        {"name":"expiresAt","type":"DateTime","source":{"file":"schema.prisma","line":1601}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1603},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"credentialId","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1604}},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1605}}
+      ],
+      "relations": [
+        {"foreignKey":"credentialId","references":"id","on":"Credential","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1594},
+      "indexes": [
+        {"columns":["credentialId","key"],"type":"unique"},
+        {"columns":["userId","key"],"type":"index"}
+      ]
+    },
+    {
+      "table": "TempOrgRedirect",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1621},"autoIncrement":true},
+        {"name":"from","type":"String","source":{"file":"schema.prisma","line":1623}},
+        {"name":"fromOrgId","type":"Int","source":{"file":"schema.prisma","line":1625}},
+        {"name":"type","type":"RedirectType","source":{"file":"schema.prisma","line":1626},"values":["user-event-type","team-event-type","user","team"]},
+        {"name":"toUrl","type":"String","source":{"file":"schema.prisma","line":1628}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":1629},"default":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1630},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1631}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1620},
+      "indexes": [
+        {"columns":["from","type","fromOrgId"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "avatars",
+      "columns": [
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":1638},"default":0},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1640},"default":0},
+        {"name":"data","type":"String","source":{"file":"schema.prisma","line":1642}},
+        {"name":"objectKey","type":"String","source":{"file":"schema.prisma","line":1644},"unique":true},
+        {"name":"isBanner","type":"Boolean","source":{"file":"schema.prisma","line":1646},"default":false}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1636},
+      "indexes": [
+        {"columns":["teamId","userId","isBanner"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "OutOfOfficeEntry",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1653},"autoIncrement":true},
+        {"name":"uuid","type":"String","source":{"file":"schema.prisma","line":1654},"unique":true},
+        {"name":"start","type":"DateTime","source":{"file":"schema.prisma","line":1655}},
+        {"name":"end","type":"DateTime","source":{"file":"schema.prisma","line":1656}},
+        {"name":"notes","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1657}},
+        {"name":"showNotePublicly","type":"Boolean","source":{"file":"schema.prisma","line":1658},"default":false},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1659}},
+        {"name":"toUserId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1661}},
+        {"name":"reasonId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1663}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1666},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1667}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"toUserId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"reasonId","references":"id","on":"OutOfOfficeReason","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1652},
+      "indexes": [
+        {"columns":["uuid"],"type":"index"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["toUserId"],"type":"index"},
+        {"columns":["start","end"],"type":"index"}
+      ]
+    },
+    {
+      "table": "OutOfOfficeReason",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1676},"autoIncrement":true},
+        {"name":"emoji","type":"String","source":{"file":"schema.prisma","line":1677}},
+        {"name":"reason","type":"String","source":{"file":"schema.prisma","line":1678},"unique":true},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":1679},"default":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1680}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1675}
+    },
+    {
+      "table": "UserHolidaySettings",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1687},"autoIncrement":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1688},"unique":true},
+        {"name":"countryCode","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1690}},
+        {"name":"disabledIds","type":"String[]","nullable":true,"source":{"file":"schema.prisma","line":1691}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1693},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1694}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1686}
+    },
+    {
+      "table": "HolidayCache",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1699}},
+        {"name":"countryCode","type":"String","source":{"file":"schema.prisma","line":1700}},
+        {"name":"calendarId","type":"String","source":{"file":"schema.prisma","line":1701}},
+        {"name":"eventId","type":"String","source":{"file":"schema.prisma","line":1702}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":1703}},
+        {"name":"date","type":"DateTime","source":{"file":"schema.prisma","line":1704}},
+        {"name":"year","type":"Int","source":{"file":"schema.prisma","line":1705}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1707},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1708}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1698},
+      "indexes": [
+        {"columns":["countryCode","eventId"],"type":"unique"},
+        {"columns":["countryCode","year"],"type":"index"},
+        {"columns":["countryCode","date"],"type":"index"}
+      ]
+    },
+    {
+      "table": "PlatformOAuthClient",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1717}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":1718}},
+        {"name":"secret","type":"String","source":{"file":"schema.prisma","line":1719}},
+        {"name":"permissions","type":"Int","source":{"file":"schema.prisma","line":1720}},
+        {"name":"logo","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1722}},
+        {"name":"redirectUris","type":"String[]","nullable":true,"source":{"file":"schema.prisma","line":1723}},
+        {"name":"organizationId","type":"Int","source":{"file":"schema.prisma","line":1724}},
+        {"name":"bookingRedirectUri","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1733}},
+        {"name":"bookingCancelRedirectUri","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1734}},
+        {"name":"bookingRescheduleRedirectUri","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1735}},
+        {"name":"areEmailsEnabled","type":"Boolean","source":{"file":"schema.prisma","line":1736},"default":false},
+        {"name":"areDefaultEventTypesEnabled","type":"Boolean","source":{"file":"schema.prisma","line":1737},"default":true},
+        {"name":"areCalendarEventsEnabled","type":"Boolean","source":{"file":"schema.prisma","line":1738},"default":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1740},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"A","references":"id","on":"users","type":"many-to-many","via":"_PlatformOAuthClientToUser","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1716}
+    },
+    {
+      "table": "PlatformAuthorizationToken",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1744}},
+        {"name":"platformOAuthClientId","type":"String","source":{"file":"schema.prisma","line":1749}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1750}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1752},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"platformOAuthClientId","references":"id","on":"PlatformOAuthClient","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1743},
+      "indexes": [
+        {"columns":["userId","platformOAuthClientId"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "AccessToken",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1758},"autoIncrement":true},
+        {"name":"secret","type":"String","source":{"file":"schema.prisma","line":1760},"unique":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1761},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"expiresAt","type":"DateTime","source":{"file":"schema.prisma","line":1762}},
+        {"name":"platformOAuthClientId","type":"String","source":{"file":"schema.prisma","line":1767}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1768}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"platformOAuthClientId","references":"id","on":"PlatformOAuthClient","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1757}
+    },
+    {
+      "table": "RefreshToken",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1772},"autoIncrement":true},
+        {"name":"secret","type":"String","source":{"file":"schema.prisma","line":1774},"unique":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1775},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"expiresAt","type":"DateTime","source":{"file":"schema.prisma","line":1776}},
+        {"name":"platformOAuthClientId","type":"String","source":{"file":"schema.prisma","line":1781}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1782}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"platformOAuthClientId","references":"id","on":"PlatformOAuthClient","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1771}
+    },
+    {
+      "table": "DSyncData",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1786},"autoIncrement":true},
+        {"name":"directoryId","type":"String","source":{"file":"schema.prisma","line":1787},"unique":true},
+        {"name":"tenant","type":"String","source":{"file":"schema.prisma","line":1788}},
+        {"name":"organizationId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1789},"unique":true}
+      ],
+      "relations": [
+        {"foreignKey":"organizationId","references":"organizationId","on":"OrganizationSettings","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1785}
+    },
+    {
+      "table": "DSyncTeamGroupMapping",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1798},"autoIncrement":true},
+        {"name":"organizationId","type":"Int","source":{"file":"schema.prisma","line":1799}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":1800}},
+        {"name":"directoryId","type":"String","source":{"file":"schema.prisma","line":1802}},
+        {"name":"groupName","type":"String","source":{"file":"schema.prisma","line":1804}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"directoryId","references":"directoryId","on":"DSyncData","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1797},
+      "indexes": [
+        {"columns":["teamId","groupName"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "SecondaryEmail",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1810},"autoIncrement":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":1812}},
+        {"name":"email","type":"String","source":{"file":"schema.prisma","line":1813},"unique":true},
+        {"name":"emailVerified","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1814}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1809},
+      "indexes": [
+        {"columns":["userId","email"],"type":"unique"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["email","emailVerified"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Task",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1826},"unique":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1827},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1828}},
+        {"name":"scheduledAt","type":"DateTime","source":{"file":"schema.prisma","line":1830},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"succeededAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1832}},
+        {"name":"type","type":"String","source":{"file":"schema.prisma","line":1834}},
+        {"name":"payload","type":"String","source":{"file":"schema.prisma","line":1836}},
+        {"name":"attempts","type":"Int","source":{"file":"schema.prisma","line":1838},"default":0},
+        {"name":"maxAttempts","type":"Int","source":{"file":"schema.prisma","line":1840},"default":3},
+        {"name":"lastError","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1841}},
+        {"name":"lastFailedAttemptAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1842}},
+        {"name":"referenceUid","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1843}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":1825},
+      "indexes": [
+        {"columns":["referenceUid","type"],"type":"unique"},
+        {"columns":["succeededAt"],"type":"index"},
+        {"columns":["scheduledAt","succeededAt"],"type":"index"}
+      ]
+    },
+    {
+      "table": "ManagedOrganization",
+      "columns": [
+        {"name":"managedOrganizationId","type":"Int","source":{"file":"schema.prisma","line":1860},"unique":true},
+        {"name":"managerOrganizationId","type":"Int","source":{"file":"schema.prisma","line":1863}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1866},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"managedOrganizationId","references":"id","on":"Team","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"managerOrganizationId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1859},
+      "indexes": [
+        {"columns":["managerOrganizationId","managedOrganizationId"],"type":"unique"},
+        {"columns":["managerOrganizationId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "PlatformBilling",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1873},"unique":true},
+        {"name":"customerId","type":"String","source":{"file":"schema.prisma","line":1875}},
+        {"name":"subscriptionId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1876}},
+        {"name":"priceId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1877}},
+        {"name":"plan","type":"String","source":{"file":"schema.prisma","line":1878},"default":"none"},
+        {"name":"billingCycleStart","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1880}},
+        {"name":"billingCycleEnd","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1881}},
+        {"name":"overdue","type":"Boolean","nullable":true,"source":{"file":"schema.prisma","line":1882},"default":false},
+        {"name":"managerBillingId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1885}}
+      ],
+      "relations": [
+        {"foreignKey":"managerBillingId","references":"id","on":"PlatformBilling","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"id","references":"id","on":"Team","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1872}
+    },
+    {
+      "table": "AttributeOption",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1901}},
+        {"name":"attributeId","type":"String","source":{"file":"schema.prisma","line":1903}},
+        {"name":"value","type":"String","source":{"file":"schema.prisma","line":1904}},
+        {"name":"slug","type":"String","source":{"file":"schema.prisma","line":1905}},
+        {"name":"isGroup","type":"Boolean","source":{"file":"schema.prisma","line":1906},"default":false},
+        {"name":"contains","type":"String[]","nullable":true,"source":{"file":"schema.prisma","line":1911}}
+      ],
+      "relations": [
+        {"foreignKey":"attributeId","references":"id","on":"Attribute","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1900}
+    },
+    {
+      "table": "Attribute",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1916}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":1922}},
+        {"name":"type","type":"AttributeType","source":{"file":"schema.prisma","line":1924},"values":["TEXT","NUMBER","SINGLE_SELECT","MULTI_SELECT"]},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":1926}},
+        {"name":"slug","type":"String","source":{"file":"schema.prisma","line":1927}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":1928},"default":true},
+        {"name":"usersCanEditRelation","type":"Boolean","source":{"file":"schema.prisma","line":1930},"default":false},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1932},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":1933}},
+        {"name":"isWeightsEnabled","type":"Boolean","source":{"file":"schema.prisma","line":1935},"default":false},
+        {"name":"isLocked","type":"Boolean","source":{"file":"schema.prisma","line":1936},"default":false}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1915},
+      "indexes": [
+        {"columns":["teamId","slug"],"type":"unique"},
+        {"columns":["teamId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "AttributeToUser",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1944}},
+        {"name":"memberId","type":"Int","source":{"file":"schema.prisma","line":1950}},
+        {"name":"attributeOptionId","type":"String","source":{"file":"schema.prisma","line":1953}},
+        {"name":"weight","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1955}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1958},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"createdById","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1959}},
+        {"name":"createdByDSyncId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1961}},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":1964}},
+        {"name":"updatedById","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":1966}},
+        {"name":"updatedByDSyncId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":1967}}
+      ],
+      "relations": [
+        {"foreignKey":"memberId","references":"id","on":"Membership","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"attributeOptionId","references":"id","on":"AttributeOption","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"createdById","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"createdByDSyncId","references":"directoryId","on":"DSyncData","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"updatedById","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"updatedByDSyncId","references":"directoryId","on":"DSyncData","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1943},
+      "indexes": [
+        {"columns":["memberId","attributeOptionId"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "AssignmentReason",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":1981},"unique":true,"autoIncrement":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":1982},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"bookingId","type":"Int","source":{"file":"schema.prisma","line":1983}},
+        {"name":"reasonEnum","type":"AssignmentReasonEnum","source":{"file":"schema.prisma","line":1985},"values":["REASSIGNED","RR_REASSIGNED","REROUTED","SALESFORCE_ASSIGNMENT"]},
+        {"name":"reasonString","type":"String","source":{"file":"schema.prisma","line":1986}}
+      ],
+      "relations": [
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1980},
+      "indexes": [
+        {"columns":["bookingId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "DelegationCredential",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":1997}},
+        {"name":"workspacePlatformId","type":"Int","source":{"file":"schema.prisma","line":1999}},
+        {"name":"serviceAccountKey","type":"Json","source":{"file":"schema.prisma","line":2002}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":2003},"default":false},
+        {"name":"lastEnabledAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2005}},
+        {"name":"lastDisabledAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2007}},
+        {"name":"organizationId","type":"Int","source":{"file":"schema.prisma","line":2008}},
+        {"name":"domain","type":"String","source":{"file":"schema.prisma","line":2010}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2014},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2015}}
+      ],
+      "relations": [
+        {"foreignKey":"workspacePlatformId","references":"id","on":"WorkspacePlatform","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":1996},
+      "indexes": [
+        {"columns":["organizationId","domain"],"type":"unique"},
+        {"columns":["enabled"],"type":"index"}
+      ]
+    },
+    {
+      "table": "WorkspacePlatform",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":2026},"autoIncrement":true},
+        {"name":"slug","type":"String","source":{"file":"schema.prisma","line":2028},"unique":true},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":2030}},
+        {"name":"description","type":"String","source":{"file":"schema.prisma","line":2031}},
+        {"name":"defaultServiceAccountKey","type":"Json","source":{"file":"schema.prisma","line":2033}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2034},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2035}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":2036},"default":false}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":2025}
+    },
+    {
+      "table": "EventTypeTranslation",
+      "columns": [
+        {"name":"uid","type":"String","primary":true,"source":{"file":"schema.prisma","line":2043}},
+        {"name":"eventTypeId","type":"Int","source":{"file":"schema.prisma","line":2045}},
+        {"name":"field","type":"EventTypeAutoTranslatedField","source":{"file":"schema.prisma","line":2046},"values":["DESCRIPTION","TITLE"]},
+        {"name":"sourceLocale","type":"String","source":{"file":"schema.prisma","line":2047}},
+        {"name":"targetLocale","type":"String","source":{"file":"schema.prisma","line":2048}},
+        {"name":"translatedText","type":"String","source":{"file":"schema.prisma","line":2049},"nativeType":"Text"},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2050},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"createdBy","type":"Int","source":{"file":"schema.prisma","line":2051}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2052}},
+        {"name":"updatedBy","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2053}}
+      ],
+      "relations": [
+        {"foreignKey":"eventTypeId","references":"id","on":"EventType","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"createdBy","references":"id","on":"users","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"updatedBy","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2042},
+      "indexes": [
+        {"columns":["eventTypeId","field","targetLocale"],"type":"unique"},
+        {"columns":["eventTypeId","field","targetLocale"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Watchlist",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2080},"nativeType":"Uuid"},
+        {"name":"type","type":"WatchlistType","source":{"file":"schema.prisma","line":2081},"values":["EMAIL","DOMAIN","USERNAME"]},
+        {"name":"value","type":"String","source":{"file":"schema.prisma","line":2082}},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2083}},
+        {"name":"isGlobal","type":"Boolean","source":{"file":"schema.prisma","line":2084},"default":false},
+        {"name":"organizationId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2085}},
+        {"name":"action","type":"WatchlistAction","source":{"file":"schema.prisma","line":2086},"default":"REPORT","values":["REPORT","BLOCK","ALERT"]},
+        {"name":"source","type":"WatchlistSource","source":{"file":"schema.prisma","line":2087},"default":"MANUAL","values":["MANUAL","FREE_DOMAIN_POLICY","SIGNUP"]},
+        {"name":"lastUpdatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2088},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":2079},
+      "indexes": [
+        {"columns":["type","value","organizationId"],"type":"unique"},
+        {"columns":["isGlobal","action","organizationId","type","value"],"type":"index"}
+      ]
+    },
+    {
+      "table": "WatchlistAudit",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2099},"nativeType":"Uuid"},
+        {"name":"type","type":"WatchlistType","source":{"file":"schema.prisma","line":2100},"values":["EMAIL","DOMAIN","USERNAME"]},
+        {"name":"value","type":"String","source":{"file":"schema.prisma","line":2101}},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2102}},
+        {"name":"action","type":"WatchlistAction","source":{"file":"schema.prisma","line":2104},"default":"REPORT","values":["REPORT","BLOCK","ALERT"]},
+        {"name":"changedAt","type":"DateTime","source":{"file":"schema.prisma","line":2106},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"changedByUserId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2107}},
+        {"name":"watchlistId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2109},"nativeType":"Uuid"}
+      ],
+      "relations": [
+        {"foreignKey":"watchlistId","references":"id","on":"Watchlist","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2098},
+      "indexes": [
+        {"columns":["watchlistId","changedAt"],"type":"index"}
+      ]
+    },
+    {
+      "table": "WatchlistEventAudit",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2116},"nativeType":"Uuid"},
+        {"name":"watchlistId","type":"String","source":{"file":"schema.prisma","line":2117},"nativeType":"Uuid"},
+        {"name":"eventTypeId","type":"Int","source":{"file":"schema.prisma","line":2118}},
+        {"name":"actionTaken","type":"WatchlistAction","source":{"file":"schema.prisma","line":2119},"values":["REPORT","BLOCK","ALERT"]},
+        {"name":"timestamp","type":"DateTime","source":{"file":"schema.prisma","line":2120},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":2115}
+    },
+    {
+      "table": "BookingReport",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2142},"nativeType":"Uuid"},
+        {"name":"bookingUid","type":"String","source":{"file":"schema.prisma","line":2143},"unique":true},
+        {"name":"bookerEmail","type":"String","source":{"file":"schema.prisma","line":2145}},
+        {"name":"reportedById","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2146}},
+        {"name":"organizationId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2147}},
+        {"name":"reason","type":"BookingReportReason","source":{"file":"schema.prisma","line":2148},"values":["SPAM","dont_know_person","OTHER"]},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2149}},
+        {"name":"cancelled","type":"Boolean","source":{"file":"schema.prisma","line":2150},"default":false},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2151},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2152}},
+        {"name":"status","type":"BookingReportStatus","source":{"file":"schema.prisma","line":2153},"default":"PENDING","values":["PENDING","DISMISSED","BLOCKED"]},
+        {"name":"systemStatus","type":"SystemReportStatus","source":{"file":"schema.prisma","line":2154},"default":"PENDING","values":["PENDING","BLOCKED","DISMISSED"]},
+        {"name":"watchlistId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2156},"nativeType":"Uuid"},
+        {"name":"globalWatchlistId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2157},"nativeType":"Uuid"}
+      ],
+      "relations": [
+        {"foreignKey":"bookingUid","references":"uid","on":"Booking","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"reportedById","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"watchlistId","references":"id","on":"Watchlist","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"globalWatchlistId","references":"id","on":"Watchlist","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2141},
+      "indexes": [
+        {"columns":["bookerEmail"],"type":"index"},
+        {"columns":["reportedById"],"type":"index"},
+        {"columns":["organizationId"],"type":"index"},
+        {"columns":["watchlistId"],"type":"index"},
+        {"columns":["globalWatchlistId"],"type":"index"},
+        {"columns":["systemStatus"],"type":"index"},
+        {"columns":["createdAt"],"type":"index"}
+      ]
+    },
+    {
+      "table": "WrongAssignmentReport",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2181},"nativeType":"Uuid"},
+        {"name":"bookingUid","type":"String","source":{"file":"schema.prisma","line":2182},"unique":true},
+        {"name":"reportedById","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2184}},
+        {"name":"correctAssignee","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2186}},
+        {"name":"additionalNotes","type":"String","source":{"file":"schema.prisma","line":2187}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2188}},
+        {"name":"status","type":"WrongAssignmentReportStatus","source":{"file":"schema.prisma","line":2190},"default":"PENDING","values":["PENDING","REVIEWED","RESOLVED","DISMISSED"]},
+        {"name":"reviewedById","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2191}},
+        {"name":"reviewedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2193}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2194},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2195}}
+      ],
+      "relations": [
+        {"foreignKey":"bookingUid","references":"uid","on":"Booking","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"reportedById","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"reviewedById","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2180},
+      "indexes": [
+        {"columns":["reportedById"],"type":"index"},
+        {"columns":["teamId"],"type":"index"},
+        {"columns":["status"],"type":"index"},
+        {"columns":["reviewedById"],"type":"index"},
+        {"columns":["createdAt"],"type":"index"},
+        {"columns":["teamId","status","createdAt"],"type":"index"}
+      ]
+    },
+    {
+      "table": "OrganizationOnboarding",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2217}},
+        {"name":"createdById","type":"Int","source":{"file":"schema.prisma","line":2221}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2222},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"orgOwnerEmail","type":"String","source":{"file":"schema.prisma","line":2226},"unique":true},
+        {"name":"error","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2227}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2229}},
+        {"name":"organizationId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2233},"unique":true},
+        {"name":"billingPeriod","type":"BillingPeriod","source":{"file":"schema.prisma","line":2236},"values":["MONTHLY","ANNUALLY"]},
+        {"name":"pricePerSeat","type":"Float","source":{"file":"schema.prisma","line":2237}},
+        {"name":"seats","type":"Int","source":{"file":"schema.prisma","line":2238}},
+        {"name":"isPlatform","type":"Boolean","source":{"file":"schema.prisma","line":2240},"default":false},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":2243}},
+        {"name":"slug","type":"String","source":{"file":"schema.prisma","line":2245}},
+        {"name":"logo","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2246}},
+        {"name":"bio","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2247}},
+        {"name":"brandColor","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2248}},
+        {"name":"bannerUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2249}},
+        {"name":"isDomainConfigured","type":"Boolean","source":{"file":"schema.prisma","line":2250},"default":false},
+        {"name":"stripeCustomerId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2253},"unique":true},
+        {"name":"stripeSubscriptionId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2255}},
+        {"name":"stripeSubscriptionItemId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2256}},
+        {"name":"invitedMembers","type":"Json","source":{"file":"schema.prisma","line":2259},"default":"[]"},
+        {"name":"teams","type":"Json","source":{"file":"schema.prisma","line":2262},"default":"[]"},
+        {"name":"isComplete","type":"Boolean","source":{"file":"schema.prisma","line":2265},"default":false}
+      ],
+      "relations": [
+        {"foreignKey":"createdById","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2215},
+      "indexes": [
+        {"columns":["orgOwnerEmail"],"type":"index"},
+        {"columns":["stripeCustomerId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "InternalNotePreset",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":2272},"autoIncrement":true},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":2273}},
+        {"name":"cancellationReason","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2274}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":2276}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2278},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2271},
+      "indexes": [
+        {"columns":["teamId","name"],"type":"unique"},
+        {"columns":["teamId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "FilterSegment",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":2291},"autoIncrement":true},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":2292}},
+        {"name":"tableIdentifier","type":"String","source":{"file":"schema.prisma","line":2294}},
+        {"name":"scope","type":"FilterSegmentScope","source":{"file":"schema.prisma","line":2295},"values":["USER","TEAM"]},
+        {"name":"activeFilters","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2297}},
+        {"name":"sorting","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2298}},
+        {"name":"columnVisibility","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2299}},
+        {"name":"columnSizing","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2300}},
+        {"name":"perPage","type":"Int","source":{"file":"schema.prisma","line":2301}},
+        {"name":"searchTerm","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2302},"nativeType":"Text"},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2303},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2304}},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":2307}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2310}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2290},
+      "indexes": [
+        {"columns":["scope","userId","tableIdentifier"],"type":"index"},
+        {"columns":["scope","teamId","tableIdentifier"],"type":"index"}
+      ]
+    },
+    {
+      "table": "UserFilterSegmentPreference",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":2320},"autoIncrement":true},
+        {"name":"userId","type":"Int","source":{"file":"schema.prisma","line":2321}},
+        {"name":"tableIdentifier","type":"String","source":{"file":"schema.prisma","line":2322}},
+        {"name":"segmentId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2323}},
+        {"name":"systemSegmentId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2324}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2325},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2326}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"segmentId","references":"id","on":"FilterSegment","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2319},
+      "indexes": [
+        {"columns":["userId","tableIdentifier"],"type":"unique"},
+        {"columns":["userId"],"type":"index"},
+        {"columns":["segmentId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "BookingInternalNote",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":2336},"autoIncrement":true},
+        {"name":"notePresetId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2339}},
+        {"name":"text","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2340}},
+        {"name":"bookingId","type":"Int","source":{"file":"schema.prisma","line":2343}},
+        {"name":"createdById","type":"Int","source":{"file":"schema.prisma","line":2346}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2348},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"notePresetId","references":"id","on":"InternalNotePreset","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"bookingId","references":"id","on":"Booking","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"createdById","references":"id","on":"users","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2335},
+      "indexes": [
+        {"columns":["bookingId","notePresetId"],"type":"unique"},
+        {"columns":["bookingId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Role",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2360}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":2361}},
+        {"name":"color","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2362}},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2363}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2364}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2368},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2369}},
+        {"name":"type","type":"RoleType","source":{"file":"schema.prisma","line":2370},"default":"CUSTOM","values":["SYSTEM","CUSTOM"]}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2359},
+      "indexes": [
+        {"columns":["name","teamId"],"type":"unique"},
+        {"columns":["teamId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "RolePermission",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2377}},
+        {"name":"roleId","type":"String","source":{"file":"schema.prisma","line":2378}},
+        {"name":"resource","type":"String","source":{"file":"schema.prisma","line":2380}},
+        {"name":"action","type":"String","source":{"file":"schema.prisma","line":2381}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2382},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"roleId","references":"id","on":"Role","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2376},
+      "indexes": [
+        {"columns":["roleId","resource","action"],"type":"unique"},
+        {"columns":["roleId"],"type":"index"},
+        {"columns":["action"],"type":"index"}
+      ]
+    },
+    {
+      "table": "AuditActor",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2448},"nativeType":"Uuid"},
+        {"name":"type","type":"AuditActorType","source":{"file":"schema.prisma","line":2449},"values":["user","guest","attendee","system","app"]},
+        {"name":"userUuid","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2456},"unique":true,"nativeType":"Uuid"},
+        {"name":"attendeeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2457},"unique":true},
+        {"name":"credentialId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2458},"unique":true},
+        {"name":"email","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2466},"unique":true},
+        {"name":"phone","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2467},"unique":true},
+        {"name":"name","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2468}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2470},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.prisma","line":2447},
+      "indexes": [
+        {"columns":["email"],"type":"index"},
+        {"columns":["userUuid"],"type":"index"},
+        {"columns":["attendeeId"],"type":"index"},
+        {"columns":["credentialId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "BookingAudit",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2486},"nativeType":"Uuid"},
+        {"name":"bookingUid","type":"String","source":{"file":"schema.prisma","line":2493}},
+        {"name":"actorId","type":"String","source":{"file":"schema.prisma","line":2497},"nativeType":"Uuid"},
+        {"name":"type","type":"BookingAuditType","source":{"file":"schema.prisma","line":2501},"values":["record_created","record_updated","record_deleted"]},
+        {"name":"action","type":"BookingAuditAction","source":{"file":"schema.prisma","line":2502},"values":["created","cancelled","accepted","rejected","pending","awaiting_host","rescheduled","attendee_added","attendee_removed","reassignment","location_changed","no_show_updated","reschedule_requested","seat_booked","seat_rescheduled"]},
+        {"name":"timestamp","type":"DateTime","source":{"file":"schema.prisma","line":2506}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2509},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2510}},
+        {"name":"source","type":"BookingAuditSource","source":{"file":"schema.prisma","line":2512},"values":["api_v1","api_v2","webapp","webhook","system","magic_link","unknown"]},
+        {"name":"operationId","type":"String","source":{"file":"schema.prisma","line":2515}},
+        {"name":"data","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2517}},
+        {"name":"context","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2522}}
+      ],
+      "relations": [
+        {"foreignKey":"actorId","references":"id","on":"AuditActor","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2485},
+      "indexes": [
+        {"columns":["actorId"],"type":"index"},
+        {"columns":["bookingUid"],"type":"index"},
+        {"columns":["timestamp"],"type":"index"},
+        {"columns":["operationId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Agent",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2542}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":2543}},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2546}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2548}},
+        {"name":"providerAgentId","type":"String","source":{"file":"schema.prisma","line":2552},"unique":true},
+        {"name":"inboundEventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2555}},
+        {"name":"outboundEventTypeId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2558}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":2560},"default":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2561},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2562}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2541},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["teamId"],"type":"index"},
+        {"columns":["inboundEventTypeId"],"type":"index"},
+        {"columns":["outboundEventTypeId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "CalAiPhoneNumber",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"schema.prisma","line":2574},"autoIncrement":true},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2577}},
+        {"name":"teamId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2579}},
+        {"name":"phoneNumber","type":"String","source":{"file":"schema.prisma","line":2582},"unique":true},
+        {"name":"provider","type":"String","source":{"file":"schema.prisma","line":2583}},
+        {"name":"providerPhoneNumberId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2586},"unique":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2588},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2589}},
+        {"name":"stripeCustomerId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2591}},
+        {"name":"stripeSubscriptionId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2592},"unique":true},
+        {"name":"subscriptionStatus","type":"PhoneNumberSubscriptionStatus","nullable":true,"source":{"file":"schema.prisma","line":2593},"values":["ACTIVE","PAST_DUE","CANCELLED","INCOMPLETE","INCOMPLETE_EXPIRED","TRIALING","UNPAID"]},
+        {"name":"inboundAgentId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2596}},
+        {"name":"outboundAgentId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2598}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"users","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"inboundAgentId","references":"id","on":"Agent","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"outboundAgentId","references":"id","on":"Agent","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2573},
+      "indexes": [
+        {"columns":["userId"],"type":"index"},
+        {"columns":["teamId"],"type":"index"},
+        {"columns":["inboundAgentId"],"type":"index"},
+        {"columns":["outboundAgentId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "TeamBilling",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2608}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":2609},"unique":true},
+        {"name":"subscriptionId","type":"String","source":{"file":"schema.prisma","line":2612},"unique":true},
+        {"name":"subscriptionItemId","type":"String","source":{"file":"schema.prisma","line":2613}},
+        {"name":"customerId","type":"String","source":{"file":"schema.prisma","line":2614}},
+        {"name":"status","type":"String","source":{"file":"schema.prisma","line":2615}},
+        {"name":"planName","type":"String","source":{"file":"schema.prisma","line":2616}},
+        {"name":"subscriptionStart","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2617}},
+        {"name":"subscriptionTrialEnd","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2618}},
+        {"name":"subscriptionEnd","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2619}},
+        {"name":"billingPeriod","type":"BillingPeriod","nullable":true,"source":{"file":"schema.prisma","line":2621},"values":["MONTHLY","ANNUALLY"]},
+        {"name":"billingMode","type":"BillingMode","source":{"file":"schema.prisma","line":2622},"default":"SEATS","values":["SEATS","ACTIVE_USERS"]},
+        {"name":"pricePerSeat","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2623}},
+        {"name":"paidSeats","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2624}},
+        {"name":"highWaterMark","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2629}},
+        {"name":"highWaterMarkPeriodStart","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2630}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2632},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2633}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2607}
+    },
+    {
+      "table": "OrganizationBilling",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2637}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":2638},"unique":true},
+        {"name":"subscriptionId","type":"String","source":{"file":"schema.prisma","line":2641},"unique":true},
+        {"name":"subscriptionItemId","type":"String","source":{"file":"schema.prisma","line":2642}},
+        {"name":"customerId","type":"String","source":{"file":"schema.prisma","line":2643}},
+        {"name":"status","type":"String","source":{"file":"schema.prisma","line":2644}},
+        {"name":"planName","type":"String","source":{"file":"schema.prisma","line":2645}},
+        {"name":"subscriptionStart","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2646}},
+        {"name":"subscriptionTrialEnd","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2647}},
+        {"name":"subscriptionEnd","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2648}},
+        {"name":"billingPeriod","type":"BillingPeriod","nullable":true,"source":{"file":"schema.prisma","line":2650},"values":["MONTHLY","ANNUALLY"]},
+        {"name":"billingMode","type":"BillingMode","source":{"file":"schema.prisma","line":2651},"default":"SEATS","values":["SEATS","ACTIVE_USERS"]},
+        {"name":"pricePerSeat","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2652}},
+        {"name":"paidSeats","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2653}},
+        {"name":"highWaterMark","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2658}},
+        {"name":"highWaterMarkPeriodStart","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2659}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2661},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2662}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2636}
+    },
+    {
+      "table": "SeatChangeLog",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2666}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":2667}},
+        {"name":"changeType","type":"SeatChangeType","source":{"file":"schema.prisma","line":2670},"values":["ADDITION","REMOVAL"]},
+        {"name":"seatCount","type":"Int","source":{"file":"schema.prisma","line":2671}},
+        {"name":"userId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2672}},
+        {"name":"triggeredBy","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2673}},
+        {"name":"changeDate","type":"DateTime","source":{"file":"schema.prisma","line":2675},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"monthKey","type":"String","source":{"file":"schema.prisma","line":2676}},
+        {"name":"operationId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2679}},
+        {"name":"processedInProrationId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2681}},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2684}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2685},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"teamBillingId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2687}},
+        {"name":"organizationBillingId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2689}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"processedInProrationId","references":"id","on":"MonthlyProration","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"teamBillingId","references":"id","on":"TeamBilling","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"organizationBillingId","references":"id","on":"OrganizationBilling","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2665},
+      "indexes": [
+        {"columns":["teamId","operationId"],"type":"unique"},
+        {"columns":["teamId","monthKey"],"type":"index"},
+        {"columns":["teamId","processedInProrationId"],"type":"index"},
+        {"columns":["monthKey"],"type":"index"}
+      ]
+    },
+    {
+      "table": "MonthlyProration",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2704}},
+        {"name":"teamId","type":"Int","source":{"file":"schema.prisma","line":2705}},
+        {"name":"monthKey","type":"String","source":{"file":"schema.prisma","line":2708}},
+        {"name":"periodStart","type":"DateTime","source":{"file":"schema.prisma","line":2709}},
+        {"name":"periodEnd","type":"DateTime","source":{"file":"schema.prisma","line":2710}},
+        {"name":"seatsAtStart","type":"Int","source":{"file":"schema.prisma","line":2712}},
+        {"name":"seatsAdded","type":"Int","source":{"file":"schema.prisma","line":2713}},
+        {"name":"seatsRemoved","type":"Int","source":{"file":"schema.prisma","line":2714}},
+        {"name":"netSeatIncrease","type":"Int","source":{"file":"schema.prisma","line":2715}},
+        {"name":"seatsAtEnd","type":"Int","source":{"file":"schema.prisma","line":2716}},
+        {"name":"subscriptionId","type":"String","source":{"file":"schema.prisma","line":2718}},
+        {"name":"subscriptionItemId","type":"String","source":{"file":"schema.prisma","line":2719}},
+        {"name":"customerId","type":"String","source":{"file":"schema.prisma","line":2720}},
+        {"name":"subscriptionStart","type":"DateTime","source":{"file":"schema.prisma","line":2722}},
+        {"name":"subscriptionEnd","type":"DateTime","source":{"file":"schema.prisma","line":2723}},
+        {"name":"remainingDays","type":"Int","source":{"file":"schema.prisma","line":2724}},
+        {"name":"pricePerSeat","type":"Int","source":{"file":"schema.prisma","line":2725}},
+        {"name":"proratedAmount","type":"Int","source":{"file":"schema.prisma","line":2726}},
+        {"name":"invoiceItemId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2728}},
+        {"name":"invoiceId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2729}},
+        {"name":"invoiceUrl","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2730}},
+        {"name":"status","type":"ProrationStatus","source":{"file":"schema.prisma","line":2732},"default":"PENDING","values":["PENDING","INVOICE_CREATED","CHARGED","FAILED","CANCELLED"]},
+        {"name":"chargedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2734}},
+        {"name":"failedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2735}},
+        {"name":"failureReason","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2736}},
+        {"name":"retryCount","type":"Int","source":{"file":"schema.prisma","line":2737},"default":0},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"schema.prisma","line":2741}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2742},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2743}},
+        {"name":"teamBillingId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2745}},
+        {"name":"organizationBillingId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2747}}
+      ],
+      "relations": [
+        {"foreignKey":"teamId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamBillingId","references":"id","on":"TeamBilling","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"organizationBillingId","references":"id","on":"OrganizationBilling","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2703},
+      "indexes": [
+        {"columns":["teamId","monthKey"],"type":"unique"},
+        {"columns":["monthKey","status"],"type":"index"},
+        {"columns":["status"],"type":"index"},
+        {"columns":["teamId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "CalendarCacheEvent",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2771}},
+        {"name":"selectedCalendarId","type":"String","source":{"file":"schema.prisma","line":2772}},
+        {"name":"externalId","type":"String","source":{"file":"schema.prisma","line":2773}},
+        {"name":"externalEtag","type":"String","source":{"file":"schema.prisma","line":2774}},
+        {"name":"iCalUID","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2775}},
+        {"name":"iCalSequence","type":"Int","source":{"file":"schema.prisma","line":2776},"default":0},
+        {"name":"summary","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2779}},
+        {"name":"description","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2780}},
+        {"name":"location","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2781}},
+        {"name":"start","type":"DateTime","source":{"file":"schema.prisma","line":2782}},
+        {"name":"end","type":"DateTime","source":{"file":"schema.prisma","line":2783}},
+        {"name":"isAllDay","type":"Boolean","source":{"file":"schema.prisma","line":2784},"default":false},
+        {"name":"timeZone","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2785}},
+        {"name":"status","type":"CalendarCacheEventStatus","source":{"file":"schema.prisma","line":2786},"default":"confirmed","values":["confirmed","tentative","cancelled"]},
+        {"name":"recurringEventId","type":"String","nullable":true,"source":{"file":"schema.prisma","line":2787}},
+        {"name":"originalStartTime","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2788}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2790},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2791}},
+        {"name":"externalCreatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2792}},
+        {"name":"externalUpdatedAt","type":"DateTime","nullable":true,"source":{"file":"schema.prisma","line":2793}}
+      ],
+      "relations": [
+        {"foreignKey":"selectedCalendarId","references":"id","on":"SelectedCalendar","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2770},
+      "indexes": [
+        {"columns":["selectedCalendarId","externalId"],"type":"unique"},
+        {"columns":["start","end","status"],"type":"index"},
+        {"columns":["selectedCalendarId","iCalUID"],"type":"index"}
+      ]
+    },
+    {
+      "table": "IntegrationAttributeSync",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2803}},
+        {"name":"organizationId","type":"Int","source":{"file":"schema.prisma","line":2804}},
+        {"name":"name","type":"String","source":{"file":"schema.prisma","line":2807}},
+        {"name":"integration","type":"String","source":{"file":"schema.prisma","line":2808}},
+        {"name":"credentialId","type":"Int","nullable":true,"source":{"file":"schema.prisma","line":2809}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":2812}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2817},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2818}}
+      ],
+      "relations": [
+        {"foreignKey":"organizationId","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"credentialId","references":"id","on":"Credential","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2802},
+      "indexes": [
+        {"columns":["organizationId"],"type":"index"},
+        {"columns":["credentialId"],"type":"index"}
+      ]
+    },
+    {
+      "table": "AttributeSyncRule",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2825}},
+        {"name":"integrationAttributeSyncId","type":"String","source":{"file":"schema.prisma","line":2827},"unique":true},
+        {"name":"rule","type":"Json","source":{"file":"schema.prisma","line":2830}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2832},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2833}}
+      ],
+      "relations": [
+        {"foreignKey":"integrationAttributeSyncId","references":"id","on":"IntegrationAttributeSync","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2824}
+    },
+    {
+      "table": "AttributeSyncFieldMapping",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"schema.prisma","line":2837}},
+        {"name":"integrationFieldName","type":"String","source":{"file":"schema.prisma","line":2838}},
+        {"name":"attributeId","type":"String","source":{"file":"schema.prisma","line":2839}},
+        {"name":"enabled","type":"Boolean","source":{"file":"schema.prisma","line":2842}},
+        {"name":"integrationAttributeSyncId","type":"String","source":{"file":"schema.prisma","line":2843}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"schema.prisma","line":2846},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"schema.prisma","line":2847}}
+      ],
+      "relations": [
+        {"foreignKey":"attributeId","references":"id","on":"Attribute","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"integrationAttributeSyncId","references":"id","on":"IntegrationAttributeSync","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.prisma","line":2836},
+      "indexes": [
+        {"columns":["integrationAttributeSyncId","attributeId"],"type":"unique"},
+        {"columns":["integrationAttributeSyncId"],"type":"index"}
+      ]
+    }
+  ],
+  "warnings": [
+    "schema.prisma:1501: view BookingTimeStatus skipped: views are not drawn.",
+    "schema.prisma:1566: view BookingTimeStatusDenormalized skipped: views are not drawn."
+  ]
+}

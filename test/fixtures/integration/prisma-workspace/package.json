@@ -1,0 +1,7 @@
+{
+  "name": "prisma-workspace",
+  "private": true,
+  "devDependencies": {
+    "prisma": "^7.10.1"
+  }
+}

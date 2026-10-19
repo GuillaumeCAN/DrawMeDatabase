@@ -1,0 +1,56 @@
+{
+  "tables": [
+    {
+      "table": "User",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":10},"autoIncrement":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":11},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"email","type":"String","source":{"file":"prisma/schema.prisma","line":12},"unique":true},
+        {"name":"name","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":13}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":9}
+    },
+    {
+      "table": "Post",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":19},"autoIncrement":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":20},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"title","type":"String","source":{"file":"prisma/schema.prisma","line":21}},
+        {"name":"content","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":22}},
+        {"name":"published","type":"Boolean","source":{"file":"prisma/schema.prisma","line":23},"default":false},
+        {"name":"authorId","type":"Int","source":{"file":"prisma/schema.prisma","line":24}}
+      ],
+      "relations": [
+        {"foreignKey":"authorId","references":"id","on":"User","type":"many-to-one","onDelete":"no action","onUpdate":"cascade"},
+        {"foreignKey":"A","references":"id","on":"Tag","type":"many-to-many","via":"_TagToPost","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":18}
+    },
+    {
+      "table": "Comment",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":31},"autoIncrement":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":32},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"comment","type":"String","source":{"file":"prisma/schema.prisma","line":33}},
+        {"name":"writtenById","type":"Int","source":{"file":"prisma/schema.prisma","line":34}},
+        {"name":"postId","type":"Int","source":{"file":"prisma/schema.prisma","line":35}}
+      ],
+      "relations": [
+        {"foreignKey":"writtenById","references":"id","on":"User","type":"many-to-one","onDelete":"no action","onUpdate":"cascade"},
+        {"foreignKey":"postId","references":"id","on":"Post","type":"many-to-one","onDelete":"no action","onUpdate":"no action"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":30}
+    },
+    {
+      "table": "Tag",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":41},"autoIncrement":true},
+        {"name":"tag","type":"String","source":{"file":"prisma/schema.prisma","line":42},"unique":true}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":40}
+    }
+  ],
+  "warnings": []
+}

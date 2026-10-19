@@ -1,0 +1,10 @@
+// A multi-file Prisma schema (Prisma 6.7+): the datasource here, the models in the other files
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../generated"
+}
