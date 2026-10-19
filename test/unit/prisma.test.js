@@ -114,7 +114,7 @@ describe('prisma parser: real and hand-made fixtures', () => {
 
     it('every fixture is detected as Prisma, with its package (100)', () => {
         for (const name of fixtures.filter(n => !['edge-cases', 'multi-schema'].includes(n))) {
-            assert.deepEqual(registry.detect(path.join(FIXTURES, name)), { framework: 'prisma', forced: false, matches: [{ id: 'prisma', label: 'Prisma', score: 100 }] }, name);
+            assert.deepEqual(registry.detect(path.join(FIXTURES, name)), { framework: 'prisma', forced: false, matches: [{ id: 'prisma', label: 'Prisma', score: 100 }], errors: [] }, name);
         }
         assert.equal(registry.detect(path.join(FIXTURES, 'edge-cases')).matches[0].score, 50, 'the schema alone');
     });
@@ -138,9 +138,8 @@ describe('prisma parser: detection', () => {
         assert.equal(parser.detect(project({ 'prisma/schema.prisma': SCHEMA, 'prisma.config.ts': 'export default {}\n' })), 100, 'a Prisma config file counts as the package');
     });
 
-    it('detection: the schema alone or the package alone score 50, nothing scores 0', () => {
+    it('detection: the schema alone or a config file alone score 50; the package alone, or nothing, scores 0', () => {
         assert.equal(parser.detect(project({ 'prisma/schema.prisma': SCHEMA })), 50);
-        assert.equal(parser.detect(project({ 'package.json': PACKAGE })), 50, 'the schema may be elsewhere: the error tells where it is looked for');
         assert.equal(parser.detect(project({ 'prisma.config.ts': 'export default {}\n' })), 50);
         assert.equal(parser.detect(project({ 'package.json': JSON.stringify({ dependencies: { '@prisma/adapter-pg': '7.0.0', 'prisma-kysely': '1.0.0' } }) })), 0);
         assert.equal(parser.detect(project({ 'package.json': JSON.stringify({ peerDependencies: { prisma: '7.0.0' } }) })), 0, 'only dependencies and devDependencies');
@@ -149,6 +148,22 @@ describe('prisma parser: detection', () => {
         assert.equal(parser.detect(path.join(project({ 'schema.prisma': SCHEMA }), 'schema.prisma')), 0, 'a file is not a project');
         assert.equal(parser.detect(''), 0);
         assert.equal(parser.detect(undefined), 0);
+    });
+
+    it('detection: the package alone scores 0, a monorepo root whose schema is in a package is no Prisma project (the framework folder is suggested)', () => {
+        assert.equal(parser.detect(project({ 'package.json': PACKAGE })), 0);
+        assert.equal(parser.detect(project({ 'package.json': JSON.stringify({ dependencies: { '@prisma/client': '6.19.1' } }) })), 0, 'an app using the client of another package');
+        const root = project({
+            'package.json': JSON.stringify({ workspaces: ['packages/*'], devDependencies: { prisma: '^6' } }),
+            'packages/db/package.json': PACKAGE,
+            'packages/db/prisma/schema.prisma': SCHEMA,
+        });
+        assert.equal(parser.detect(root), 0);
+        assert.deepEqual(registry.detect(root), { framework: 'Unknown', forced: false, matches: [], errors: [] });
+        assert.equal(parser.detect(path.join(root, 'packages', 'db')), 100, 'its framework folder');
+        // A config file or a "prisma.schema" of package.json whose schema is missing: a Prisma project, parse() tells it
+        assert.equal(parser.detect(project({ 'package.json': JSON.stringify({ prisma: { schema: 'db/main.prisma' }, devDependencies: { prisma: '6.19.1' } }) })), 50);
+        assert.equal(parser.detect(project({ 'package.json': JSON.stringify({ prisma: { schema: 'db/main.prisma' } }) })), 0, 'without the package');
     });
 
     it('detection: the multi-file schema folder prisma/schema, the "prisma.schema" path of package.json and the schema of prisma.config.ts', () => {
@@ -198,6 +213,32 @@ describe('prisma parser: where the schema is', () => {
         }
     });
 
+    it('prisma.config.ts: only the schema of the config object counts, not the schema option of a driver adapter or of another object', () => {
+        const configs = [
+            // PrismaPg and PrismaNeon take the Postgres schema in their options
+            "import { defineConfig } from 'prisma/config'\nclass PrismaPg { constructor(public pool: object, public options: object) {} }\nconst tenant = { schema: 'tenant_b' }\n\nexport default defineConfig({\n  experimental: { adapter: true },\n  async adapter() {\n    return new PrismaPg({ connectionString: process.env.DATABASE_URL }, { schema: 'tenant_a' })\n  },\n  schema: 'db/main.prisma',\n})\n",
+            // A variable that is exported, typed, with a nested schema key
+            "import type { PrismaConfig } from 'prisma'\nconst adapterOptions = { schema: 'tenant_a' }\nconst config: PrismaConfig = {\n  migrations: { path: 'db/migrations', schema: 'x' },\n  'schema': 'db/main.prisma',\n}\nexport default config\n",
+            "const options = { schema: 'tenant_a' }\nexport default {\n  ...base,\n  schema: 'db/main.prisma',\n} satisfies PrismaConfig\n",
+            "module.exports = defineConfig({ datasource: { url: env('DATABASE_URL'), schema: 'x' }, schemaPath: 'x', schema: 'db/main.prisma' })\n",
+            "const config = defineConfig({ adapter: () => new PrismaPg(pool, { schema: 'a' }), schema: 'db/main.prisma' })\nexport default config\n",
+        ];
+        for (const text of configs) {
+            const dir = project({ 'prisma.config.ts': text, 'db/main.prisma': SCHEMA, 'prisma/schema.prisma': SCHEMA.replace('User', 'Other') });
+            assert.deepEqual(fileOf(dir), { file: path.join('db', 'main.prisma') }, text);
+            assert.deepEqual(parser.parse(dir, { git: false }).warnings, [], text);
+        }
+        // A config object without a schema: the default locations, without a warning
+        const nested = project({ 'prisma.config.ts': "export default defineConfig({\n  adapter: () => new PrismaPg(pool, { schema: 'tenant_a' }),\n})\n", 'prisma/schema.prisma': SCHEMA });
+        assert.deepEqual(fileOf(nested), { file: path.join('prisma', 'schema.prisma') });
+        assert.deepEqual(parser.parse(nested, { git: false }).warnings, []);
+        // A config built by a function: its schema is computed
+        const built = project({ 'prisma.config.ts': "export default defineConfig(makeConfig({ schema: 'db/main.prisma' }))\n", 'prisma/schema.prisma': SCHEMA });
+        assert.deepEqual(parser.parse(built, { git: false }).warnings, ['prisma.config.ts: the schema path is computed, it cannot be read without running the file: the default locations are read.']);
+        const plain = project({ 'prisma.config.ts': 'export default makeConfig()\n', 'prisma/schema.prisma': SCHEMA });
+        assert.deepEqual(parser.parse(plain, { git: false }).warnings, [], 'no schema key: nothing to tell');
+    });
+
     it('a schema path computed in prisma.config.ts is told, and the default locations are read', () => {
         const dir = project({ 'prisma.config.ts': 'export default defineConfig({ schema: process.env.SCHEMA ?? "prisma/schema.prisma" })\n', 'prisma/schema.prisma': SCHEMA });
         const result = parser.parse(dir, { git: false });
@@ -216,6 +257,31 @@ describe('prisma parser: where the schema is', () => {
         const broken = parser.parse(project({ 'package.json': '{,}', 'prisma/schema.prisma': SCHEMA }), { git: false });
         assert.equal(broken.warnings.length, 1);
         assert.match(broken.warnings[0], /^package\.json could not be read: /);
+    });
+
+    it('Prisma 7 ignores the "prisma.schema" of package.json: the default location is read, else that schema, with a warning', () => {
+        const pkg = (version, key = 'devDependencies', name = 'prisma') => JSON.stringify({ prisma: { schema: 'db/schema.prisma' }, [key]: { [name]: version } });
+        const both = { 'db/schema.prisma': SCHEMA.replace('User', 'FromPkg'), 'prisma/schema.prisma': SCHEMA };
+        for (const [version, key, name] of [['^7.10.1'], ['7.0.0', 'dependencies'], ['~7.1.0', 'dependencies', '@prisma/client'], ['>= 7', 'devDependencies'], ['workspace:^7.2.0']]) {
+            const dir = project({ 'package.json': pkg(version, key, name), ...both });
+            const result = parser.parse(dir, { git: false });
+            assert.deepEqual(result.tables.map(t => t.table), ['User'], version);
+            assert.deepEqual(result.warnings, [`package.json: Prisma 7 ignores "prisma.schema" (the schema is set in prisma.config.ts): prisma/schema.prisma is read, as the Prisma CLI does.`], version);
+            assert.deepEqual(fileOf(dir), { file: path.join('prisma', 'schema.prisma') }, 'the sources follow');
+        }
+        // Prisma 5 and 6, or a range that tells no version: package.json is followed, without a warning
+        for (const version of ['6.19.1', '^5.22.0', 'latest', 'workspace:*']) {
+            const result = parser.parse(project({ 'package.json': pkg(version), ...both }), { git: false });
+            assert.deepEqual([result.tables.map(t => t.table), result.warnings], [['FromPkg'], []], version);
+        }
+        // Prisma 7 without a schema at a default location: the schema of package.json, told
+        const only = parser.parse(project({ 'package.json': pkg('^7.10.1'), 'db/schema.prisma': SCHEMA.replace('User', 'FromPkg') }), { git: false });
+        assert.deepEqual(only.tables.map(t => t.table), ['FromPkg']);
+        assert.deepEqual(only.warnings, ['package.json: Prisma 7 ignores "prisma.schema" (the schema is set in prisma.config.ts), there is no schema at the default locations: the one of package.json is read.']);
+        // The schema of prisma.config.ts still wins
+        const config = project({ 'package.json': pkg('^7.10.1'), 'prisma.config.ts': "export default { schema: 'other.prisma' }\n", 'other.prisma': SCHEMA.replace('User', 'Other'), ...both });
+        const configured = parser.parse(config, { git: false });
+        assert.deepEqual([configured.tables.map(t => t.table), configured.warnings], [['Other'], []]);
     });
 
     it('errors: no schema, a schema path that does not exist, a folder without .prisma files', () => {
@@ -274,6 +340,24 @@ describe('prisma parser: where the schema is', () => {
     });
 });
 
+describe('prisma parser: sources of unsaved editors', () => {
+    it('sources() follow an unsaved package.json or prisma.config.ts that moves the schema (options.overrides), as parse() does', () => {
+        const pkgText = (extra = {}) => JSON.stringify({ ...extra, devDependencies: { prisma: '6.19.1' } });
+        const dir = project({ 'prisma/schema.prisma': SCHEMA, 'alt/schema.prisma': SCHEMA.replace('User', 'Alt'), 'package.json': pkgText(), 'prisma.config.ts': 'export default {}\n' });
+        const files = (rel) => [path.join(dir, rel), path.join(dir, 'package.json'), path.join(dir, 'prisma.config.ts')];
+        assert.deepEqual(registry.getSources('prisma', dir).files, files(path.join('prisma', 'schema.prisma')));
+        const pkg = new Map([[path.join(dir, 'package.json'), pkgText({ prisma: { schema: 'alt/schema.prisma' } })]]);
+        assert.deepEqual(registry.getSources('prisma', dir, { overrides: pkg }).files, files(path.join('alt', 'schema.prisma')));
+        assert.deepEqual(parser.parse(dir, { overrides: pkg, git: false }).tables.map(t => [t.table, t.source.file]), [['Alt', 'alt/schema.prisma']]);
+        const config = new Map([[path.join(dir, 'prisma.config.ts'), "export default { schema: 'alt' }\n"]]);
+        assert.deepEqual(registry.getSources('prisma', dir, { overrides: config }).folders, [{ path: path.join(dir, 'alt'), recursive: true }]);
+        assert.deepEqual(parser.sources(dir, { overrides: new Map() }), parser.sources(dir));
+        assert.deepEqual(parser.sources(dir, null), parser.sources(dir));
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+
 // ---------------------------------------------------------------------------------------------
 
 describe('prisma parser: models and columns', () => {
@@ -292,6 +376,43 @@ model Post {
             { table: 'users', columns: [{ name: 'user_id', type: 'Int', primary: true }, { name: 'first_name', type: 'String' }], relations: [] },
             { table: 'blog_posts', columns: [{ name: 'id', type: 'Int', primary: true }], relations: [] },
         ]);
+    });
+
+    it('attributes written against the type (Int@id, String?@unique, B@relation(...)) are read, as the Prisma CLI accepts them', () => {
+        const body = `model A {
+  id    Int@id
+  tags  String[]@default([])
+  email String?@unique
+  bId   Int
+  b     B@relation(fields: [bId], references: [id])
+  geo   Unsupported("point")@map("location")
+}
+
+model B {
+  id Int @id
+  as A[]
+}
+`;
+        const expected = [
+            {
+                table: 'A',
+                columns: [
+                    { name: 'id', type: 'Int', primary: true },
+                    { name: 'tags', type: 'String[]', nullable: true },
+                    { name: 'email', type: 'String', nullable: true, unique: true },
+                    { name: 'bId', type: 'Int' },
+                    { name: 'location', type: 'Unsupported("point")', nativeType: 'point' },
+                ],
+                relations: [{ foreignKey: 'bId', references: 'id', on: 'B', type: 'many-to-one', onDelete: 'restrict', onUpdate: 'cascade' }],
+            },
+            { table: 'B', columns: [{ name: 'id', type: 'Int', primary: true }], relations: [] },
+        ];
+        for (const text of [body, body.replace(/\n/g, '\r\n')]) {
+            assert.deepEqual(parseSchema(text).warnings, []);
+            assert.deepEqual(tablesOf(text, { details: true }), expected);
+        }
+        // Something else against the type is still no field
+        assert.deepEqual(parseSchema('model A {\n  id Int@id\n  name String!\n}\n').warnings, ['prisma/schema.prisma:7: line not understood, skipped: name String!']);
     });
 
     it('scalar fields keep their Prisma type: String, Int, BigInt, Float, Decimal, Boolean, DateTime, Json, Bytes, enums, Unsupported("...")', () => {
@@ -746,6 +867,22 @@ describe('prisma parser: details', () => {
         ]);
     });
 
+    it('native types are prefixed with the name of the datasource: @pg.VarChar(32) for `datasource pg`', () => {
+        const dir = project({ 'prisma/schema.prisma': 'datasource pg {\n  provider = "postgresql"\n}\n\nmodel Product {\n  id    Int     @id @pg.SmallInt\n  sku   String  @unique @pg.VarChar(32)\n  price Decimal @pg.Decimal(10, 2)\n  code  String  @pg.Char(3)\n  note  String  @db.Text\n}\n' });
+        assert.deepEqual(parser.parse(dir, { git: false, details: true }).tables[0].columns, [
+            { name: 'id', type: 'Int', primary: true, nativeType: 'SmallInt' },
+            { name: 'sku', type: 'String', length: 32, unique: true, nativeType: 'VarChar(32)' },
+            { name: 'price', type: 'Decimal', precision: 10, scale: 2, nativeType: 'Decimal(10, 2)' },
+            { name: 'code', type: 'String', length: 3, nativeType: 'Char(3)' },
+            // Prisma rejects another prefix than the datasource name: no native type
+            { name: 'note', type: 'String' },
+        ]);
+        // Without a datasource: @db
+        assert.deepEqual(parser.parse(project({ 'prisma/schema.prisma': 'model T {\n  id String @id @db.VarChar(8)\n}\n' }), { git: false, details: true }).tables[0].columns, [
+            { name: 'id', type: 'String', primary: true, length: 8, nativeType: 'VarChar(8)' },
+        ]);
+    });
+
     it('@default: strings, numbers, booleans, enum values as stored, now(), dbgenerated("..."), autoincrement(), sequence(); a BigInt above 2^53 as SQL', () => {
         assert.deepEqual(columnsOf(`model Thing {
   id      Int      @id @default(autoincrement())
@@ -921,6 +1058,33 @@ model Post {
         assert.deepEqual(statuses(parser.parse(dir)).map(s => s.slice(0, 2)), [['Label', 'untracked'], ['User', 'committed'], ['Post', 'committed'], ['Tag', 'committed']]);
     });
 
+    it('a model added to a file that is in HEAD is new (untracked), with its columns, as in a new file; a model with changed fields is modified', () => {
+        const dir = project({ 'prisma/schema.prisma': BODY, 'package.json': PACKAGE });
+        git(dir, 'init', '-q');
+        commitAll(dir);
+        const file = path.join(dir, 'prisma', 'schema.prisma');
+        // Inserted between two models (with a blank line in it), and appended
+        fs.writeFileSync(file, `${BODY.replace('model Post {', 'model Draft {\n  id   Int @id\n\n  text String\n}\n\nmodel Post {')}\nmodel Comment {\n  id   Int    @id\n  body String\n}\n`);
+        assert.deepEqual(statuses(parser.parse(dir)), [
+            ['User', 'committed', 'id=committed', 'email=committed', 'name=committed'],
+            ['Draft', 'untracked', 'id=untracked', 'text=untracked'],
+            ['Post', 'committed', 'id=committed', 'title=committed', 'authorId=committed'],
+            ['Comment', 'untracked', 'id=untracked', 'body=untracked'],
+        ]);
+        // A field typed in the new model, not saved yet: the model is being edited, its saved fields stay new
+        const typed = fs.readFileSync(file, 'utf8').replace('  body String\n', '  body String\n  note String?\n');
+        assert.deepEqual(statuses(parser.parse(dir, { overrides: new Map([[file, typed]]) })).at(-1), ['Comment', 'unsaved', 'id=untracked', 'body=untracked', 'note=unsaved']);
+        // Without git: no status
+        assert.deepEqual(statuses(parser.parse(dir, { git: false })).at(-1), ['Comment', undefined, 'id=undefined', 'body=undefined']);
+        // Once committed, a model whose fields all change (not its model line) is modified
+        commitAll(dir);
+        fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('  id   Int    @id\n  body String\n', '  id   BigInt @id\n  body Json\n'));
+        assert.deepEqual(statuses(parser.parse(dir)).at(-1), ['Comment', 'modified', 'id=modified', 'body=modified']);
+        // A model renamed with all its fields: a new table
+        fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('model Comment {\n  id   BigInt @id\n  body Json\n', 'model Reply {\n  key  String @id\n  text Json\n'));
+        assert.deepEqual(statuses(parser.parse(dir)).at(-1), ['Reply', 'untracked', 'key=untracked', 'text=untracked']);
+    });
+
     it('unsaved editors: the text of the schema, of a file of the schema folder, of prisma.config.ts and of package.json is read', () => {
         const dir = project({ 'prisma/schema.prisma': BODY, 'db/main.prisma': SCHEMA.replace('User', 'Other'), 'package.json': PACKAGE, 'prisma.config.ts': 'export default {}\n' });
         git(dir, 'init', '-q');
@@ -951,7 +1115,7 @@ model Post {
         assert.equal(gitCache.size, 1);
         fs.appendFileSync(path.join(dir, 'prisma', 'schema.prisma'), '\nmodel Tag {\n  id Int @id\n}\n');
         assert.equal(parser.parse(dir, { gitCache }).tables[2].git, 'committed', 'the cache is kept');
-        assert.equal(parser.parse(dir, { gitCache: new Map() }).tables[2].git, 'modified');
+        assert.equal(parser.parse(dir, { gitCache: new Map() }).tables[2].git, 'untracked');
         const off = parser.parse(dir, { git: false });
         assert.ok(off.tables.every(t => t.git === undefined && t.columns.every(c => c.git === undefined)));
         const outside = parser.parse(project({ 'prisma/schema.prisma': BODY }));
@@ -968,7 +1132,7 @@ model Post {
         assert.deepEqual(result.tables.map(t => [t.table, t.git, t.source.file]), [
             ['User', 'committed', 'prisma/schema/schema.prisma'],
             ['Post', 'committed', 'prisma/schema/schema.prisma'],
-            ['Tag', 'modified', 'prisma/schema/schema.prisma'],
+            ['Tag', 'untracked', 'prisma/schema/schema.prisma'],
         ]);
     });
 });
@@ -1000,6 +1164,14 @@ model Post {
             'prisma/schema/b.prisma:1: model User is declared twice, skipped.',
             'Table "User" is mapped twice (prisma/schema/a.prisma and prisma/schema/b.prisma).',
         ]);
+    });
+
+    it('an Unsupported field being typed (without its complete ("...")) is skipped with a warning, it does not throw', () => {
+        for (const line of ['geom Unsupported', 'geom Unsupported?', 'geom Unsupported(', 'geom Unsupported("geometry"', 'geom Unsupported("geometry', 'geom Unsupported()', 'geom Unsupported(geometry)', 'geom Unsupported(1)']) {
+            const result = parseSchema(`model Place {\n  id Int @id\n  ${line}\n  name String\n}\n`, { details: true });
+            assert.deepEqual(result.tables[0].columns.map(c => c.name), ['id', 'name'], line);
+            assert.deepEqual(result.warnings, [`prisma/schema.prisma:7: line not understood, skipped: ${line}`], line);
+        }
     });
 
     it('a UTF-8 BOM and CRLF line endings', () => {

@@ -140,14 +140,33 @@ test('composer.json with a UTF-8 BOM is read', () => {
     assert.equal(detectFramework(symfony), 'symfony');
 });
 
+test('no source file holds a raw byte order mark: an editor that strips it would empty the regex that removes it', () => {
+    const ROOT = path.join(__dirname, '..', '..');
+    const files = [];
+    const walk = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory() && !['node_modules', 'vendor', 'fixtures', '.git', '.vscode-test'].includes(entry.name)) {
+                walk(full);
+            } else if (entry.isFile() && /\.(?:js|mjs)$/.test(entry.name)) {
+                files.push(full);
+            }
+        }
+    };
+    walk(ROOT);
+    assert.ok(files.includes(path.join(ROOT, 'parsers', 'composer.js')));
+    assert.deepEqual(files.filter(file => fs.readFileSync(file, 'utf8').includes('\uFEFF')).map(file => path.relative(ROOT, file)), []);
+});
+
 const PRISMA_SCHEMA = 'datasource db {\n  provider = "postgresql"\n}\n\nmodel User {\n  id Int @id\n}\n';
 
 test('detects Prisma: a schema and prisma or @prisma/client in package.json, or the schema alone', () => {
     const app = project('prisma-app', { 'package.json': JSON.stringify({ devDependencies: { prisma: '^7.10.1' } }), 'prisma/schema.prisma': PRISMA_SCHEMA });
-    assert.deepEqual(registry.detect(app), { framework: 'prisma', forced: false, matches: [{ id: 'prisma', label: 'Prisma', score: 100 }] });
+    assert.deepEqual(registry.detect(app), { framework: 'prisma', forced: false, matches: [{ id: 'prisma', label: 'Prisma', score: 100 }], errors: [] });
     assert.equal(detectFramework(project('prisma-schema-only', { 'schema.prisma': PRISMA_SCHEMA })), 'prisma');
     assert.equal(detectFramework(project('prisma-folder', { 'prisma/schema/user.prisma': PRISMA_SCHEMA })), 'prisma');
-    assert.equal(detectFramework(project('prisma-package-only', { 'package.json': JSON.stringify({ dependencies: { '@prisma/client': '6.19.1' } }) })), 'prisma');
+    // The package alone is no Prisma project (a monorepo root, an app using the client of a package)
+    assert.equal(detectFramework(project('prisma-package-only', { 'package.json': JSON.stringify({ dependencies: { '@prisma/client': '6.19.1' } }) })), 'Unknown');
     assert.equal(detectFramework(project('node-app', { 'package.json': JSON.stringify({ dependencies: { express: '^5.0.0' } }) })), 'Unknown');
 });
 
@@ -225,8 +244,8 @@ test('scores: Laravel 100, Symfony 100 with its framework bundle and 80 with ano
     assert.equal(symfony.detect(bundle), 100);
     assert.equal(symfony.detect(consoleOnly), 80);
     assert.equal(laravel.detect(bundle), 0);
-    assert.deepEqual(registry.detect(consoleOnly), { framework: 'symfony', forced: false, matches: [{ id: 'symfony', label: 'Symfony', score: 80 }] });
-    assert.deepEqual(registry.detect(project('score-none', {})), { framework: 'Unknown', forced: false, matches: [] });
+    assert.deepEqual(registry.detect(consoleOnly), { framework: 'symfony', forced: false, matches: [{ id: 'symfony', label: 'Symfony', score: 80 }], errors: [] });
+    assert.deepEqual(registry.detect(project('score-none', {})), { framework: 'Unknown', forced: false, matches: [], errors: [] });
 });
 
 test('Laravel wins a tie with Symfony, as before the registry; both are listed', () => {
@@ -241,6 +260,7 @@ test('the best score wins, the order of the registry breaks the ties', () => {
         framework: 'b',
         forced: false,
         matches: [{ id: 'b', label: 'B', score: 80 }, { id: 'c', label: 'C', score: 80 }, { id: 'a', label: 'A', score: 50 }],
+        errors: [],
     });
     assert.equal(createRegistry([fake('a', 80), fake('b', 80)]).detectFramework(tmpRoot), 'a');
     assert.equal(createRegistry([fake('b', 80), fake('a', 80)]).detectFramework(tmpRoot), 'b');
@@ -276,10 +296,51 @@ test('the error of a parser is thrown only when no other parser recognizes the f
     assert.equal(createRegistry([broken]).detectFramework(tmpRoot, { framework: 'broken' }), 'broken', 'set, it is not detected');
 });
 
+test('the errors of the parsers that throw come with the detection when another parser recognizes the folder', () => {
+    const broken = fake('broken', () => {
+        throw new ParserError('broken config');
+    });
+    assert.deepEqual(createRegistry([broken, fake('ok', 10)]).detect(tmpRoot), {
+        framework: 'ok',
+        forced: false,
+        matches: [{ id: 'ok', label: 'OK', score: 10 }],
+        errors: [{ id: 'broken', label: 'BROKEN', message: 'broken config' }],
+    });
+    // A PHP project whose composer.json is invalid, with a Prisma schema: drawn as Prisma, the
+    // error of composer.json is kept for the output
+    const dir = project('prisma-broken-composer', { artisan: '', 'bin/console': '', 'composer.json': '{,}', 'prisma/schema.prisma': PRISMA_SCHEMA });
+    const detection = registry.detect(dir);
+    assert.equal(detection.framework, 'prisma');
+    assert.deepEqual(detection.errors.map(error => [error.id, error.label]), [['laravel', 'Laravel'], ['symfony', 'Symfony']]);
+    assert.ok(detection.errors.every(error => error.message.startsWith(`composer.json in "${dir}" could not be read: `)), JSON.stringify(detection.errors));
+    // Set, nothing is detected: no errors
+    assert.deepEqual(registry.detect(dir, { framework: 'prisma' }).errors, []);
+});
+
+test('getSources() gives options.overrides (the unsaved editors) to the parser: its sources may follow an unsaved configuration file', () => {
+    const received = [];
+    const configured = createRegistry([fake('conf', 1, {
+        sources: (basePath, options) => {
+            received.push(options);
+            return { files: options && options.overrides ? [...options.overrides.keys()] : [] };
+        },
+    })]);
+    const overrides = new Map([[path.join(tmpRoot, 'config.json'), '{}']]);
+    assert.deepEqual(configured.getSources('conf', tmpRoot, { overrides }).files, [path.join(tmpRoot, 'config.json')]);
+    assert.equal(received[0].overrides, overrides);
+    assert.deepEqual(configured.getSources('conf', tmpRoot).files, []);
+    assert.deepEqual(configured.getSources('conf', tmpRoot, { overrides: 'not a Map' }).files, []);
+    assert.deepEqual(received.slice(1), [{ overrides: null }, { overrides: null }]);
+    // Laravel and Symfony read fixed folders, whatever the editors
+    for (const id of ['laravel', 'symfony']) {
+        assert.deepEqual(registry.getSources(id, tmpRoot, { overrides }), registry.getSources(id, tmpRoot), id);
+    }
+});
+
 test('options.framework (the DrawMeDatabase.framework setting) wins over the detection', () => {
     const dir = project('tie-setting', BOTH);
     assert.equal(detectFramework(dir, { framework: 'symfony' }), 'symfony');
-    assert.deepEqual(registry.detect(dir, { framework: 'symfony' }), { framework: 'symfony', forced: true, matches: [] });
+    assert.deepEqual(registry.detect(dir, { framework: 'symfony' }), { framework: 'symfony', forced: true, matches: [], errors: [] });
     assert.equal(detectFramework(dir, { framework: 'laravel' }), 'laravel');
     // Even for a folder that does not look like it: the parser then tells what is missing
     assert.equal(detectFramework(project('forced-empty', {}), { framework: 'symfony' }), 'symfony');

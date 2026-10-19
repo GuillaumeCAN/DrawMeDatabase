@@ -169,6 +169,35 @@ describe('createStatusReader with the sources of a parser', () => {
     });
 });
 
+describe('createStatusReader: lines not in HEAD', () => {
+    it('addedOf(): the lines added since HEAD, of a file that is not in HEAD, or typed in an editor; the saved ones only with git', () => {
+        const dir = fs.mkdtempSync(path.join(TMP, 'dmdb-added-'));
+        created.push(dir);
+        const file = path.join(dir, 'schema.txt');
+        fs.writeFileSync(file, 'a\nb\nc\n');
+        git(dir, 'init', '-q');
+        commitAll(dir);
+        fs.writeFileSync(file, 'a\nb\nx\ny\nc\n');
+        const fresh = path.join(dir, 'new.txt');
+        fs.writeFileSync(fresh, 'n\n');
+        const reader = createStatusReader([dir]);
+        assert.deepEqual([1, 2, 3, 4, 5].map(line => reader.addedOf(file)(line)), [false, false, true, true, false]);
+        assert.equal(reader.addedOf(fresh)(1), true);
+        // The status of the lines is the same as before
+        assert.deepEqual([reader.statusOf(file)(1, 2), reader.statusOf(file)(3, 4), reader.statusOf(file)(1, 5), reader.statusOf(fresh)(1, 1)], ['committed', 'modified', 'modified', 'untracked']);
+
+        // An editor: a typed line is not in HEAD, the others are the lines of the saved file
+        const edited = createStatusReader([dir], { overrides: new Map([[file, 'a\nTYPED\nb\nx\ny\nc\n']]) });
+        assert.deepEqual([1, 2, 3, 4, 5, 6].map(line => edited.addedOf(file)(line)), [false, true, false, true, true, false]);
+        // A file only in an editor
+        assert.equal(createStatusReader([dir], { overrides: new Map([[path.join(dir, 'draft.txt'), 'd\n']]) }).addedOf(path.join(dir, 'draft.txt'))(1), true);
+        // Without git: the typed lines only
+        const offline = createStatusReader([dir], { git: false, overrides: new Map([[file, 'a\nTYPED\nb\n']]) });
+        assert.deepEqual([1, 2, 3].map(line => offline.addedOf(file)(line)), [false, true, false]);
+        assert.deepEqual([1, 3].map(line => createStatusReader([dir], { git: false }).addedOf(file)(line)), [false, false]);
+    });
+});
+
 describe('laravel parser: git status', () => {
     it('committed, modified, untracked and unsaved tables and columns', () => {
         const repo = repository({ '2024_01_01_000000_create_users_table.php': USERS });

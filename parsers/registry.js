@@ -7,7 +7,7 @@
 
 // The parsers of DrawMeDatabase, one per stack (framework or ORM), and the detection of the stack
 // of a folder. Each parser module follows the contract of docs/parsers.md:
-//   { id, label, detect(basePath) → score, sources(basePath) → { folders, files, extensions },
+//   { id, label, detect(basePath) → score, sources(basePath, { overrides }) → { folders, files, extensions },
 //     parse(basePath, options) → { tables, warnings } }
 // A new stack is a new module in the list below.
 
@@ -38,19 +38,20 @@ function createRegistry(entries) {
     // The labels of the supported stacks, in the order of detection (['Laravel', 'Symfony'])
     const labels = () => getParsers().map(parser => parser.label);
 
-    // The stack of the framework root basePath: { framework, forced, matches }.
+    // The stack of the framework root basePath: { framework, forced, matches, errors }.
     // - framework: the id of the parser, or 'Unknown';
     // - forced: true when options.framework names a parser (the DrawMeDatabase.framework setting),
     //   which wins without detection; 'auto', or a value that names no parser, detects;
     // - matches: the parsers that recognize the folder, best first ({ id, label, score }), the
-    //   order of the list breaking ties.
+    //   order of the list breaking ties;
+    // - errors: the parsers that threw ({ id, label, message }), in the order of the list.
     // A parser that throws (an invalid composer.json...) recognizes nothing; its error is thrown
-    // when no other parser recognizes the folder.
+    // when no other parser recognizes the folder, else it is in `errors`, for the output.
     const detect = (basePath, options = {}) => {
         const framework = options && typeof options === 'object' ? options.framework : undefined;
         const forced = framework !== 'auto' ? getParser(framework) : undefined;
         if (forced) {
-            return { framework: forced.id, forced: true, matches: [] };
+            return { framework: forced.id, forced: true, matches: [], errors: [] };
         }
         const found = [];
         const errors = [];
@@ -62,17 +63,22 @@ function createRegistry(entries) {
                         found.push({ id: parser.id, label: parser.label, score, index });
                     }
                 } catch (err) {
-                    errors.push(err);
+                    errors.push({ parser, err });
                 }
             });
         }
         if (found.length === 0 && errors.length > 0) {
-            throw errors[0];
+            throw errors[0].err;
         }
         const matches = found
             .sort((a, b) => b.score - a.score || a.index - b.index)
             .map(({ id, label, score }) => ({ id, label, score }));
-        return { framework: matches.length > 0 ? matches[0].id : UNKNOWN, forced: false, matches };
+        return {
+            framework: matches.length > 0 ? matches[0].id : UNKNOWN,
+            forced: false,
+            matches,
+            errors: errors.map(({ parser, err }) => ({ id: parser.id, label: parser.label, message: err && err.message ? err.message : String(err) })),
+        };
     };
 
     // The id of the stack of basePath ('laravel', 'symfony'...), or 'Unknown'. options.framework:
@@ -82,13 +88,16 @@ function createRegistry(entries) {
 
     // The sources of the parser `id` for basePath, cleaned: { folders: [{ path, recursive }],
     // files, extensions }, with absolute paths and extensions starting with '.'. A folder given as
-    // a string is not recursive. undefined for an unknown id.
-    const getSources = (id, basePath) => {
+    // a string is not recursive. undefined for an unknown id. options.overrides (Map: absolute
+    // path → text of an unsaved editor) goes to the parser, whose sources may depend on the text of
+    // a configuration file (the schema path of an unsaved prisma.config.ts).
+    const getSources = (id, basePath, options = {}) => {
         const parser = getParser(id);
         if (!parser) {
             return undefined;
         }
-        const raw = (typeof parser.sources === 'function' && parser.sources(basePath)) || {};
+        const overrides = options && options.overrides instanceof Map ? options.overrides : null;
+        const raw = (typeof parser.sources === 'function' && parser.sources(basePath, { overrides })) || {};
         const base = nonEmpty(basePath) ? basePath : '.';
         return {
             folders: list(raw.folders)

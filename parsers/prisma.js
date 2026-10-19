@@ -168,78 +168,164 @@ function scriptPath(expression, configDir) {
     return call[1] === 'resolve' ? path.resolve(configDir, ...values) : path.join(...values);
 }
 
-// The schema of a Prisma config file: { path } (absolute, relative paths resolved from the folder of
-// the config file, as Prisma does), { computed: true } when it cannot be read without running the
-// file, or null when the file sets no schema
-function configSchema(configFile, text) {
-    const code = stripScriptComments(text);
-    const configDir = path.dirname(configFile);
-    // `schema: <expression>` up to the next top-level `,` or `}`, or the shorthand `schema,`
-    const key = /(?:^|[{,\s])(?:schema|'schema'|"schema")\s*(:|,|\})/g;
-    let match;
-    while ((match = key.exec(code))) {
-        let value;
-        if (match[1] !== ':') {
-            // Shorthand property: the value of `const schema = ...` in the same file
-            const declaration = /\b(?:const|let|var)\s+schema\s*=\s*([^;\n]+)/.exec(code);
-            value = declaration ? declaration[1] : null;
-        } else {
-            let depth = 0;
-            let end = key.lastIndex;
-            let quote = null;
-            for (; end < code.length; end++) {
-                const c = code[end];
-                if (quote) {
-                    if (c === '\\') {
-                        end++;
-                    } else if (c === quote) {
-                        quote = null;
-                    }
-                } else if (c === '"' || c === '\'' || c === '`') {
-                    quote = c;
-                } else if (c === '(' || c === '[' || c === '{') {
-                    depth++;
-                } else if (c === ')' || c === ']' || c === '}') {
-                    if (depth === 0) {
-                        break;
-                    }
-                    depth--;
-                } else if (c === ',' && depth === 0) {
-                    break;
-                }
+// A `schema` key of an object literal (`schema:`, `'schema':`, `"schema":`, or the shorthand
+// `schema,`), at the start of a property
+const SCHEMA_KEY = /(?:schema|'schema'|"schema")\s*(:|,|\})/y;
+
+// The end of the expression of code from `from`: the next `,` or closing bracket outside of
+// brackets and strings
+function expressionEnd(code, from) {
+    let depth = 0;
+    let quote = null;
+    let end = from;
+    for (; end < code.length; end++) {
+        const c = code[end];
+        if (quote) {
+            if (c === '\\') {
+                end++;
+            } else if (c === quote) {
+                quote = null;
             }
-            value = code.slice(key.lastIndex, end);
+        } else if (c === '"' || c === '\'' || c === '`') {
+            quote = c;
+        } else if (c === '(' || c === '[' || c === '{') {
+            depth++;
+        } else if (c === ')' || c === ']' || c === '}') {
+            if (depth === 0) {
+                break;
+            }
+            depth--;
+        } else if (c === ',' && depth === 0) {
+            break;
         }
-        const resolved = value === null ? null : scriptPath(value, configDir);
-        return resolved === null ? { computed: true } : { path: path.resolve(configDir, resolved) };
+    }
+    return end;
+}
+
+// The offset of the `{` of the config object: the object given to defineConfig() or exported by
+// default (`export default {`, `module.exports = {`), or the object of the variable they name
+// (`export default config`); -1 when the config is built by code (a function call)
+function configObject(code) {
+    const literal = /\bdefineConfig\s*\(\s*\{|\bexport\s+default\s*\{|\bmodule\.exports\s*=\s*\{/.exec(code);
+    if (literal) {
+        return literal.index + literal[0].length - 1;
+    }
+    const named = /\b(?:defineConfig\s*\(|export\s+default\b|module\.exports\s*=)\s*([A-Za-z_$][\w$]*)(?![\w$]|\s*\()/g;
+    let match;
+    while ((match = named.exec(code))) {
+        const name = match[1].replace(/\$/g, '\\$');
+        const declaration = new RegExp(`\\b(?:const|let|var)\\s+${name}\\s*(?::[^=]*)?=\\s*(?:defineConfig\\s*\\(\\s*)?\\{`).exec(code);
+        if (declaration) {
+            return declaration.index + declaration[0].length - 1;
+        }
+    }
+    return -1;
+}
+
+// The `schema` property of the object literal at code[open] = '{', not the ones of the objects and
+// functions nested in it (the options of a driver adapter): { value } with the expression as
+// written (null for a shorthand property without its `const schema = ...`), or null when the object
+// has no schema
+function schemaProperty(code, open) {
+    let depth = 0;
+    let quote = null;
+    // At the start of a property: after the `{` or a `,` of the object
+    let start = true;
+    for (let i = open + 1; i < code.length; i++) {
+        const c = code[i];
+        if (quote) {
+            if (c === '\\') {
+                i++;
+            } else if (c === quote) {
+                quote = null;
+            }
+            continue;
+        }
+        if (depth === 0 && start && !/\s/.test(c)) {
+            start = false;
+            SCHEMA_KEY.lastIndex = i;
+            const key = SCHEMA_KEY.exec(code);
+            if (key && key[1] === ':') {
+                const from = i + key[0].length;
+                return { value: code.slice(from, expressionEnd(code, from)) };
+            }
+            if (key) {
+                // Shorthand property: the value of `const schema = ...` in the same file
+                const declaration = /\b(?:const|let|var)\s+schema\s*=\s*([^;\n]+)/.exec(code);
+                return { value: declaration ? declaration[1] : null };
+            }
+        }
+        if (c === '"' || c === '\'' || c === '`') {
+            quote = c;
+        } else if (c === '(' || c === '[' || c === '{') {
+            depth++;
+        } else if (c === ')' || c === ']' || c === '}') {
+            if (depth === 0) {
+                return null;
+            }
+            depth--;
+        } else if (c === ',' && depth === 0) {
+            start = true;
+        }
     }
     return null;
 }
 
-// package.json: { packages: names of the dependencies and devDependencies, schema: its
-// "prisma.schema" (absolute), error: why it could not be read }
+// The schema of a Prisma config file: { path } (absolute, relative paths resolved from the folder of
+// the config file, as Prisma does), { computed: true } when it cannot be read without running the
+// file, or null when the file sets no schema. Only the `schema` of the config object counts.
+function configSchema(configFile, text) {
+    const code = stripScriptComments(text);
+    const configDir = path.dirname(configFile);
+    const open = configObject(code);
+    if (open === -1) {
+        // A config built by code: a schema key somewhere cannot be read without running it
+        return /(?:^|[{,\s])(?:schema|'schema'|"schema")\s*[:,}]/.test(code) ? { computed: true } : null;
+    }
+    const property = schemaProperty(code, open);
+    if (!property) {
+        return null;
+    }
+    const resolved = property.value === null ? null : scriptPath(property.value, configDir);
+    return resolved === null ? { computed: true } : { path: path.resolve(configDir, resolved) };
+}
+
+// The major version of a range of package.json ('^7.10.1', '~6.19', '>=7', 'workspace:^7.0.0'),
+// undefined when it does not tell one ('latest', 'catalog:')
+function majorVersion(range) {
+    const match = typeof range === 'string' ? /^\s*(?:workspace:|npm:[^@\s]+@)?[\^~>=v\s]*(\d+)/.exec(range) : null;
+    return match ? Number(match[1]) : undefined;
+}
+
+// package.json: { packages: names of the dependencies and devDependencies, major: the major
+// version of prisma (else @prisma/client) when its range tells it, schema: its "prisma.schema"
+// (absolute), error: why it could not be read }
 function readPackage(basePath, overrides) {
     const file = path.resolve(basePath, 'package.json');
     const text = readText(file, overrides);
     if (text === null) {
-        return { packages: [], schema: undefined, error: null };
+        return { packages: [], major: undefined, schema: undefined, error: null };
     }
     let pkg;
     try {
         pkg = JSON.parse(text.replace(/^\uFEFF/, ''));
     } catch (err) {
-        return { packages: [], schema: undefined, error: err.message };
+        return { packages: [], major: undefined, schema: undefined, error: err.message };
     }
     const object = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+    const versions = { ...object(pkg && pkg.devDependencies), ...object(pkg && pkg.dependencies) };
     const packages = [...Object.keys(object(pkg && pkg.dependencies)), ...Object.keys(object(pkg && pkg.devDependencies))];
+    const major = PACKAGES.map(name => majorVersion(versions[name])).find(value => value !== undefined);
     const schema = object(pkg && pkg.prisma).schema;
-    return { packages, schema: typeof schema === 'string' && schema.trim() ? path.resolve(basePath, schema.trim()) : undefined, error: null };
+    return { packages, major, schema: typeof schema === 'string' && schema.trim() ? path.resolve(basePath, schema.trim()) : undefined, error: null };
 }
 
 // Where the schema of basePath is, in the order of the Prisma CLI: the schema of the config file,
-// else "prisma.schema" of package.json, else schema.prisma, prisma/schema.prisma, then the
-// prisma/schema folder. { path, folder, exists, origin, configFile, warnings }: origin is the file
-// that set the path (the config file or package.json), or null for a default location.
+// else "prisma.schema" of package.json (Prisma 5 and 6), else schema.prisma, prisma/schema.prisma,
+// then the prisma/schema folder. Prisma 7 no longer reads package.json: its "prisma.schema" is then
+// read only when there is no schema at a default location, with a warning. { path, folder, exists,
+// origin, configFile, warnings }: origin is the file that set the path (the config file or
+// package.json), or null for a default location.
 function locateSchema(basePath, overrides = null) {
     const warnings = [];
     const configFile = findConfigFile(basePath);
@@ -263,18 +349,31 @@ function locateSchema(basePath, overrides = null) {
     if (pkg.error) {
         warnings.push(`package.json could not be read: ${pkg.error}`);
     }
-    if (pkg.schema) {
+    const prisma7 = pkg.major >= 7;
+    if (pkg.schema && !prisma7) {
         return located(pkg.schema, 'package.json');
     }
-    for (const name of DEFAULT_FILES) {
-        const filePath = path.resolve(basePath, name);
-        if (isFile(filePath)) {
-            return located(filePath, null);
+    const defaultLocation = () => {
+        for (const name of DEFAULT_FILES) {
+            const filePath = path.resolve(basePath, name);
+            if (isFile(filePath)) {
+                return filePath;
+            }
         }
+        const folder = path.resolve(basePath, DEFAULT_FOLDER);
+        return isDirectory(folder) ? folder : null;
+    };
+    const found = defaultLocation();
+    if (pkg.schema) {
+        warnings.push(found
+            ? `package.json: Prisma ${pkg.major} ignores "prisma.schema" (the schema is set in prisma.config.ts): ${toPosix(path.relative(basePath, found))} is read, as the Prisma CLI does.`
+            : `package.json: Prisma ${pkg.major} ignores "prisma.schema" (the schema is set in prisma.config.ts), there is no schema at the default locations: the one of package.json is read.`);
     }
-    const folder = path.resolve(basePath, DEFAULT_FOLDER);
-    if (isDirectory(folder)) {
-        return located(folder, null);
+    if (found) {
+        return located(found, null);
+    }
+    if (pkg.schema) {
+        return located(pkg.schema, 'package.json');
     }
     return { path: null, folder: false, exists: false, origin: null, configFile, warnings };
 }
@@ -593,7 +692,8 @@ function readBlocks(file, rel, text, warnings) {
         for (const segment of mask.slice(open + 1, close).split('\n')) {
             if (segment.trim() !== '') {
                 const start = offset + segment.search(/\S/);
-                const end = offset + segment.trimEnd().length;
+                // The end of the code: a string not closed yet (being typed) is blank in the mask
+                const end = offset + code.slice(offset, offset + segment.length).trimEnd().length;
                 lines.push({ code: code.slice(start, end), mask: mask.slice(start, end), line: lineAt(start) });
             }
             offset += segment.length + 1;
@@ -613,9 +713,10 @@ function readField(line) {
     let i = head[0].length;
     let native;
     if (head[2] === 'Unsupported') {
+        // Unsupported("type"): a line being typed (`Unsupported`, `Unsupported("geo`) is not a field
         const open = /^[ \t]*\(/.exec(line.mask.slice(i));
-        const args = open && readArguments(line.code, i + open[0].length - 1);
-        native = args && stringOf(argument({ args: args.args }, null));
+        const args = open ? readArguments(line.code, i + open[0].length - 1) : null;
+        native = args ? stringOf(argument({ args: args.args }, null)) : undefined;
         if (native === undefined) {
             return null;
         }
@@ -623,7 +724,8 @@ function readField(line) {
     }
     const modifiers = /^(\[\])?(\?)?/.exec(line.mask.slice(i));
     i += modifiers[0].length;
-    if (i < line.mask.length && !/\s/.test(line.mask[i])) {
+    // The attributes may follow the type without a space (`Int@id`), as the Prisma CLI accepts
+    if (i < line.mask.length && !/[\s@]/.test(line.mask[i])) {
         return null;
     }
     const attributes = readAttributes(line.code, i);
@@ -640,7 +742,11 @@ module.exports.id = 'prisma';
 module.exports.label = 'Prisma';
 
 // 100 for a schema with prisma or @prisma/client in package.json (or a Prisma config file), 50 for
-// the schema alone or the package alone. The schema is looked for where the Prisma CLI looks.
+// the schema alone, or for a config file or a "prisma.schema" of package.json whose schema is
+// missing (parse() tells where it was looked for). The package alone is not a Prisma project: the
+// root of a monorepo whose schema is in a package, or an app that uses the client of another
+// package; the user is then told to set DrawMeDatabase.frameworkPath. The schema is looked for
+// where the Prisma CLI looks.
 module.exports.detect = function (basePath) {
     if (typeof basePath !== 'string' || !isDirectory(basePath)) {
         return 0;
@@ -650,13 +756,14 @@ module.exports.detect = function (basePath) {
     if (location.exists) {
         return marked ? 100 : 50;
     }
-    return marked ? 50 : 0;
+    return marked && (location.configFile || location.origin) ? 50 : 0;
 };
 
 // The files read: the schema file, or the .prisma files of the schema folder and its sub-folders,
-// plus package.json and the config file
-function sources(basePath) {
-    return sourcesOf(basePath, locateSchema(basePath));
+// plus package.json and the config file. options.overrides (the text of the unsaved editors): an
+// unsaved prisma.config.ts or package.json that moves the schema moves the sources too.
+function sources(basePath, options = {}) {
+    return sourcesOf(basePath, locateSchema(basePath, (options && options.overrides) || null));
 }
 module.exports.sources = sources;
 
@@ -705,6 +812,8 @@ module.exports.parse = function (basePath, options = {}) {
         }
     }
     const provider = stringOf(settings.get('provider'));
+    // The native types are prefixed with the name of the datasource (@db.VarChar for `datasource db`)
+    const nativePrefix = `${datasource ? datasource.name : 'db'}.`;
     if (provider === 'mongodb') {
         warnings.push(`${at(datasource, datasource.first)}: the mongodb provider stores documents, not tables: the models are not drawn.`);
         return { tables: [], warnings };
@@ -787,12 +896,25 @@ module.exports.parse = function (basePath, options = {}) {
         warnings.push(reader.warning);
     }
     const statusOf = (block, first, last) => reader.statusOf(block.file)(first, last);
+    // A model added to a file that is in HEAD: its model line and every line of its body are new
+    // (the closing brace and the blank lines may match older ones), so its table and its columns
+    // are new ('untracked'), not 'modified'
+    const isNewBlock = (block) => {
+        const added = reader.addedOf(block.file);
+        return added(block.first) && block.lines.every(line => added(line.line));
+    };
 
     const tables = [];
     const seenTables = new Map();
     const manyToMany = new Set();
     for (const model of models.values()) {
         const { block } = model;
+        const newBlock = isNewBlock(block);
+        // The line status of the declaration and of the fields, new when the whole model is
+        const blockStatus = (first, last) => {
+            const status = statusOf(block, first, last);
+            return status === 'modified' && newBlock ? 'untracked' : status;
+        };
         if (seenTables.has(model.table)) {
             warnings.push(`Table "${model.table}" is mapped twice (${seenTables.get(model.table)} and ${block.rel}).`);
         } else {
@@ -897,7 +1019,7 @@ module.exports.parse = function (basePath, options = {}) {
             if (field.optional || field.list) {
                 column.nullable = true;
             }
-            const status = statusOf(block, field.line, field.line);
+            const status = blockStatus(field.line, field.line);
             if (status) {
                 column.git = status;
             }
@@ -905,7 +1027,7 @@ module.exports.parse = function (basePath, options = {}) {
                 column.source = { file: block.rel, line: field.line };
             }
             if (options.details) {
-                const details = columnDetails(field, enums.get(field.type), provider);
+                const details = columnDetails(field, enums.get(field.type), provider, nativePrefix);
                 if (uniques.some(set => set.length === 1 && set[0] === field.name)) {
                     details.unique = true;
                 }
@@ -922,7 +1044,7 @@ module.exports.parse = function (basePath, options = {}) {
 
         // The table: its block (a field or a relation changed, added or removed) and its columns
         table.source = { file: block.rel, line: block.first };
-        const git = tableStatus(statusOf(block, block.first, block.last), table.columns.map(c => c.git));
+        const git = tableStatus(blockStatus(block.first, block.last), table.columns.map(c => c.git));
         if (git) {
             table.git = git;
         }
@@ -949,12 +1071,13 @@ module.exports.parse = function (basePath, options = {}) {
 // Details of a scalar field (option `details`): native type, length, precision, unsigned, default,
 // enum values, unique, auto-increment. Values generated by Prisma Client (uuid(), cuid(), nanoid(),
 // ulid(), @updatedAt), and the Json and Bytes defaults on MySQL, which Prisma does not write to the
-// database, are left out.
-function columnDetails(field, enumValues, provider) {
+// database, are left out. nativePrefix: the name of the datasource and a dot ('db.'), which
+// prefixes the native types.
+function columnDetails(field, enumValues, provider, nativePrefix = 'db.') {
     const details = {};
-    const native = field.attributes.find(a => a.name.startsWith('db.'));
+    const native = field.attributes.find(a => a.name.startsWith(nativePrefix));
     if (native) {
-        const name = native.name.slice(3);
+        const name = native.name.slice(nativePrefix.length);
         const args = native.args.map(arg => arg.value);
         const numbers = args.map(value => (value.kind === 'number' && /^\d+$/.test(value.text) ? Number(value.text) : undefined));
         if (LENGTH_TYPES.has(name) && numbers.length === 1 && numbers[0] !== undefined) {

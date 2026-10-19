@@ -185,7 +185,7 @@ function readGitStatus(paths) {
         const change = changes.get(rel);
         const isNew = !hasHead || notInHead.has(rel) || Boolean(change && change.isNew);
 
-        return (first, last) => {
+        const status = (first, last) => {
             if (isNew) {
                 return 'untracked';
             }
@@ -202,6 +202,9 @@ function readGitStatus(paths) {
             }
             return 'committed';
         };
+        // Whether a line is not in HEAD: added since HEAD, or in a file that is not in HEAD
+        status.added = (line) => isNew || Boolean(change && change.lines.has(line));
+        return status;
     };
 }
 
@@ -305,6 +308,10 @@ const exists = (filePath) => {
 // lastLine) returns 'unsaved', 'untracked', 'modified', 'committed', or null when there is no
 // information (git disabled or unavailable, and no unsaved change). Lines are those of the parsed
 // text, which is the editor text for the files of `overrides` (Map: absolute path → text).
+// reader.addedOf(filePath)(line) tells whether a line is not in HEAD: added since HEAD (or in a
+// file that is not in HEAD), or typed in an editor and not saved; false without git. A parser whose
+// declarations share a file (the models of a Prisma schema) uses it to tell a new declaration from
+// a modified one.
 // options: git (false: no git), overrides, cache (Map reused between parses: git runs again only
 // once the cache is cleared). reader.warning: why the git status is missing, if it should be told.
 function createStatusReader(sources, { git: useGit = true, overrides = null, cache = null } = {}) {
@@ -354,36 +361,44 @@ function createStatusReader(sources, { git: useGit = true, overrides = null, cac
                 committed = null;
             }
         }
+        // Whether a line of the saved file is not in HEAD (false without git)
+        const savedAdded = (line) => Boolean(committed && typeof committed.added === 'function' && line > 0 && committed.added(line));
         // A file that only exists in an editor
         if (edited !== undefined && saved === null) {
-            return () => 'unsaved';
+            return { status: () => 'unsaved', added: () => true };
         }
         if (edited === undefined || splitLines(edited).join('\n') === splitLines(saved).join('\n')) {
-            return (first, last) => (committed ? committed(first, last) : null);
+            return { status: (first, last) => (committed ? committed(first, last) : null), added: savedAdded };
         }
         const map = lineMapping(saved, edited);
-        return (first, last) => {
-            let previous = 0;
-            for (let line = first; line <= last; line++) {
-                const savedLine = map[line] || 0;
-                // A new or changed line, or saved lines removed inside the range
-                if (savedLine === 0 || (previous && savedLine !== previous + 1)) {
-                    return 'unsaved';
+        return {
+            status: (first, last) => {
+                let previous = 0;
+                for (let line = first; line <= last; line++) {
+                    const savedLine = map[line] || 0;
+                    // A new or changed line, or saved lines removed inside the range
+                    if (savedLine === 0 || (previous && savedLine !== previous + 1)) {
+                        return 'unsaved';
+                    }
+                    previous = savedLine;
                 }
-                previous = savedLine;
-            }
-            return committed ? committed(map[first], map[last]) : null;
+                return committed ? committed(map[first], map[last]) : null;
+            },
+            // A line typed in the editor is not in HEAD; the others are lines of the saved file
+            added: (line) => !map[line] || savedAdded(map[line]),
         };
+    };
+    const fileEntry = (filePath) => {
+        if (!byFile.has(filePath)) {
+            byFile.set(filePath, fileStatus(filePath));
+        }
+        return byFile.get(filePath);
     };
 
     return {
         warning,
-        statusOf(filePath) {
-            if (!byFile.has(filePath)) {
-                byFile.set(filePath, fileStatus(filePath));
-            }
-            return byFile.get(filePath);
-        },
+        statusOf: (filePath) => fileEntry(filePath).status,
+        addedOf: (filePath) => fileEntry(filePath).added,
     };
 }
 

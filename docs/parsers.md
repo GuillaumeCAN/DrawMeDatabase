@@ -6,7 +6,7 @@ DrawMeDatabase reads the schema of the database from the code of a project. Each
 |----|-------|-------|-------------|
 | `laravel` | Laravel | `database/migrations/*.php`, in file name order (not the sub-folders) | `artisan` and `laravel/framework` in the `require` of `composer.json` |
 | `symfony` | Symfony | `src/Entity/**/*.php` (Doctrine entities) | `bin/console` and `symfony/framework-bundle` (or another `symfony/*` package except the polyfills) in the `require` of `composer.json` |
-| `prisma` | Prisma | The Prisma schema where the Prisma CLI looks for it: the `schema` of `prisma.config.ts` (read, not run), else `prisma.schema` of `package.json`, else `schema.prisma`, `prisma/schema.prisma`, then the multi-file folder `prisma/schema/` (`**/*.prisma`). Also `package.json` and the config file, which can move it | A schema and `prisma` or `@prisma/client` in the `dependencies` or `devDependencies` of `package.json`, or a Prisma config file (100); one of them only (50) |
+| `prisma` | Prisma | The Prisma schema where the Prisma CLI looks for it: the `schema` of the config object of `prisma.config.ts` (read, not run), else `prisma.schema` of `package.json` (Prisma 5 and 6: Prisma 7 ignores it, so it is then read only when there is no schema at a default location), else `schema.prisma`, `prisma/schema.prisma`, then the multi-file folder `prisma/schema/` (`**/*.prisma`). Also `package.json` and the config file, which can move it | A schema and `prisma` or `@prisma/client` in the `dependencies` or `devDependencies` of `package.json`, or a Prisma config file (100); the schema alone, or a config file (or a `prisma.schema` of `package.json` with the package) whose schema is missing (50). The package alone is no Prisma project: the root of a monorepo whose schema is in a package gets the advice to set `DrawMeDatabase.frameworkPath` |
 
 ## The contract
 
@@ -17,7 +17,7 @@ module.exports = {
     id: 'laravel',            // stack id: lower case, stable (settings, API, getSchema().framework)
     label: 'Laravel',         // shown to the user (views, messages, Markdown export)
     detect(basePath) { },     // → score, 0 = not this stack
-    sources(basePath) { },    // → { folders, files, extensions }: what it reads
+    sources(basePath, options) { }, // → { folders, files, extensions }: what it reads
     parse(basePath, options) { }, // → { tables, warnings }: the pivot format
 };
 ```
@@ -37,16 +37,17 @@ A number: `0` (or anything that is not a positive finite number) when the folder
 |-------|---------|----------|
 | `100` | The marker file of the stack and its main package | `artisan` + `laravel/framework`; `bin/console` + `symfony/framework-bundle`; a Prisma schema + `prisma` in `package.json` |
 | `80` | The marker file and a package of the family | `bin/console` + `symfony/console` |
-| `50` | Only the package, or only the schema file | `prisma` in `package.json`, a `schema.prisma` without it |
+| `50` | Only the schema file, or the configuration without its schema | a `schema.prisma` without the `prisma` package; a `prisma.config.ts` whose schema is missing (`parse()` then tells where it looked) |
 | `1`-`49` | A weak hint | |
 
 - Keep it fast: the registry calls it for every parser before each reading of the schema (small files only, no recursive scan of the project).
-- It must not throw for a missing folder or file: it returns `0`. It may throw a `ParserError` (`parsers/errors.js`) for a file it cannot read (an invalid `composer.json`): the error is shown to the user only when no other parser recognizes the folder.
+- It must not throw for a missing folder or file: it returns `0`. It may throw a `ParserError` (`parsers/errors.js`) for a file it cannot read (an invalid `composer.json`): the error is shown to the user when no other parser recognizes the folder, else it is written to the output as a warning (`composer.json in "..." could not be read: ... (detection of Laravel, Symfony)`), so that a broken project is not silently drawn with another stack.
+- A package alone is a weak sign: at the root of a monorepo, the package of the stack is often listed while the schema is in a sub-folder. Score `0` there, so that the user is told to set `DrawMeDatabase.frameworkPath`, rather than an error of the parser.
 - A project that matches several stacks is drawn with the best one; the output lists the others (`Frameworks found: laravel (100), symfony (100)`), and the `DrawMeDatabase.framework` setting chooses another one. When the setting names a parser, `detect()` is not called at all.
 
-### `sources(basePath)` → `{ folders, files, extensions }`
+### `sources(basePath, options)` → `{ folders, files, extensions }`
 
-What the parser reads, without reading it (no exception, even when the folders are missing):
+What the parser reads, without reading it (no exception, even when the folders are missing). `options.overrides` is the `Map` of the unsaved editors (absolute path → text), as for `parse()`: a parser whose sources depend on a configuration file reads its unsaved text there (an unsaved `prisma.config.ts` that moves the schema moves the sources, so the new schema file is followed while typing); the other ones ignore it.
 
 | Field | Type | Meaning |
 |-------|------|---------|
@@ -67,7 +68,7 @@ Paths are absolute, or relative to `basePath`; `registry.getSources(id, basePath
 The tables in the pivot format, and the warnings (strings) written to the DrawMeDatabase output; see [pivot-format.md](pivot-format.md) for the format and the options (`git`, `overrides`, `gitCache`, `columnSources`, `details`, `until`). In short:
 
 - read `options.overrides.get(absolutePath)` instead of the file when it is set (an unsaved editor);
-- give each table and column its `source: { file, line }` (with `columnSources`), and its `git` status from `createStatusReader(sources(basePath), { git: options.git !== false, overrides: options.overrides, cache: options.gitCache })` and `tableStatus()` of `parsers/git.js`;
+- give each table and column its `source: { file, line }` (with `columnSources`), and its `git` status from `createStatusReader(sources(basePath), { git: options.git !== false, overrides: options.overrides, cache: options.gitCache })` and `tableStatus()` of `parsers/git.js`. Where several declarations share a file (the models of a Prisma schema), `reader.addedOf(file)(line)` tells the lines that are not in HEAD, so that a declaration added to a committed file is `untracked`, not `modified`;
 - throw a `ParserError` with a message for the user when there is nothing to read (`No src/Entity folder found in ...`): the message is shown as is;
 - keep `type` the name the stack gives to the column type (the Blueprint method, the Doctrine type, the Prisma scalar): the diagram draws any string.
 
@@ -78,9 +79,9 @@ The tables in the pivot format, and the warnings (strings) written to the DrawMe
 | `getParsers()` | The parser modules, in the order of detection (loaded on first use) |
 | `getParser(id)` | The parser of a stack id, or `undefined` |
 | `labels()` | The labels, in the same order |
-| `detect(basePath, { framework })` | `{ framework, forced, matches }`: the id of the best parser (or `'Unknown'`), `forced: true` when `framework` names a parser (it then wins without detection), and the parsers that recognize the folder, best first (`{ id, label, score }`) |
+| `detect(basePath, { framework })` | `{ framework, forced, matches, errors }`: the id of the best parser (or `'Unknown'`), `forced: true` when `framework` names a parser (it then wins without detection), the parsers that recognize the folder, best first (`{ id, label, score }`), and the ones that threw while another one recognized it (`{ id, label, message }`) |
 | `detectFramework(basePath, { framework })` | `detect(...).framework` |
-| `getSources(id, basePath)` | The cleaned `sources()` of a parser |
+| `getSources(id, basePath, { overrides })` | The cleaned `sources()` of a parser (`overrides`: the unsaved editors) |
 | `covers(sources, file)`, `watchPatterns(sources)` | Whether a file is one of the sources; the globs that watch them |
 | `createRegistry(parsers)` | Another registry with these parsers (modules, or functions that return them), for the tests |
 

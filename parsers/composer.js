@@ -29,7 +29,7 @@ const readComposerRequire = (basePath) => {
     let composer;
     try {
         // Strip a UTF-8 BOM, JSON.parse rejects it
-        composer = JSON.parse(fs.readFileSync(composerPath, 'utf8').replace(/^﻿/, ''));
+        composer = JSON.parse(fs.readFileSync(composerPath, 'utf8').replace(/^\uFEFF/, ''));
     } catch (err) {
         throw new ParserError(`composer.json in "${basePath}" could not be read: ${err.message}`);
     }
