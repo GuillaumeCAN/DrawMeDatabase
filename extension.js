@@ -252,12 +252,13 @@ function activate(context) {
         }
         let failure = 'noFolder';
         let schema;
+        // What the developer sees: the text of the editors not saved yet
+        const overrides = unsavedEditors();
         if (folder) {
             lastFolder = folder;
             schema = readSchema(folder, output, {
                 notify,
-                // What the developer sees: the text of the editors not saved yet
-                overrides: unsavedEditors(),
+                overrides,
                 gitCache,
                 git: vscode.workspace.getConfiguration('DrawMeDatabase').get('showGitStatus', true) !== false,
                 onFailure: (reason) => {
@@ -266,7 +267,8 @@ function activate(context) {
             });
         }
         if (schema && schema.tables.length > 0) {
-            current = { folder, basePath: schema.basePath, framework: schema.framework, tables: schema.tables, warnings: schema.warnings };
+            // overrides: the sources follow an unsaved configuration file that moves the schema
+            current = { folder, basePath: schema.basePath, framework: schema.framework, tables: schema.tables, warnings: schema.warnings, overrides };
             if (watching()) {
                 watcher.watch(current);
             }
@@ -337,8 +339,8 @@ function activate(context) {
     // The schema follows the code while the diagram or the Schema view is visible
     const watching = () => viewer.isOpen() || views.schemaVisible();
 
-    // Opens the file a table comes from (migration or entity), beside the diagram
-    // Opens the file of a table, or the line of one of its columns (column: its name)
+    // Opens the file a table comes from (migration, entity, Prisma model) beside the diagram, or
+    // the line of one of its columns (column: its name)
     const openTable = (name, columnName) => {
         const table = current && typeof name === 'string' ? current.tables.find(candidate => candidate.table === name) : undefined;
         const column = table && typeof columnName === 'string' ? (table.columns || []).find(candidate => candidate.name === columnName) : undefined;
@@ -346,10 +348,13 @@ function activate(context) {
         if (!source || typeof source.file !== 'string') {
             return;
         }
-        // Only files of the project: the path comes from the parser, never from the page
+        // Only files of the project, or the sources of its parser (a Prisma schema that
+        // prisma.config.ts sets outside of the framework folder): the path comes from the parser,
+        // never from the page
         const file = path.resolve(current.basePath, source.file);
         const relative = path.relative(current.basePath, file);
-        if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+        const inside = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+        if (!inside && !registry.covers(sourcesOf(current), file)) {
             return;
         }
         const line = Math.max(0, (Number(source.line) || 1) - 1);
@@ -378,15 +383,17 @@ function activate(context) {
     });
     context.subscriptions.push(watcher);
 
-    // Text of the unsaved editors of the watched sources (absolute path → text)
+    // Text of the unsaved editors of the watched sources (absolute path → text). The sources can
+    // move with the text of these editors (the schema path of an unsaved prisma.config.ts or
+    // package.json): the unsaved editors of the sources they give then, and only those, are read.
     const unsavedEditors = () => {
-        const overrides = new Map();
-        for (const document of vscode.workspace.textDocuments) {
-            if (document.isDirty && document.uri.scheme === 'file' && watcher.covers(document.uri.fsPath)) {
-                overrides.set(path.resolve(document.uri.fsPath), document.getText());
-            }
-        }
-        return overrides;
+        const dirty = vscode.workspace.textDocuments.filter(document => document.isDirty && document.uri.scheme === 'file');
+        const collect = (covers) => new Map(dirty
+            .filter(document => covers(document.uri.fsPath))
+            .map(document => [path.resolve(document.uri.fsPath), document.getText()]));
+        const overrides = collect(file => watcher.covers(file));
+        const moved = overrides.size > 0 && current ? sourcesOf({ ...current, overrides }) : undefined;
+        return moved ? collect(file => registry.covers(moved, file)) : overrides;
     };
 
     // Live diagram: an edit of a source of the schema (a migration, an entity...), before it is saved
@@ -804,11 +811,15 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
 
     let result;
     let framework;
+    // The errors of the parsers that could not tell whether the folder is theirs (an invalid
+    // composer.json) while another one recognized it: warnings, not to hide a broken project
+    let detectionWarnings = [];
     try {
         // Framework detection, unless the DrawMeDatabase.framework setting names a parser
         const setting = getFrameworkSetting(folder);
         const detection = registry.detect(basePath, { framework: setting });
         framework = detection.framework;
+        detectionWarnings = detectionErrors(detection.errors);
         if (setting !== 'auto' && !detection.forced) {
             output.appendLine(`DrawMeDatabase.framework: "${setting}" is not a supported framework, the framework is detected.`);
         }
@@ -843,7 +854,7 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
     }
 
     const tables = result && Array.isArray(result.tables) ? result.tables : [];
-    const warnings = result && Array.isArray(result.warnings) ? result.warnings : [];
+    const warnings = [...detectionWarnings, ...(result && Array.isArray(result.warnings) ? result.warnings : [])];
     warnings.forEach(warning => output.appendLine(`Warning: ${warning}`));
     output.appendLine(`${tables.length} table(s) found.`);
 
@@ -856,6 +867,16 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         tell(vscode.window.showInformationMessage, tr('message.noTables', { path: basePath }));
     }
     return { tables, warnings: warnings.length, framework, basePath };
+}
+
+// The detection errors of registry.detect() as warnings, one per message: 'composer.json in "..."
+// could not be read: ... (detection of Laravel, Symfony)'
+function detectionErrors(errors) {
+    const byMessage = new Map();
+    for (const error of Array.isArray(errors) ? errors : []) {
+        byMessage.set(error.message, [...(byMessage.get(error.message) || []), error.label]);
+    }
+    return [...byMessage].map(([message, labels]) => `${message} (detection of ${labels.join(', ')})`);
 }
 
 // The files the parser of a framework reads in basePath, as globs relative to it
@@ -931,6 +952,16 @@ function reportWarnings(output, count) {
     });
 }
 
+// The sources of the parser of a schema ({ basePath, framework, overrides }: the text of the unsaved
+// editors it was read with, which may move them), or undefined when the parser cannot tell them
+function sourcesOf({ basePath, framework, overrides }) {
+    try {
+        return registry.getSources(framework, basePath, { overrides });
+    } catch {
+        return undefined;
+    }
+}
+
 // Watches the sources of the parser of the schema on screen (the migrations of Laravel, the
 // entities of Symfony...: see sources() in docs/parsers.md), while DrawMeDatabase.autoRefresh is on.
 // onChange({ disk }) runs once the changes pause: 300 ms after an edit in an editor, 500 ms after a
@@ -965,15 +996,11 @@ function createWatcher(onChange) {
     };
 
     return {
-        watch({ basePath, framework }) {
+        // schema: { basePath, framework, overrides (the unsaved editors it was read with) }
+        watch(schema) {
+            const { framework } = schema;
             const enabled = vscode.workspace.getConfiguration('DrawMeDatabase').get('autoRefresh', true) !== false;
-            let newSources;
-            try {
-                newSources = enabled ? registry.getSources(framework, basePath) : undefined;
-            } catch {
-                // A parser that cannot tell its sources: nothing to follow
-                newSources = undefined;
-            }
+            const newSources = enabled ? sourcesOf(schema) : undefined;
             const patterns = registry.watchPatterns(newSources);
             const target = patterns.length > 0 ? `${framework}:${JSON.stringify(newSources)}` : '';
             if (target === watched) {

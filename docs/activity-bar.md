@@ -51,14 +51,15 @@ DrawMeDatabase Pro (read from its exports, see `connectPro()` in api.md) fills t
 - Column: icon `key` for a primary key, `references` for a foreign key, `symbol-field` otherwise;
   description = its type, `?` when nullable, and `→ table.column` for a foreign key. The git status
   of each column comes with DrawMeDatabase Pro, as in the diagram.
-- A click on a table opens its migration or entity, a click on a column opens its line (the source
+- A click on a table opens its migration, entity or Prisma model, a click on a column opens its line (the source
   lines the parsers already give to the inspector). The context menu adds *Show in Diagram*, which
   opens the diagram, selects the table and shows it in the inspector.
 - Title: *Draw Database Schema* (opens the diagram), *Refresh*, *Collapse All*, and *Settings* in the
   `...` menu. The description of the view is the framework and the project (`Laravel · backend`).
 - The view reads the schema itself when it becomes visible: no diagram is needed. The schema is
   then shared with the diagram (and with `getSchema()` / `onDidChangeSchema` of the API), and the
-  view follows the edits of the migrations and entities live while it, or the diagram, is visible.
+  view follows the edits of the sources of the parser (`sources()`: the migrations, the entities,
+  the Prisma schema) live while it, or the diagram, is visible.
 - Welcome content (`viewsWelcome`), from the context key `drawMeDatabase.schemaState`:
   - no folder open: *Open Folder*;
   - no supported project found: *Set the Framework Folder* (the `DrawMeDatabase.frameworkPath`

@@ -730,6 +730,34 @@ test('a click on a table opens its source file beside the diagram, inside the pr
     assert.equal(ext.state.opened.length, 1);
 });
 
+test('a click opens a Prisma schema set outside of the framework folder (a source of the parser), never another file outside of it', async () => {
+    const schemaFile = '../../packages/db/prisma/schema.prisma';
+    const ext = activate(() => ({
+        tables: [
+            { table: 'User', columns: [{ name: 'email', type: 'String', source: { file: schemaFile, line: 7 } }], relations: [], source: { file: schemaFile, line: 5 } },
+            { table: 'Seed', columns: [], relations: [], source: { file: '../../packages/db/seed.ts', line: 1 } },
+        ],
+        warnings: [],
+    }));
+    const root = folder('prisma-outside', {
+        'apps/web/package.json': JSON.stringify({ dependencies: { '@prisma/client': '^6.19.1' } }),
+        'apps/web/prisma.config.ts': `export default { schema: '${schemaFile}' }\n`,
+        'packages/db/prisma/schema.prisma': 'model User {\n  id Int @id\n}\n',
+        'packages/db/seed.ts': '',
+    });
+    ext.openFolders(root);
+    ext.setFrameworkPath(root, 'apps/web');
+    ext.run();
+    assert.equal(ext.context.api.getSchema().framework, 'prisma');
+    const open = ext.state.commands.get('DMDB.openTable');
+    open('User');
+    open('User', 'email');
+    open('Seed');
+    await flush();
+    const target = path.join(root, 'packages', 'db', 'prisma', 'schema.prisma');
+    assert.deepEqual(ext.state.opened.map(item => [item.path, item.options.selection.startLine]), [[target, 4], [target, 6]]);
+});
+
 const settle = (ms = 600) => new Promise(resolve => setTimeout(resolve, ms));
 
 test('auto-refresh: a change of the migrations redraws the open diagram, quietly', async () => {
@@ -873,6 +901,49 @@ test('live diagram of a Prisma project: the unsaved .prisma files of its schema 
     assert.equal(ext.state.parsed.length, 2, 'a file outside of the sources is not followed');
     // The API gives the same sources
     assert.equal(ext.context.api.getSources(dir, 'prisma').folders[0].path, path.join(dir, 'prisma', 'schema'));
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('live diagram of a Prisma project: an unsaved package.json that moves the schema moves the sources, and the new schema file is followed', async () => {
+    const ext = activate();
+    const pkg = (extra = {}) => JSON.stringify({ ...extra, devDependencies: { prisma: '6.19.1' } });
+    const dir = folder('live-prisma-moved', {
+        'package.json': pkg(),
+        'prisma/schema.prisma': 'model User {\n  id Int @id\n}\n',
+        'alt/schema.prisma': 'model Alt {\n  id Int @id\n}\n',
+    });
+    ext.openFolders(dir);
+    ext.run();
+    ext.state.panels[0].postFromPage({ type: 'ready' });
+    const watched = () => ext.state.watchers.filter(watcher => !watcher.disposed).map(watcher => path.join(watcher.pattern.base.fsPath, watcher.pattern.pattern));
+    assert.deepEqual(watched(), [path.join(dir, 'prisma', 'schema.prisma'), path.join(dir, 'package.json'), path.join(dir, 'prisma.config.ts')]);
+
+    // The unsaved package.json moves the schema to alt/schema.prisma, already being edited too
+    const packageEditor = editor(path.join(dir, 'package.json'), pkg({ prisma: { schema: 'alt/schema.prisma' } }));
+    const alt = editor(path.join(dir, 'alt', 'schema.prisma'), 'model Alt {\n  id Int @id\n}\n\nmodel AltLive {\n  id Int @id\n}\n');
+    ext.state.documents = [packageEditor, alt];
+    ext.vscode.editDocument(packageEditor);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2);
+    assert.deepEqual([...ext.state.parseOptions[1].overrides.keys()], [path.join(dir, 'package.json'), path.join(dir, 'alt', 'schema.prisma')], 'the unsaved schema it moves to is read');
+    assert.deepEqual(watched(), [path.join(dir, 'alt', 'schema.prisma'), path.join(dir, 'package.json'), path.join(dir, 'prisma.config.ts')]);
+
+    // Typing in the new schema file refreshes the diagram
+    ext.vscode.editDocument(alt);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 3);
+    assert.deepEqual([...ext.state.parseOptions[2].overrides.keys()], [path.join(dir, 'package.json'), path.join(dir, 'alt', 'schema.prisma')]);
+
+    // package.json reverted: the schema and the sources are back, the editor of alt/ is no source any more
+    packageEditor.isDirty = false;
+    ext.vscode.editDocument(packageEditor);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 4);
+    assert.deepEqual([...ext.state.parseOptions[3].overrides.keys()], []);
+    assert.deepEqual(watched(), [path.join(dir, 'prisma', 'schema.prisma'), path.join(dir, 'package.json'), path.join(dir, 'prisma.config.ts')]);
+    ext.vscode.editDocument(alt);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 4, 'alt/schema.prisma is not followed any more');
     ext.context.subscriptions.forEach(item => item.dispose());
 });
 
@@ -1282,6 +1353,40 @@ test('a folder without project suggests the setting only when it is empty', () =
     ]);
     assert.deepEqual(ext.state.parsed, []);
     assert.ok(ext.state.output.includes('Supported frameworks: Laravel, Symfony, Prisma.'), 'the output lists the supported frameworks');
+});
+
+test('a monorepo root with prisma in its package.json, the schema in a package: the framework folder is suggested', () => {
+    const root = folder('prisma-monorepo', {
+        'package.json': JSON.stringify({ workspaces: ['packages/*'], devDependencies: { prisma: '^6.19.1' } }),
+        'packages/db/package.json': JSON.stringify({ dependencies: { '@prisma/client': '^6.19.1' } }),
+        'packages/db/prisma/schema.prisma': 'model User {\n  id Int @id\n}\n',
+    });
+    const ext = activate();
+    ext.openFolders(root);
+    assert.equal(ext.run(), undefined);
+    assert.deepEqual(ext.state.errors.map(error => error.text), [`No supported project (Laravel, Symfony, Prisma) found in "${root}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`]);
+    assert.equal(ext.state.context['drawMeDatabase.schemaState'], 'noProject', 'the Schema view offers to set the framework folder');
+    assert.deepEqual(ext.state.parsed, []);
+    // The framework folder of the package
+    ext.setFrameworkPath(root, 'packages/db');
+    assert.deepEqual(ext.run(), TABLES);
+    assert.deepEqual(ext.state.parsed, [path.join(root, 'packages', 'db')]);
+});
+
+test('a parser that could not read the folder while another one recognized it: its error is a warning in the output', () => {
+    const dir = folder('prisma-bad-composer', { artisan: '', 'composer.json': '{,}', ...PRISMA });
+    const ext = activate(() => ({ tables: TABLES, warnings: ['w'] }));
+    ext.openFolders(dir);
+    assert.deepEqual(ext.run(), TABLES);
+    assert.equal(ext.context.api.getSchema().framework, 'prisma');
+    const warnings = ext.state.output.filter(line => line.startsWith('Warning: '));
+    assert.equal(warnings.length, 2, JSON.stringify(ext.state.output));
+    // One warning for both parsers that read composer.json
+    assert.ok(warnings[0].startsWith(`Warning: composer.json in "${dir}" could not be read: `), warnings[0]);
+    assert.ok(warnings[0].endsWith(' (detection of Laravel, Symfony)'), warnings[0]);
+    assert.equal(warnings[1], 'Warning: w');
+    // Counted with the warnings of the parser
+    assert.deepEqual(ext.state.warnings.map(warning => warning.text), ['2 warnings while reading the schema. See the "DrawMeDatabase" output for details.']);
 });
 
 test('an invalid composer.json is reported as such', () => {

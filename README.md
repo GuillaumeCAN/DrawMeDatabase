@@ -136,7 +136,9 @@ DrawMeDatabase reads your code, it does not execute it nor connect to a database
   - Embeddables are not shown, and Symfony's default naming strategy is assumed.
   - Backed enums declared outside `src/Entity` are shown as `string`.
 - **Prisma**
-  - The schema path of `prisma.config.ts` is read without running the file: a string, or `path.join()` / `path.resolve()` of strings and `__dirname`. A computed path (an environment variable...) is named in the output, and the default locations are read instead. In a monorepo, set `DrawMeDatabase.frameworkPath` to the folder of the Prisma project.
+  - The schema path of `prisma.config.ts` is read without running the file: the `schema` of the object given to `defineConfig()` or exported, a string, or `path.join()` / `path.resolve()` of strings and `__dirname`. A computed path (an environment variable, a config built by a function...) is named in the output, and the default locations are read instead.
+  - In a monorepo, set `DrawMeDatabase.frameworkPath` to the folder of the Prisma project: a folder whose `package.json` only lists `prisma` or `@prisma/client`, without a schema, is not taken for a Prisma project. A schema that `prisma.config.ts` sets outside of that folder is read and opened from the diagram too.
+  - Prisma 7 no longer reads `prisma.schema` of `package.json`: for a Prisma 7 project, it is read only when there is no schema at a default location, with a warning.
   - MongoDB projects (`provider = "mongodb"`) have no tables: nothing is drawn. Views (`view`) and composite types (`type`) are not drawn either, with a warning.
   - The types are those of Prisma (`String`, `DateTime`, the name of an enum): the native type of the database (`@db.VarChar(255)`) is in the details, for the exports of DrawMeDatabase Pro and the API. Scalar lists are drawn `String[]?`, as `prisma migrate` creates them nullable.
   - Models and fields with `@@ignore` / `@ignore` are drawn: `prisma migrate` still creates them. With `relationMode = "prisma"`, the relations are drawn although the database has no foreign key.
