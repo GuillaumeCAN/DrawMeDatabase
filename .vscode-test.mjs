@@ -41,4 +41,11 @@ export default defineConfig([
 		// Workspace with a Drizzle project at its root, its schema files set by drizzle.config.ts
 		workspaceFolder: 'test/fixtures/integration/drizzle-workspace',
 	},
+	{
+		...common,
+		label: 'sql',
+		files: 'test/integration/sql.test.js',
+		// Workspace with the SQL migrations of a Supabase project at its root
+		workspaceFolder: 'test/fixtures/integration/sql-workspace',
+	},
 ]);

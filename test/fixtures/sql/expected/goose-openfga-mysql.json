@@ -1,0 +1,77 @@
+{
+  "tables": [
+    {
+      "table": "tuple",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":3},"length":26},
+        {"name":"object_type","type":"varchar","primary":true,"source":{"file":"008_collate_identifiers.sql","line":14},"length":128},
+        {"name":"object_id","type":"varchar","primary":true,"source":{"file":"007_collate_object_id.sql","line":2},"length":255},
+        {"name":"relation","type":"varchar","primary":true,"source":{"file":"008_collate_identifiers.sql","line":15},"length":50},
+        {"name":"_user","type":"varchar","primary":true,"source":{"file":"008_collate_identifiers.sql","line":16},"length":256},
+        {"name":"user_type","type":"varchar","source":{"file":"001_initialize_schema.sql","line":8},"length":7},
+        {"name":"ulid","type":"char","source":{"file":"001_initialize_schema.sql","line":9},"length":26,"unique":true},
+        {"name":"inserted_at","type":"timestamp","source":{"file":"001_initialize_schema.sql","line":10}},
+        {"name":"condition_name","type":"varchar","nullable":true,"source":{"file":"008_collate_identifiers.sql","line":17},"length":256},
+        {"name":"condition_context","type":"longblob","nullable":true,"source":{"file":"005_add_conditions_to_tuples.sql","line":2}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":2},
+      "indexes": [
+        {"columns":["store","_user","relation","object_type","object_id"],"type":"index","name":"idx_user_lookup"}
+      ]
+    },
+    {
+      "table": "authorization_model",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":17},"length":26},
+        {"name":"authorization_model_id","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":18},"length":26},
+        {"name":"type","type":"varchar","primary":true,"source":{"file":"008_collate_identifiers.sql","line":29},"length":256},
+        {"name":"type_definition","type":"blob","nullable":true,"source":{"file":"001_initialize_schema.sql","line":20}},
+        {"name":"schema_version","type":"varchar","source":{"file":"002_add_authorization_model_version.sql","line":2},"length":5,"default":"1.0"},
+        {"name":"serialized_protobuf","type":"longblob","nullable":true,"source":{"file":"004_add_authorization_model_serialized_protobuf.sql","line":2}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":16}
+    },
+    {
+      "table": "store",
+      "columns": [
+        {"name":"id","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":25},"length":26},
+        {"name":"name","type":"varchar","source":{"file":"001_initialize_schema.sql","line":26},"length":64},
+        {"name":"created_at","type":"timestamp","source":{"file":"001_initialize_schema.sql","line":27}},
+        {"name":"updated_at","type":"timestamp","nullable":true,"source":{"file":"001_initialize_schema.sql","line":28}},
+        {"name":"deleted_at","type":"timestamp","nullable":true,"source":{"file":"001_initialize_schema.sql","line":29}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":24}
+    },
+    {
+      "table": "assertion",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":33},"length":26},
+        {"name":"authorization_model_id","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":34},"length":26},
+        {"name":"assertions","type":"blob","nullable":true,"source":{"file":"001_initialize_schema.sql","line":35}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":32}
+    },
+    {
+      "table": "changelog",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":40},"length":26},
+        {"name":"object_type","type":"varchar","primary":true,"source":{"file":"008_collate_identifiers.sql","line":21},"length":256},
+        {"name":"object_id","type":"varchar","source":{"file":"008_collate_identifiers.sql","line":22},"length":256},
+        {"name":"relation","type":"varchar","source":{"file":"008_collate_identifiers.sql","line":23},"length":50},
+        {"name":"_user","type":"varchar","source":{"file":"008_collate_identifiers.sql","line":24},"length":512},
+        {"name":"operation","type":"integer","source":{"file":"001_initialize_schema.sql","line":45}},
+        {"name":"ulid","type":"char","primary":true,"source":{"file":"001_initialize_schema.sql","line":46},"length":26},
+        {"name":"inserted_at","type":"timestamp","source":{"file":"001_initialize_schema.sql","line":47}},
+        {"name":"condition_name","type":"varchar","nullable":true,"source":{"file":"008_collate_identifiers.sql","line":25},"length":256},
+        {"name":"condition_context","type":"longblob","nullable":true,"source":{"file":"005_add_conditions_to_tuples.sql","line":3}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":39}
+    }
+  ],
+  "warnings": []
+}

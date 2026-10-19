@@ -1,0 +1,36 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {"name":"user_id","type":"integer","nullable":true,"source":{"file":"migrations/1085649617_create_users_table.up.sql","line":2},"unique":true},
+        {"name":"name","type":"varchar","nullable":true,"source":{"file":"migrations/1085649617_create_users_table.up.sql","line":3},"length":40},
+        {"name":"email","type":"varchar","nullable":true,"source":{"file":"migrations/1085649617_create_users_table.up.sql","line":4},"length":40,"unique":true},
+        {"name":"city","type":"varchar","nullable":true,"source":{"file":"migrations/1185749658_add_city_to_users.up.sql","line":1},"length":100}
+      ],
+      "relations": [],
+      "source": {"file":"migrations/1085649617_create_users_table.up.sql","line":1}
+    },
+    {
+      "table": "books",
+      "columns": [
+        {"name":"user_id","type":"integer","nullable":true,"source":{"file":"migrations/1385949617_create_books_table.up.sql","line":2}},
+        {"name":"name","type":"varchar","nullable":true,"source":{"file":"migrations/1385949617_create_books_table.up.sql","line":3},"length":40},
+        {"name":"author","type":"varchar","nullable":true,"source":{"file":"migrations/1385949617_create_books_table.up.sql","line":4},"length":40}
+      ],
+      "relations": [],
+      "source": {"file":"migrations/1385949617_create_books_table.up.sql","line":1}
+    },
+    {
+      "table": "movies",
+      "columns": [
+        {"name":"user_id","type":"integer","nullable":true,"source":{"file":"migrations/1485949617_create_movies_table.up.sql","line":2}},
+        {"name":"name","type":"varchar","nullable":true,"source":{"file":"migrations/1485949617_create_movies_table.up.sql","line":3},"length":40},
+        {"name":"director","type":"varchar","nullable":true,"source":{"file":"migrations/1485949617_create_movies_table.up.sql","line":4},"length":40}
+      ],
+      "relations": [],
+      "source": {"file":"migrations/1485949617_create_movies_table.up.sql","line":1}
+    }
+  ],
+  "warnings": []
+}

@@ -1,0 +1,82 @@
+{
+  "tables": [
+    {
+      "table": "tuple",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"005_initialize_schema.sql","line":3},"length":26},
+        {"name":"object_type","type":"varchar","primary":true,"source":{"file":"005_initialize_schema.sql","line":4},"length":128},
+        {"name":"object_id","type":"varchar","primary":true,"source":{"file":"005_initialize_schema.sql","line":5},"length":128},
+        {"name":"relation","type":"varchar","primary":true,"source":{"file":"005_initialize_schema.sql","line":6},"length":50},
+        {"name":"user_object_type","type":"varchar","primary":true,"source":{"file":"005_initialize_schema.sql","line":7},"length":128},
+        {"name":"user_object_id","type":"varchar","primary":true,"source":{"file":"005_initialize_schema.sql","line":8},"length":128},
+        {"name":"user_relation","type":"varchar","primary":true,"source":{"file":"005_initialize_schema.sql","line":9},"length":50},
+        {"name":"user_type","type":"varchar","source":{"file":"005_initialize_schema.sql","line":10},"length":7},
+        {"name":"ulid","type":"char","source":{"file":"005_initialize_schema.sql","line":11},"length":26,"unique":true},
+        {"name":"inserted_at","type":"timestamp","source":{"file":"005_initialize_schema.sql","line":12}},
+        {"name":"condition_name","type":"varchar","nullable":true,"source":{"file":"005_initialize_schema.sql","line":13},"length":256},
+        {"name":"condition_context","type":"longblob","nullable":true,"source":{"file":"005_initialize_schema.sql","line":14}}
+      ],
+      "relations": [],
+      "source": {"file":"005_initialize_schema.sql","line":2},
+      "indexes": [
+        {"columns":["store","object_type","relation","user_object_type","user_object_id","user_relation"],"type":"index","name":"idx_reverse_lookup_user"},
+        {"columns":["store","object_type","object_id","relation","user_object_type","user_object_id","user_relation"],"type":"index","name":"idx_tuple_partial_user"},
+        {"columns":["store","object_type","object_id","relation","user_object_type","user_object_id","user_relation"],"type":"index","name":"idx_tuple_partial_userset"},
+        {"columns":["store","ulid"],"type":"index","name":"idx_store_ulid"}
+      ]
+    },
+    {
+      "table": "authorization_model",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"005_initialize_schema.sql","line":24},"length":26},
+        {"name":"authorization_model_id","type":"char","primary":true,"source":{"file":"005_initialize_schema.sql","line":25},"length":26},
+        {"name":"schema_version","type":"varchar","source":{"file":"005_initialize_schema.sql","line":26},"length":5,"default":"1.1"},
+        {"name":"serialized_protobuf","type":"longblob","source":{"file":"005_initialize_schema.sql","line":27}}
+      ],
+      "relations": [],
+      "source": {"file":"005_initialize_schema.sql","line":23}
+    },
+    {
+      "table": "store",
+      "columns": [
+        {"name":"id","type":"char","primary":true,"nullable":true,"source":{"file":"005_initialize_schema.sql","line":32},"length":26},
+        {"name":"name","type":"varchar","source":{"file":"005_initialize_schema.sql","line":33},"length":64},
+        {"name":"created_at","type":"timestamp","source":{"file":"005_initialize_schema.sql","line":34}},
+        {"name":"updated_at","type":"timestamp","nullable":true,"source":{"file":"005_initialize_schema.sql","line":35}},
+        {"name":"deleted_at","type":"timestamp","nullable":true,"source":{"file":"005_initialize_schema.sql","line":36}}
+      ],
+      "relations": [],
+      "source": {"file":"005_initialize_schema.sql","line":31}
+    },
+    {
+      "table": "assertion",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"005_initialize_schema.sql","line":40},"length":26},
+        {"name":"authorization_model_id","type":"char","primary":true,"source":{"file":"005_initialize_schema.sql","line":41},"length":26},
+        {"name":"assertions","type":"blob","nullable":true,"source":{"file":"005_initialize_schema.sql","line":42}}
+      ],
+      "relations": [],
+      "source": {"file":"005_initialize_schema.sql","line":39}
+    },
+    {
+      "table": "changelog",
+      "columns": [
+        {"name":"store","type":"char","primary":true,"source":{"file":"005_initialize_schema.sql","line":47},"length":26},
+        {"name":"object_type","type":"varchar","primary":true,"source":{"file":"005_initialize_schema.sql","line":48},"length":256},
+        {"name":"object_id","type":"varchar","source":{"file":"005_initialize_schema.sql","line":49},"length":256},
+        {"name":"relation","type":"varchar","source":{"file":"005_initialize_schema.sql","line":50},"length":50},
+        {"name":"user_object_type","type":"varchar","source":{"file":"005_initialize_schema.sql","line":51},"length":128},
+        {"name":"user_object_id","type":"varchar","source":{"file":"005_initialize_schema.sql","line":52},"length":128},
+        {"name":"user_relation","type":"varchar","source":{"file":"005_initialize_schema.sql","line":53},"length":50},
+        {"name":"operation","type":"integer","source":{"file":"005_initialize_schema.sql","line":54}},
+        {"name":"ulid","type":"char","primary":true,"source":{"file":"005_initialize_schema.sql","line":55},"length":26},
+        {"name":"inserted_at","type":"timestamp","source":{"file":"005_initialize_schema.sql","line":56}},
+        {"name":"condition_name","type":"varchar","nullable":true,"source":{"file":"005_initialize_schema.sql","line":57},"length":256},
+        {"name":"condition_context","type":"longblob","nullable":true,"source":{"file":"005_initialize_schema.sql","line":58}}
+      ],
+      "relations": [],
+      "source": {"file":"005_initialize_schema.sql","line":46}
+    }
+  ],
+  "warnings": []
+}

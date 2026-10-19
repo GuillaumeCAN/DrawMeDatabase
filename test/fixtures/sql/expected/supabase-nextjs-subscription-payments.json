@@ -1,0 +1,88 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":7}},
+        {"name":"full_name","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":8}},
+        {"name":"avatar_url","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":9}},
+        {"name":"billing_address","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":11}},
+        {"name":"payment_method","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":13}}
+      ],
+      "relations": [
+        {"foreignKey":"id","references":"id","on":"auth.users","type":"one-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20230530034630_init.sql","line":5}
+    },
+    {
+      "table": "customers",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":40}},
+        {"name":"stripe_customer_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":42}}
+      ],
+      "relations": [
+        {"foreignKey":"id","references":"id","on":"auth.users","type":"one-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20230530034630_init.sql","line":38}
+    },
+    {
+      "table": "products",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":53}},
+        {"name":"active","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":55}},
+        {"name":"name","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":57}},
+        {"name":"description","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":59}},
+        {"name":"image","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":61}},
+        {"name":"metadata","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":63}}
+      ],
+      "relations": [],
+      "source": {"file":"supabase/migrations/20230530034630_init.sql","line":51}
+    },
+    {
+      "table": "prices",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":76}},
+        {"name":"product_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":78}},
+        {"name":"active","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":80}},
+        {"name":"description","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":82}},
+        {"name":"unit_amount","type":"bigint","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":84}},
+        {"name":"currency","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":86}},
+        {"name":"type","type":"pricing_type","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":88},"values":["one_time","recurring"]},
+        {"name":"interval","type":"pricing_plan_interval","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":90},"values":["day","week","month","year"]},
+        {"name":"interval_count","type":"integer","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":92}},
+        {"name":"trial_period_days","type":"integer","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":94}},
+        {"name":"metadata","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":96}}
+      ],
+      "relations": [
+        {"foreignKey":"product_id","references":"id","on":"products","type":"many-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20230530034630_init.sql","line":74}
+    },
+    {
+      "table": "subscriptions",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":108}},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20230530034630_init.sql","line":109}},
+        {"name":"status","type":"subscription_status","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":111},"values":["trialing","active","canceled","incomplete","incomplete_expired","past_due","unpaid","paused"]},
+        {"name":"metadata","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":113}},
+        {"name":"price_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":115}},
+        {"name":"quantity","type":"integer","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":117}},
+        {"name":"cancel_at_period_end","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":119}},
+        {"name":"created","type":"timestamp with time zone","source":{"file":"supabase/migrations/20230530034630_init.sql","line":121},"defaultRaw":"timezone('utc'::text, now())"},
+        {"name":"current_period_start","type":"timestamp with time zone","source":{"file":"supabase/migrations/20230530034630_init.sql","line":123},"defaultRaw":"timezone('utc'::text, now())"},
+        {"name":"current_period_end","type":"timestamp with time zone","source":{"file":"supabase/migrations/20230530034630_init.sql","line":125},"defaultRaw":"timezone('utc'::text, now())"},
+        {"name":"ended_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":127},"defaultRaw":"timezone('utc'::text, now())"},
+        {"name":"cancel_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":129},"defaultRaw":"timezone('utc'::text, now())"},
+        {"name":"canceled_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":131},"defaultRaw":"timezone('utc'::text, now())"},
+        {"name":"trial_start","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":133},"defaultRaw":"timezone('utc'::text, now())"},
+        {"name":"trial_end","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20230530034630_init.sql","line":135},"defaultRaw":"timezone('utc'::text, now())"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one"},
+        {"foreignKey":"price_id","references":"id","on":"prices","type":"many-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20230530034630_init.sql","line":106}
+    }
+  ],
+  "warnings": []
+}

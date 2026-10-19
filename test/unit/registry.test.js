@@ -209,6 +209,23 @@ test('Prisma wins a tie with Drizzle (a project moving from one to the other); t
     assert.deepEqual(registry.detect(half).matches.map(match => [match.id, match.score]), [['prisma', 100], ['drizzle', 50]]);
 });
 
+test('detects SQL: the migrations of a SQL tool or a dump (45, 40), below the frameworks, whose SQL output it is not when they are detected', () => {
+    const supabase = project('sql-supabase', { 'supabase/migrations/20240101000000_init.sql': 'create table profiles (id uuid primary key references auth.users);\n' });
+    assert.deepEqual(registry.detect(supabase), { framework: 'sql', forced: false, matches: [{ id: 'sql', label: 'SQL', score: 45 }], errors: [] });
+    assert.equal(detectFramework(project('sql-dump', { 'db/schema.sql': 'CREATE TABLE a (id int);\n' })), 'sql');
+    assert.equal(detectFramework(project('sql-loose', { 'notes.sql': 'CREATE TABLE a (id int);\n' })), 'Unknown', 'a .sql file of any name is read only when the setting chooses sql');
+    // Below every framework, also a Prisma schema without its package (50)
+    const laravel = project('laravel-sql', { artisan: '', 'composer.json': composer({ 'laravel/framework': '^12.0' }), 'schema.sql': 'CREATE TABLE a (id int);\n' });
+    assert.deepEqual(registry.detect(laravel).matches.map(match => [match.id, match.score]), [['laravel', 100], ['sql', 40]]);
+    const prisma = project('prisma-sql', { 'prisma/schema.prisma': PRISMA_SCHEMA, 'supabase/migrations/1_init.sql': 'CREATE TABLE a (id int);\n' });
+    assert.deepEqual(registry.detect(prisma).matches.map(match => [match.id, match.score]), [['prisma', 50], ['sql', 45]]);
+    // prisma/migrations is the SQL of a Prisma project, not a SQL project; the setting reads it
+    const migrated = project('prisma-migrated', { 'package.json': JSON.stringify({ devDependencies: { prisma: '^7.10.1' } }), 'prisma/schema.prisma': PRISMA_SCHEMA, 'prisma/migrations/1_init/migration.sql': 'CREATE TABLE "User" ("id" INTEGER NOT NULL);\n' });
+    assert.deepEqual(registry.detect(migrated).matches.map(match => match.id), ['prisma']);
+    assert.equal(detectFramework(migrated, { framework: 'sql' }), 'sql');
+    assert.deepEqual(registry.getParser('sql').parse(migrated, { git: false }).tables.map(t => t.table), ['User']);
+});
+
 test('artisan must be a file', () => {
     const dir = project('artisan-dir', {
         'artisan/readme.txt': '',
@@ -239,8 +256,8 @@ const BOTH = {
 
 test('every parser follows the contract: id, label, detect(), sources(), parse()', () => {
     const parsers = registry.getParsers();
-    assert.deepEqual(parsers.map(parser => parser.id), ['laravel', 'symfony', 'prisma', 'drizzle'], 'Laravel first: it wins the ties');
-    assert.deepEqual(registry.labels(), ['Laravel', 'Symfony', 'Prisma', 'Drizzle']);
+    assert.deepEqual(parsers.map(parser => parser.id), ['laravel', 'symfony', 'prisma', 'drizzle', 'sql'], 'Laravel first: it wins the ties');
+    assert.deepEqual(registry.labels(), ['Laravel', 'Symfony', 'Prisma', 'Drizzle', 'SQL']);
     const missing = path.join(tmpRoot, 'does-not-exist');
     for (const parser of parsers) {
         assert.match(parser.id, /^[a-z][a-z0-9-]*$/, parser.id);
@@ -433,6 +450,16 @@ test('the sources of Drizzle: the schema files and what they import, the folders
     assert.equal(covers(sources, path.join(app, 'src', 'db', 'schema', 'posts.ts')), true);
     assert.equal(covers(sources, path.join(app, 'src', 'db', 'schema', 'notes.md')), false);
     assert.equal(covers(sources, path.join(app, 'src', 'db', 'seed.ts')), false);
+});
+
+test('the sources of SQL: the folder of the migrations of its tool, or the dump; the places looked for while there is none', () => {
+    const flyway = project('sql-sources-flyway', { 'src/main/resources/db/migration/V1__init.sql': 'CREATE TABLE a (id int);\n' });
+    const sources = registry.getSources('sql', flyway);
+    assert.deepEqual(sources, { folders: [{ path: path.join(flyway, 'src', 'main', 'resources', 'db', 'migration'), recursive: true }], files: [], extensions: ['.sql'] });
+    assert.equal(covers(sources, path.join(flyway, 'src', 'main', 'resources', 'db', 'migration', 'v2', 'V2__more.sql')), true);
+    assert.equal(covers(sources, path.join(flyway, 'src', 'main', 'resources', 'db', 'migration', 'README.md')), false);
+    const empty = registry.getSources('sql', project('sql-sources-empty', {}));
+    assert.ok(empty.folders.length > 5 && empty.files.length > 5);
 });
 
 test('getSources() cleans the sources of a parser: absolute paths, recursive or not, extensions with a dot', () => {

@@ -7,11 +7,14 @@
 
 // Laravel parser: replays database/migrations/*.php in filename order (like `php artisan migrate`)
 // and keeps the state of every table. Only up() is read, with the migration's own methods it calls.
+// A schema dump of `php artisan schema:dump` (database/schema/<connection>-schema.sql) is loaded
+// first, as `php artisan migrate` does on a new database, and only the migrations it does not list
+// are replayed after it.
 
 const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
-const { createStatusReader, tableStatus } = require('./git');
+const { createStatusReader, tableStatus, changedStatus } = require('./git');
 const { composerPackages } = require('./composer');
 const {
     skipLiteral,
@@ -1194,11 +1197,21 @@ function applyMigration(state, file, filePath, source) {
     applyMethod(ctx, 'up', up, new Set());
 }
 
-// Internal table state to the pivot format (docs/pivot-format.md)
-function toPivot(table, statusOf, basePath, columnSources, details) {
+// Internal table state to the pivot format (docs/pivot-format.md). The tables of a schema dump also
+// have the later statements of the dump that changed them and their columns (`changes`), and the
+// lines of their CREATE TABLE (`statementLines`: a table added to a committed dump is new); addedOf:
+// the lines that are not in HEAD (reader.addedOf).
+function toPivot(table, statusOf, basePath, columnSources, details, addedOf) {
     const status = (origin) => (origin ? statusOf(origin.path)(origin.first, origin.last) : null);
-    const columnStatuses = table.columns.map(c => status(c.origin));
-    const tableGit = tableStatus(status(table.origin), columnStatuses);
+    const isNew = Boolean(table.statementLines && addedOf) && table.statementLines.every(line => addedOf(table.origin.path)(line));
+    const declared = (origin, inCreate) => {
+        const value = status(origin);
+        return value === 'modified' && isNew && inCreate ? 'untracked' : value;
+    };
+    const columnStatuses = table.columns.map(c => (c.changes ? changedStatus(declared(c.origin, c.inCreate), c.changes.map(status)) : status(c.origin)));
+    const tableGit = tableStatus(table.changes
+        ? changedStatus(declared(table.origin, true), table.changes.map(range => (status(range) === 'untracked' ? 'modified' : status(range))))
+        : status(table.origin), columnStatuses);
     const primaryCount = table.columns.filter(c => c.primary).length;
     const isUnique = (name) => table.columns.some(c => c.name === name && (c.unique || (c.primary && primaryCount === 1)));
 
@@ -1250,6 +1263,99 @@ function stat(file) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Schema dumps (php artisan schema:dump)
+
+// The default connection of the application: DB_CONNECTION of .env, else the default of
+// config/database.php (`'default' => env('DB_CONNECTION', 'mysql')`), else null
+function defaultConnection(basePath, overrides) {
+    const read = (file) => {
+        const filePath = path.join(basePath, ...file);
+        if (overrides && overrides.has(filePath)) {
+            return overrides.get(filePath);
+        }
+        try {
+            return fs.readFileSync(filePath, 'utf8');
+        } catch {
+            return '';
+        }
+    };
+    const env = /^[ \t]*DB_CONNECTION[ \t]*=[ \t]*["']?([\w-]+)/m.exec(read(['.env']));
+    if (env) {
+        return env[1];
+    }
+    const config = /['"]default['"]\s*=>\s*(?:env\(\s*['"]DB_CONNECTION['"]\s*,\s*)?['"]([\w-]+)['"]/.exec(stripComments(read(['config', 'database.php'])));
+    return config ? config[1] : null;
+}
+
+// The schema dump that `php artisan migrate` loads: database/schema/<connection>-schema.dump, else
+// <connection>-schema.sql, for the default connection; the only dump when the connection is not
+// known or has none. { path, name, warning }, or null when there is no dump.
+function findSchemaDump(basePath, overrides = null) {
+    const folder = path.resolve(basePath, 'database', 'schema');
+    let names;
+    try {
+        names = fs.readdirSync(folder).filter(name => /^[\w-]+-schema\.(?:dump|sql)$/.test(name) && stat(path.join(folder, name))?.isFile()).sort();
+    } catch {
+        return null;
+    }
+    if (names.length === 0) {
+        return null;
+    }
+    const of = (connection) => [`${connection}-schema.dump`, `${connection}-schema.sql`].find(name => names.includes(name));
+    const connection = defaultConnection(basePath, overrides);
+    const connections = [...new Set(names.map(name => name.replace(/-schema\.\w+$/, '')))];
+    let name = connection ? of(connection) : undefined;
+    let warning = null;
+    if (!name) {
+        name = of(connections[0]);
+        if (connections.length > 1) {
+            warning = `database/schema: ${names.join(', ')}: the default connection ${connection ? `(${connection}) has no dump` : 'is not known (DB_CONNECTION)'}, ${name} is read.`;
+        }
+    }
+    return { path: path.join(folder, name), name, warning };
+}
+
+// The tables of a schema dump as tables of the replay, and the migrations it lists (the rows of its
+// migrations table): { tables, ran: Set of migration names }, or null when the dump cannot be read
+// (a binary pg_dump); its warnings are added to `warnings`
+function readSchemaDump(dump, text, warnings) {
+    if (text.startsWith('PGDMP') || text.includes('\u0000')) {
+        warnings.push(`database/schema/${dump.name}: a binary dump (pg_dump --format=custom), not read: dump the schema again as SQL (php artisan schema:dump).`);
+        return null;
+    }
+    const read = require('./sql').readDump({ path: dump.path, rel: `database/schema/${dump.name}`, text }, { skip: ['migrations'], collect: 'migrations' });
+    warnings.push(...read.warnings);
+    const ran = new Set(read.rows.map(row => (Array.isArray(row) ? row[1] : row.migration)).filter(name => typeof name === 'string'));
+    const tables = read.tables.map(table => ({
+        name: table.name,
+        columns: table.columns.map(column => {
+            const converted = newColumn(column.name, column.type, { primary: column.primary, nullable: column.nullable, unique: column.unique, details: column.details });
+            if (column.uniqueName) {
+                converted.uniqueName = column.uniqueName;
+            }
+            converted.origin = column.origin;
+            converted.changes = column.changes;
+            converted.inCreate = column.inCreate;
+            return converted;
+        }),
+        relations: table.relations.map(relation => ({
+            foreignKey: relation.foreignKey,
+            references: relation.references,
+            on: relation.on,
+            constraint: relation.constraint,
+            ...(relation.onDelete ? { onDelete: relation.onDelete } : {}),
+            ...(relation.onUpdate ? { onUpdate: relation.onUpdate } : {}),
+        })),
+        indexes: table.indexes.map(index => ({ columns: index.columns, type: index.type, name: index.name, explicit: index.named })),
+        source: table.source,
+        origin: table.origin,
+        changes: table.changes,
+        statementLines: table.statementLines,
+    }));
+    return { tables, ran };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Parser contract (docs/parsers.md)
 
 module.exports.id = 'laravel';
@@ -1262,11 +1368,13 @@ module.exports.detect = function (basePath) {
     return stat(path.join(basePath, 'artisan'))?.isFile() && packages.includes('laravel/framework') ? 100 : 0;
 };
 
-// The files read: the PHP files of database/migrations, not its sub-folders
+// The files read: the PHP files of database/migrations, not its sub-folders, and the schema dump
+// of database/schema when there is one
 function sources(basePath) {
+    const dump = findSchemaDump(basePath);
     return {
         folders: [{ path: path.resolve(basePath, 'database', 'migrations'), recursive: false }],
-        files: [],
+        files: dump ? [dump.path] : [],
         extensions: ['.php'],
     };
 }
@@ -1278,32 +1386,54 @@ module.exports.sources = sources;
 // - gitCache: Map kept between parses, to run git again only once it is cleared
 // - columnSources: true adds the statement that last created, changed or renamed each column
 //   (source: { file, line }), for the tools that point at a column
-// - until: a migration file name: the schema right after it (the later migrations are skipped)
+// - until: a migration file name: the schema right after it (the later migrations are skipped). A
+//   schema dump is read for the migrations it does not list; for one it lists, the migration files
+//   alone are replayed, as before the dump
+
 // - details: true adds the length, default, indexes, ON DELETE... declared by the migrations,
 //   for the exports (docs/pivot-format.md)
 module.exports.parse = function (basePath, options = {}) {
     const migrationsPath = path.join(basePath, 'database', 'migrations');
     const folder = stat(migrationsPath);
-    if (!folder || !folder.isDirectory()) {
+    const overrides = options.overrides || null;
+    const state = { tables: [], warnings: [] };
+
+    // The schema dump, loaded first on a new database: the migrations it lists are not replayed
+    const dump = findSchemaDump(basePath, overrides);
+    let loaded = null;
+    if (dump) {
+        if (dump.warning) {
+            state.warnings.push(dump.warning);
+        }
+        const text = overrides && overrides.has(dump.path) ? overrides.get(dump.path) : fs.readFileSync(dump.path, 'utf8');
+        loaded = readSchemaDump(dump, text, state.warnings);
+        if (loaded && typeof options.until === 'string' && loaded.ran.has(options.until.replace(/\.php$/, ''))) {
+            // A migration of the dump: the migration files alone, as before the dump
+            loaded = null;
+        }
+        if (loaded) {
+            state.tables = loaded.tables;
+        }
+    }
+    if ((!folder || !folder.isDirectory()) && !loaded) {
         throw new ParserError(`Laravel migrations folder not found: ${migrationsPath}`);
     }
 
     // Same files as `php artisan migrate` (glob '*_*.php', so no dotfile), in the same order: by name
-    const files = fs.readdirSync(migrationsPath)
+    const files = (folder && folder.isDirectory() ? fs.readdirSync(migrationsPath) : [])
         .filter(file => !file.startsWith('.') && file.includes('_') && file.endsWith('.php'))
         .filter(file => stat(path.join(migrationsPath, file))?.isFile())
         .sort()
-        .filter(file => typeof options.until !== 'string' || file <= options.until);
-    if (files.length === 0 && typeof options.until === 'string') {
+        .filter(file => typeof options.until !== 'string' || file <= options.until)
+        .filter(file => !loaded || !loaded.ran.has(file.replace(/\.php$/, '')));
+    if (files.length === 0 && typeof options.until === 'string' && !loaded) {
         // Before the first migration: no table yet
         return { tables: [], warnings: [] };
     }
-    if (files.length === 0) {
+    if (files.length === 0 && !loaded) {
         throw new ParserError(`No PHP migration files found in ${migrationsPath}`);
     }
 
-    const state = { tables: [], warnings: [] };
-    const overrides = options.overrides || null;
     for (const file of files) {
         const filePath = path.join(migrationsPath, file);
         const text = overrides && overrides.has(filePath) ? overrides.get(filePath) : fs.readFileSync(filePath, 'utf8');
@@ -1316,7 +1446,7 @@ module.exports.parse = function (basePath, options = {}) {
         state.warnings.push(reader.warning);
     }
     return {
-        tables: state.tables.map(table => toPivot(table, reader.statusOf, basePath, options.columnSources === true, options.details === true)),
+        tables: state.tables.map(table => toPivot(table, reader.statusOf, basePath, options.columnSources === true, options.details === true, reader.addedOf)),
         warnings: state.warnings,
     };
 };

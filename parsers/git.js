@@ -420,4 +420,21 @@ function tableStatus(declaration, columns) {
     return declaration || (known.length > 0 ? 'committed' : null);
 }
 
-module.exports = { readGitStatus, gitErrorReason, parseDiff, lineMapping, createStatusReader, sourcePaths, tableStatus };
+// Status of a declaration that later statements changed (the ALTER TABLE of a SQL migration): being
+// edited ('unsaved') when it or a change is, new ('untracked') as declared, else 'modified' when a
+// change is not committed
+function changedStatus(declaration, changes) {
+    const known = changes.filter(status => status);
+    if (declaration === 'unsaved' || known.includes('unsaved')) {
+        return 'unsaved';
+    }
+    if (declaration === 'untracked') {
+        return 'untracked';
+    }
+    if (declaration === 'modified' || known.some(status => status !== 'committed')) {
+        return 'modified';
+    }
+    return declaration || (known.length > 0 ? 'committed' : null);
+}
+
+module.exports = { readGitStatus, gitErrorReason, parseDiff, lineMapping, createStatusReader, sourcePaths, tableStatus, changedStatus };

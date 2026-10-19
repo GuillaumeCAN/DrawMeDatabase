@@ -1,0 +1,341 @@
+{
+  "tables": [
+    {
+      "table": "subscribers",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":21},"autoIncrement":true},
+        {"name":"uuid","type":"uuid","source":{"file":"schema.sql","line":22},"unique":true},
+        {"name":"email","type":"text","source":{"file":"schema.sql","line":23},"unique":true},
+        {"name":"name","type":"text","source":{"file":"schema.sql","line":24}},
+        {"name":"attribs","type":"jsonb","source":{"file":"schema.sql","line":25},"default":"{}"},
+        {"name":"status","type":"subscriber_status","source":{"file":"schema.sql","line":26},"default":"enabled","values":["enabled","disabled","blocklisted"]},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":28},"defaultRaw":"NOW()"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":29},"defaultRaw":"NOW()"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":20},
+      "indexes": [
+        {"columns":["LOWER(email)"],"type":"unique","name":"idx_subs_email"},
+        {"columns":["status"],"type":"index","name":"idx_subs_status"},
+        {"columns":["id","status"],"type":"index","name":"idx_subs_id_status"},
+        {"columns":["created_at"],"type":"index","name":"idx_subs_created_at"},
+        {"columns":["updated_at"],"type":"index","name":"idx_subs_updated_at"}
+      ]
+    },
+    {
+      "table": "lists",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":40},"autoIncrement":true},
+        {"name":"uuid","type":"uuid","source":{"file":"schema.sql","line":41},"unique":true},
+        {"name":"name","type":"text","source":{"file":"schema.sql","line":42}},
+        {"name":"type","type":"list_type","source":{"file":"schema.sql","line":43},"values":["public","private","temporary"]},
+        {"name":"optin","type":"list_optin","source":{"file":"schema.sql","line":44},"default":"single","values":["single","double"]},
+        {"name":"status","type":"list_status","source":{"file":"schema.sql","line":45},"default":"active","values":["active","archived"]},
+        {"name":"tags","type":"varchar[]","nullable":true,"source":{"file":"schema.sql","line":46},"length":100},
+        {"name":"description","type":"text","source":{"file":"schema.sql","line":47},"default":""},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":49},"defaultRaw":"NOW()"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":50},"defaultRaw":"NOW()"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":39},
+      "indexes": [
+        {"columns":["type"],"type":"index","name":"idx_lists_type"},
+        {"columns":["optin"],"type":"index","name":"idx_lists_optin"},
+        {"columns":["status"],"type":"index","name":"idx_lists_status"},
+        {"columns":["name"],"type":"index","name":"idx_lists_name"},
+        {"columns":["created_at"],"type":"index","name":"idx_lists_created_at"},
+        {"columns":["updated_at"],"type":"index","name":"idx_lists_updated_at"}
+      ]
+    },
+    {
+      "table": "subscriber_lists",
+      "columns": [
+        {"name":"subscriber_id","type":"integer","primary":true,"source":{"file":"schema.sql","line":62}},
+        {"name":"list_id","type":"integer","primary":true,"source":{"file":"schema.sql","line":63}},
+        {"name":"meta","type":"jsonb","source":{"file":"schema.sql","line":64},"default":"{}"},
+        {"name":"status","type":"subscription_status","source":{"file":"schema.sql","line":65},"default":"unconfirmed","values":["unconfirmed","confirmed","unsubscribed"]},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":67},"defaultRaw":"NOW()"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":68},"defaultRaw":"NOW()"}
+      ],
+      "relations": [
+        {"foreignKey":"subscriber_id","references":"id","on":"subscribers","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"list_id","references":"id","on":"lists","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":61},
+      "indexes": [
+        {"columns":["subscriber_id"],"type":"index","name":"idx_sub_lists_sub_id"},
+        {"columns":["list_id"],"type":"index","name":"idx_sub_lists_list_id"},
+        {"columns":["status"],"type":"index","name":"idx_sub_lists_status"},
+        {"columns":["created_at"],"type":"index","name":"idx_sub_lists_created_at"},
+        {"columns":["updated_at"],"type":"index","name":"idx_sub_lists_unsubscribed_updated_at"}
+      ]
+    },
+    {
+      "table": "templates",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":81},"autoIncrement":true},
+        {"name":"name","type":"text","source":{"file":"schema.sql","line":82}},
+        {"name":"type","type":"template_type","source":{"file":"schema.sql","line":83},"default":"campaign","values":["campaign","campaign_visual","tx"]},
+        {"name":"subject","type":"text","source":{"file":"schema.sql","line":84}},
+        {"name":"body","type":"text","source":{"file":"schema.sql","line":85}},
+        {"name":"body_source","type":"text","nullable":true,"source":{"file":"schema.sql","line":86}},
+        {"name":"is_default","type":"boolean","source":{"file":"schema.sql","line":87},"default":false},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":89},"defaultRaw":"NOW()"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":90},"defaultRaw":"NOW()"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":80},
+      "indexes": [
+        {"columns":["is_default"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "campaigns",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":98},"autoIncrement":true},
+        {"name":"uuid","type":"uuid","source":{"file":"schema.sql","line":99},"unique":true},
+        {"name":"name","type":"text","source":{"file":"schema.sql","line":100}},
+        {"name":"subject","type":"text","source":{"file":"schema.sql","line":101}},
+        {"name":"from_email","type":"text","source":{"file":"schema.sql","line":102}},
+        {"name":"body","type":"text","source":{"file":"schema.sql","line":103}},
+        {"name":"body_source","type":"text","nullable":true,"source":{"file":"schema.sql","line":104}},
+        {"name":"altbody","type":"text","nullable":true,"source":{"file":"schema.sql","line":105}},
+        {"name":"content_type","type":"content_type","source":{"file":"schema.sql","line":106},"default":"richtext","values":["richtext","html","plain","markdown","visual"]},
+        {"name":"send_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":107}},
+        {"name":"headers","type":"jsonb","source":{"file":"schema.sql","line":108},"default":"[]"},
+        {"name":"attribs","type":"jsonb","source":{"file":"schema.sql","line":109},"default":"{}"},
+        {"name":"status","type":"campaign_status","source":{"file":"schema.sql","line":110},"default":"draft","values":["draft","running","scheduled","paused","cancelled","finished"]},
+        {"name":"tags","type":"varchar[]","nullable":true,"source":{"file":"schema.sql","line":111},"length":100},
+        {"name":"type","type":"campaign_type","nullable":true,"source":{"file":"schema.sql","line":115},"default":"regular","values":["regular","optin"]},
+        {"name":"messenger","type":"text","source":{"file":"schema.sql","line":118}},
+        {"name":"template_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":119}},
+        {"name":"to_send","type":"int","source":{"file":"schema.sql","line":122},"default":0},
+        {"name":"sent","type":"int","source":{"file":"schema.sql","line":123},"default":0},
+        {"name":"max_subscriber_id","type":"int","source":{"file":"schema.sql","line":124},"default":0},
+        {"name":"last_subscriber_id","type":"int","source":{"file":"schema.sql","line":125},"default":0},
+        {"name":"archive","type":"boolean","source":{"file":"schema.sql","line":128},"default":false},
+        {"name":"archive_slug","type":"text","nullable":true,"source":{"file":"schema.sql","line":129},"unique":true},
+        {"name":"archive_template_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":130}},
+        {"name":"archive_meta","type":"jsonb","source":{"file":"schema.sql","line":131},"default":"{}"},
+        {"name":"started_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":133}},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":134},"defaultRaw":"NOW()"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":135},"defaultRaw":"NOW()"}
+      ],
+      "relations": [
+        {"foreignKey":"template_id","references":"id","on":"templates","type":"many-to-one","onDelete":"set null"},
+        {"foreignKey":"archive_template_id","references":"id","on":"templates","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"schema.sql","line":97},
+      "indexes": [
+        {"columns":["status"],"type":"index","name":"idx_camps_status"},
+        {"columns":["name"],"type":"index","name":"idx_camps_name"},
+        {"columns":["created_at"],"type":"index","name":"idx_camps_created_at"},
+        {"columns":["updated_at"],"type":"index","name":"idx_camps_updated_at"}
+      ]
+    },
+    {
+      "table": "campaign_lists",
+      "columns": [
+        {"name":"id","type":"bigserial","primary":true,"source":{"file":"schema.sql","line":145},"autoIncrement":true},
+        {"name":"campaign_id","type":"integer","source":{"file":"schema.sql","line":146}},
+        {"name":"list_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":150}},
+        {"name":"list_name","type":"text","source":{"file":"schema.sql","line":151},"default":""}
+      ],
+      "relations": [
+        {"foreignKey":"campaign_id","references":"id","on":"campaigns","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"list_id","references":"id","on":"lists","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":144},
+      "indexes": [
+        {"columns":["campaign_id","list_id"],"type":"unique"},
+        {"columns":["campaign_id"],"type":"index","name":"idx_camp_lists_camp_id"},
+        {"columns":["list_id"],"type":"index","name":"idx_camp_lists_list_id"}
+      ]
+    },
+    {
+      "table": "campaign_views",
+      "columns": [
+        {"name":"id","type":"bigserial","primary":true,"source":{"file":"schema.sql","line":159},"autoIncrement":true},
+        {"name":"campaign_id","type":"integer","source":{"file":"schema.sql","line":160}},
+        {"name":"subscriber_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":163}},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":164},"defaultRaw":"NOW()"}
+      ],
+      "relations": [
+        {"foreignKey":"campaign_id","references":"id","on":"campaigns","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"subscriber_id","references":"id","on":"subscribers","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":158},
+      "indexes": [
+        {"columns":["campaign_id"],"type":"index","name":"idx_views_camp_id"},
+        {"columns":["subscriber_id"],"type":"index","name":"idx_views_subscriber_id"},
+        {"columns":["created_at"],"type":"index","name":"idx_views_date"}
+      ]
+    },
+    {
+      "table": "media",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":173},"autoIncrement":true},
+        {"name":"uuid","type":"uuid","source":{"file":"schema.sql","line":174},"unique":true},
+        {"name":"provider","type":"text","source":{"file":"schema.sql","line":175},"default":""},
+        {"name":"filename","type":"text","source":{"file":"schema.sql","line":176}},
+        {"name":"content_type","type":"text","source":{"file":"schema.sql","line":177},"default":"application/octet-stream"},
+        {"name":"thumb","type":"text","source":{"file":"schema.sql","line":178}},
+        {"name":"meta","type":"jsonb","source":{"file":"schema.sql","line":179},"default":"{}"},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":180},"defaultRaw":"NOW()"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":172},
+      "indexes": [
+        {"columns":["provider","filename"],"type":"index","name":"idx_media_filename"}
+      ]
+    },
+    {
+      "table": "campaign_media",
+      "columns": [
+        {"name":"campaign_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":187}},
+        {"name":"media_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":191}},
+        {"name":"filename","type":"text","source":{"file":"schema.sql","line":193},"default":""}
+      ],
+      "relations": [
+        {"foreignKey":"campaign_id","references":"id","on":"campaigns","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"media_id","references":"id","on":"media","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":186},
+      "indexes": [
+        {"columns":["campaign_id","media_id"],"type":"unique","name":"idx_camp_media_id"},
+        {"columns":["campaign_id"],"type":"index","name":"idx_camp_media_camp_id"}
+      ]
+    },
+    {
+      "table": "links",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":202},"autoIncrement":true},
+        {"name":"uuid","type":"uuid","source":{"file":"schema.sql","line":203},"unique":true},
+        {"name":"url","type":"text","source":{"file":"schema.sql","line":204},"unique":true},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":205},"defaultRaw":"NOW()"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":201}
+    },
+    {
+      "table": "link_clicks",
+      "columns": [
+        {"name":"id","type":"bigserial","primary":true,"source":{"file":"schema.sql","line":210},"autoIncrement":true},
+        {"name":"campaign_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":211}},
+        {"name":"link_id","type":"integer","source":{"file":"schema.sql","line":212}},
+        {"name":"subscriber_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":215}},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":216},"defaultRaw":"NOW()"}
+      ],
+      "relations": [
+        {"foreignKey":"campaign_id","references":"id","on":"campaigns","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"link_id","references":"id","on":"links","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"subscriber_id","references":"id","on":"subscribers","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":209},
+      "indexes": [
+        {"columns":["campaign_id"],"type":"index","name":"idx_clicks_camp_id"},
+        {"columns":["link_id"],"type":"index","name":"idx_clicks_link_id"},
+        {"columns":["subscriber_id"],"type":"index","name":"idx_clicks_sub_id"},
+        {"columns":["created_at"],"type":"index","name":"idx_clicks_date"}
+      ]
+    },
+    {
+      "table": "settings",
+      "columns": [
+        {"name":"key","type":"text","source":{"file":"schema.sql","line":226},"unique":true},
+        {"name":"value","type":"jsonb","source":{"file":"schema.sql","line":227},"default":"{}"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":228},"defaultRaw":"NOW()"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":225},
+      "indexes": [
+        {"columns":["key"],"type":"index","name":"idx_settings_key"}
+      ]
+    },
+    {
+      "table": "bounces",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":309},"autoIncrement":true},
+        {"name":"subscriber_id","type":"integer","source":{"file":"schema.sql","line":310}},
+        {"name":"campaign_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":311}},
+        {"name":"type","type":"bounce_type","source":{"file":"schema.sql","line":312},"default":"hard","values":["soft","hard","complaint"]},
+        {"name":"source","type":"text","source":{"file":"schema.sql","line":313},"default":""},
+        {"name":"meta","type":"jsonb","source":{"file":"schema.sql","line":314},"default":"{}"},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":315},"defaultRaw":"NOW()"}
+      ],
+      "relations": [
+        {"foreignKey":"subscriber_id","references":"id","on":"subscribers","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"campaign_id","references":"id","on":"campaigns","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":308},
+      "indexes": [
+        {"columns":["subscriber_id"],"type":"index","name":"idx_bounces_sub_id"},
+        {"columns":["campaign_id"],"type":"index","name":"idx_bounces_camp_id"},
+        {"columns":["source"],"type":"index","name":"idx_bounces_source"},
+        {"columns":["created_at"],"type":"index","name":"idx_bounces_date"}
+      ]
+    },
+    {
+      "table": "roles",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":325},"autoIncrement":true},
+        {"name":"type","type":"role_type","source":{"file":"schema.sql","line":326},"default":"user","values":["user","list"]},
+        {"name":"parent_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":327}},
+        {"name":"list_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":328}},
+        {"name":"permissions","type":"text[]","source":{"file":"schema.sql","line":329},"default":"{}"},
+        {"name":"name","type":"text","nullable":true,"source":{"file":"schema.sql","line":330}},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":331},"defaultRaw":"NOW()"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":332},"defaultRaw":"NOW()"}
+      ],
+      "relations": [
+        {"foreignKey":"parent_id","references":"id","on":"roles","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"list_id","references":"id","on":"lists","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":324},
+      "indexes": [
+        {"columns":["parent_id","list_id"],"type":"unique","name":"idx_roles"},
+        {"columns":["type","name"],"type":"unique","name":"idx_roles_name"}
+      ]
+    },
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"serial","primary":true,"source":{"file":"schema.sql","line":340},"autoIncrement":true},
+        {"name":"username","type":"text","source":{"file":"schema.sql","line":341},"unique":true},
+        {"name":"password_login","type":"boolean","source":{"file":"schema.sql","line":342},"default":false},
+        {"name":"password","type":"text","nullable":true,"source":{"file":"schema.sql","line":343}},
+        {"name":"email","type":"text","source":{"file":"schema.sql","line":344},"unique":true},
+        {"name":"name","type":"text","source":{"file":"schema.sql","line":345}},
+        {"name":"avatar","type":"text","nullable":true,"source":{"file":"schema.sql","line":346}},
+        {"name":"type","type":"user_type","source":{"file":"schema.sql","line":347},"default":"user","values":["user","api"]},
+        {"name":"user_role_id","type":"integer","source":{"file":"schema.sql","line":348}},
+        {"name":"list_role_id","type":"integer","nullable":true,"source":{"file":"schema.sql","line":349}},
+        {"name":"status","type":"user_status","source":{"file":"schema.sql","line":350},"default":"disabled","values":["enabled","disabled"]},
+        {"name":"twofa_type","type":"twofa_type","source":{"file":"schema.sql","line":351},"default":"none","values":["none","totp"]},
+        {"name":"twofa_key","type":"text","nullable":true,"source":{"file":"schema.sql","line":352}},
+        {"name":"loggedin_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":353}},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":354},"defaultRaw":"NOW()"},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"schema.sql","line":355},"defaultRaw":"NOW()"}
+      ],
+      "relations": [
+        {"foreignKey":"user_role_id","references":"id","on":"roles","type":"many-to-one","onDelete":"restrict"},
+        {"foreignKey":"list_role_id","references":"id","on":"roles","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":339}
+    },
+    {
+      "table": "sessions",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"schema.sql","line":361}},
+        {"name":"data","type":"jsonb","source":{"file":"schema.sql","line":362},"default":"{}"},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"schema.sql","line":363},"defaultRaw":"now()"}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":360},
+      "indexes": [
+        {"columns":["id","created_at"],"type":"index","name":"idx_sessions"}
+      ]
+    }
+  ],
+  "warnings": []
+}

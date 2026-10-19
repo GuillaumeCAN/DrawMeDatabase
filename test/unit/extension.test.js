@@ -1090,7 +1090,7 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     assert.equal(api.detectFramework(folder('api-none')), 'Unknown');
 
     // Version 3: the supported stacks, and what their parsers read
-    assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }, { id: 'drizzle', label: 'Drizzle' }]);
+    assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }, { id: 'drizzle', label: 'Drizzle' }, { id: 'sql', label: 'SQL' }]);
     assert.deepEqual(api.getSources(dir, 'laravel'), { folders: [{ path: path.join(dir, 'database', 'migrations'), recursive: false }], files: [], extensions: ['.php'] });
     assert.deepEqual(api.getSources(dir, 'symfony').folders, [{ path: path.join(dir, 'src', 'Entity'), recursive: true }]);
     assert.throws(() => api.getSources(dir, 'rails'), error => error instanceof ParserError && error.message === 'Unknown framework: rails');
@@ -1348,11 +1348,11 @@ test('a folder without project suggests the setting only when it is empty', () =
     ext.setFrameworkPath(workspace, 'backend');
     assert.equal(ext.run(), undefined);
     assert.deepEqual(ext.state.errors.map(error => error.text), [
-        `No supported project (Laravel, Symfony, Prisma, Drizzle) found in "${workspace}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`,
-        `No supported project (Laravel, Symfony, Prisma, Drizzle) found in "${path.join(workspace, 'backend')}". Check the DrawMeDatabase.frameworkPath setting. Unable to draw the schema.`,
+        `No supported project (Laravel, Symfony, Prisma, Drizzle, SQL) found in "${workspace}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`,
+        `No supported project (Laravel, Symfony, Prisma, Drizzle, SQL) found in "${path.join(workspace, 'backend')}". Check the DrawMeDatabase.frameworkPath setting. Unable to draw the schema.`,
     ]);
     assert.deepEqual(ext.state.parsed, []);
-    assert.ok(ext.state.output.includes('Supported frameworks: Laravel, Symfony, Prisma, Drizzle.'), 'the output lists the supported frameworks');
+    assert.ok(ext.state.output.includes('Supported frameworks: Laravel, Symfony, Prisma, Drizzle, SQL.'), 'the output lists the supported frameworks');
 });
 
 test('a monorepo root with prisma in its package.json, the schema in a package: the framework folder is suggested', () => {
@@ -1364,7 +1364,7 @@ test('a monorepo root with prisma in its package.json, the schema in a package: 
     const ext = activate();
     ext.openFolders(root);
     assert.equal(ext.run(), undefined);
-    assert.deepEqual(ext.state.errors.map(error => error.text), [`No supported project (Laravel, Symfony, Prisma, Drizzle) found in "${root}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`]);
+    assert.deepEqual(ext.state.errors.map(error => error.text), [`No supported project (Laravel, Symfony, Prisma, Drizzle, SQL) found in "${root}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`]);
     assert.equal(ext.state.context['drawMeDatabase.schemaState'], 'noProject', 'the Schema view offers to set the framework folder');
     assert.deepEqual(ext.state.parsed, []);
     // The framework folder of the package

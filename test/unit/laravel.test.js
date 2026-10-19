@@ -1745,3 +1745,149 @@ describe('laravel parser: details', () => {
         assert.deepEqual(detailed.warnings, plain.warnings);
     });
 });
+
+// ---------------------------------------------------------------------------------------------
+
+describe('laravel parser: schema dumps (php artisan schema:dump)', () => {
+    const childProcess = require('node:child_process');
+    const registry = require('../../parsers/registry');
+    const TMP = fs.realpathSync(os.tmpdir());
+    // A Laravel project with any files ({ 'database/schema/mysql-schema.sql': '...' })
+    function laravelProject(files) {
+        const dir = fs.mkdtempSync(path.join(TMP, 'dmdb-laravel-dump-'));
+        tempDirs.push(dir);
+        for (const [rel, content] of Object.entries({ artisan: '', 'composer.json': JSON.stringify({ require: { 'laravel/framework': '^12.0' } }), ...files })) {
+            fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+            fs.writeFileSync(path.join(dir, rel), content);
+        }
+        return dir;
+    }
+    const git = (cwd, ...args) => childProcess.execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'init.defaultBranch=main', ...args], { cwd, stdio: 'pipe', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_CEILING_DIRECTORIES: TMP } });
+    const MYSQL_DUMP = `/*!40101 SET NAMES utf8mb4 */;
+CREATE TABLE \`migrations\` (
+  \`id\` int unsigned NOT NULL AUTO_INCREMENT,
+  \`migration\` varchar(255) NOT NULL,
+  \`batch\` int NOT NULL,
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE \`users\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+  \`email\` varchar(255) NOT NULL,
+  \`name\` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`users_email_unique\` (\`email\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE \`posts\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+  \`user_id\` bigint unsigned NOT NULL,
+  PRIMARY KEY (\`id\`),
+  KEY \`posts_user_id_foreign\` (\`user_id\`),
+  CONSTRAINT \`posts_user_id_foreign\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO \`migrations\` (\`id\`, \`migration\`, \`batch\`) VALUES (1,'2024_01_01_000000_create_users_table',1);
+INSERT INTO \`migrations\` (\`id\`, \`migration\`, \`batch\`) VALUES (2,'2024_01_02_000000_create_posts_table',1);
+`;
+    const CREATE_USERS = migration("        Schema::create('users', function (Blueprint $table) {\n            $table->id();\n            $table->string('email')->unique();\n        });");
+    const CREATE_POSTS = migration("        Schema::create('posts', function (Blueprint $table) {\n            $table->id();\n            $table->foreignId('user_id')->constrained();\n        });");
+    const ADD_TITLE = migration("        Schema::table('posts', function (Blueprint $table) {\n            $table->string('title')->nullable();\n            $table->dropForeign(['user_id']);\n        });");
+    const MIGRATIONS = {
+        'database/migrations/2024_01_01_000000_create_users_table.php': CREATE_USERS,
+        'database/migrations/2024_01_02_000000_create_posts_table.php': CREATE_POSTS,
+        'database/migrations/2024_02_01_000000_add_title_to_posts.php': ADD_TITLE,
+    };
+    const summary = (result) => result.tables.map(t => `${t.table}(${t.columns.map(col => `${col.name}:${col.type}${col.nullable ? '?' : ''}`).join(' ')})${t.relations.map(r => ` ${r.foreignKey}->${r.on}`).join('')} @${t.source.file}`);
+
+    it('the dump is loaded first, then the migrations it does not list; its migrations table is not drawn', () => {
+        const dir = laravelProject({ 'database/schema/mysql-schema.sql': MYSQL_DUMP, ...MIGRATIONS });
+        const result = parser.parse(dir, { git: false });
+        assert.deepEqual(summary(result), [
+            'users(id:bigint email:varchar name:varchar?) @database/schema/mysql-schema.sql',
+            'posts(id:bigint user_id:bigint title:string?) @database/schema/mysql-schema.sql',
+        ]);
+        assert.deepEqual(result.warnings, []);
+        const detailed = parser.parse(dir, { git: false, details: true, columnSources: true });
+        assert.deepEqual(table(detailed, 'users').columns[1], { name: 'email', type: 'varchar', source: { file: 'database/schema/mysql-schema.sql', line: 10 }, length: 255, unique: true });
+        assert.deepEqual(table(detailed, 'posts').columns[2], { name: 'title', type: 'string', nullable: true, source: { file: 'database/migrations/2024_02_01_000000_add_title_to_posts.php', line: 13 } });
+        assert.deepEqual(table(detailed, 'posts').indexes, [{ columns: ['user_id'], type: 'index', name: 'posts_user_id_foreign' }]);
+        // Without the dump: the migrations, as before
+        const plain = laravelProject(MIGRATIONS);
+        assert.deepEqual(summary(parser.parse(plain, { git: false })), [
+            'users(id:bigIncrements email:string) @database/migrations/2024_01_01_000000_create_users_table.php',
+            'posts(id:bigIncrements user_id:foreignId title:string?) @database/migrations/2024_01_02_000000_create_posts_table.php',
+        ]);
+        // A dump without migrations folder (they were pruned)
+        assert.deepEqual(summary(parser.parse(laravelProject({ 'database/schema/mysql-schema.sql': MYSQL_DUMP }), { git: false })).length, 2);
+    });
+
+    it('the dump of the default connection: DB_CONNECTION of .env, else the default of config/database.php; <connection>-schema.dump before .sql; the only one; a warning when it cannot be told', () => {
+        const PG_DUMP = "SELECT pg_catalog.set_config('search_path', '', false);\nCREATE TABLE public.pg_table (id bigint NOT NULL);\nCOPY public.migrations (id, migration, batch) FROM stdin;\n1\t2024_01_01_000000_create_users_table\t1\n\\.\n";
+        const SQLITE_DUMP = 'CREATE TABLE IF NOT EXISTS "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null);\nCREATE TABLE IF NOT EXISTS "lite_table" ("id" integer primary key autoincrement not null);\nINSERT INTO migrations VALUES(1,\'2024_01_01_000000_create_users_table\',1);\n';
+        const dumps = { 'database/schema/mysql-schema.sql': MYSQL_DUMP, 'database/schema/pgsql-schema.sql': PG_DUMP, 'database/schema/sqlite-schema.dump': SQLITE_DUMP };
+        const first = (files) => {
+            const result = parser.parse(laravelProject({ ...dumps, ...MIGRATIONS, ...files }), { git: false });
+            return [result.tables[0].table, result.tables.at(-1).table, result.warnings];
+        };
+        assert.deepEqual(first({ '.env': 'APP_NAME=x\nDB_CONNECTION=pgsql\n', 'config/database.php': "<?php return ['default' => env('DB_CONNECTION', 'sqlite')];" }), ['pg_table', 'posts', []]);
+        assert.deepEqual(first({ 'config/database.php': "<?php\n// 'default' => 'mysql',\nreturn ['default' => env('DB_CONNECTION', 'sqlite')];" }), ['lite_table', 'posts', []]);
+        assert.deepEqual(first({ '.env': 'DB_CONNECTION="mariadb"\n' }), ['users', 'posts', ['database/schema: mysql-schema.sql, pgsql-schema.sql, sqlite-schema.dump: the default connection (mariadb) has no dump, mysql-schema.sql is read.']]);
+        assert.deepEqual(first({}), ['users', 'posts', ['database/schema: mysql-schema.sql, pgsql-schema.sql, sqlite-schema.dump: the default connection is not known (DB_CONNECTION), mysql-schema.sql is read.']]);
+        assert.deepEqual(parser.parse(laravelProject({ 'database/schema/tenant-schema.sql': MYSQL_DUMP }), { git: false }).tables.map(t => t.table), ['users', 'posts'], 'the only dump, whatever its connection');
+        // A binary dump of pg_dump --format=custom (Laravel 8): the migrations only
+        const binary = laravelProject({ 'database/schema/pgsql-schema.dump': 'PGDMP\u0001\u000e\u0000binary', '.env': 'DB_CONNECTION=pgsql', ...MIGRATIONS });
+        assert.deepEqual(parser.parse(binary, { git: false }).warnings, ['database/schema/pgsql-schema.dump: a binary dump (pg_dump --format=custom), not read: dump the schema again as SQL (php artisan schema:dump).']);
+        assert.equal(parser.parse(binary, { git: false }).tables[0].source.file, 'database/migrations/2024_01_01_000000_create_users_table.php');
+    });
+
+    it('until: a migration that the dump lists gives the migrations alone, as before the dump; a later one, the dump and the migrations up to it', () => {
+        const dir = laravelProject({ 'database/schema/mysql-schema.sql': MYSQL_DUMP, ...MIGRATIONS });
+        const at = (until) => summary(parser.parse(dir, { git: false, until }));
+        assert.deepEqual(at('2024_01_01_000000_create_users_table.php'), ['users(id:bigIncrements email:string) @database/migrations/2024_01_01_000000_create_users_table.php']);
+        assert.deepEqual(at('2024_02_01_000000_add_title_to_posts.php'), summary(parser.parse(dir, { git: false })));
+        assert.deepEqual(at('2024_01_15_000000_between.php'), [
+            'users(id:bigint email:varchar name:varchar?) @database/schema/mysql-schema.sql',
+            'posts(id:bigint user_id:bigint) user_id->users @database/schema/mysql-schema.sql',
+        ]);
+    });
+
+    it('the sources: the dump file when there is one, so that its changes refresh the diagram; the git status of its tables', () => {
+        const dir = laravelProject({ 'database/schema/mysql-schema.sql': MYSQL_DUMP, ...MIGRATIONS });
+        assert.deepEqual(registry.getSources('laravel', dir), {
+            folders: [{ path: path.join(dir, 'database', 'migrations'), recursive: false }],
+            files: [path.join(dir, 'database', 'schema', 'mysql-schema.sql')],
+            extensions: ['.php'],
+        });
+        assert.deepEqual(registry.getSources('laravel', laravelProject(MIGRATIONS)).files, []);
+        git(dir, 'init', '-q');
+        git(dir, 'add', '-A');
+        git(dir, 'commit', '-q', '-m', 'init');
+        const statuses = () => parser.parse(dir).tables.map(t => [t.table, t.git, ...t.columns.map(col => `${col.name}=${col.git}`)]);
+        assert.deepEqual(statuses(), [
+            ['users', 'committed', 'id=committed', 'email=committed', 'name=committed'],
+            ['posts', 'committed', 'id=committed', 'user_id=committed', 'title=committed'],
+        ]);
+        // A table dumped again with a changed column, a new table: modified, new
+        fs.writeFileSync(path.join(dir, 'database', 'schema', 'mysql-schema.sql'), MYSQL_DUMP
+            .replace('`name` varchar(255) DEFAULT NULL', '`name` varchar(100) DEFAULT NULL')
+            .replace('CREATE TABLE `posts`', 'CREATE TABLE `tags` (\n  `id` int NOT NULL\n) ENGINE=InnoDB;\nCREATE TABLE `posts`'));
+        assert.deepEqual(statuses(), [
+            ['users', 'modified', 'id=committed', 'email=committed', 'name=modified'],
+            ['tags', 'untracked', 'id=untracked'],
+            ['posts', 'committed', 'id=committed', 'user_id=committed', 'title=committed'],
+        ]);
+    });
+
+    it('laravel.io and LinkAce: their dump, then the migrations it does not list (fixtures)', () => {
+        const laravelio = parser.parse(fixture('schema-dump-laravelio'), { git: false });
+        assert.deepEqual(laravelio.warnings, []);
+        assert.equal(laravelio.tables.length, 21);
+        assert.deepEqual(laravelio.tables.filter(t => t.source.file.startsWith('database/migrations/')).map(t => t.table), ['job_batches', 'jobs', 'cache', 'cache_locks']);
+        assert.ok(!laravelio.tables.some(t => t.table === 'migrations'));
+        // users: the columns of the dump, then the ones of the migrations after it
+        assert.deepEqual(table(laravelio, 'users').columns.slice(-4).map(col => `${col.name}:${col.type}`), ['author_verified_at:timestamp', 'github_has_identicon:boolean', 'hero_image_path:string', 'profile_picture_path:string']);
+        // LinkAce: three dumps, the one of its default connection (mysql, config/database.php), the .dump file
+        const linkace = parser.parse(fixture('schema-dump-linkace'), { git: false });
+        assert.equal(table(linkace, 'links').source.file, 'database/schema/mysql-schema.dump');
+        assert.deepEqual(linkace.tables.map(t => t.table), ['failed_jobs', 'jobs', 'link_lists', 'link_tags', 'links', 'lists', 'notes', 'password_resets', 'old_settings', 'tags', 'users', 'personal_access_tokens', 'audits', 'settings', 'user_invitations']);
+        assert.equal(registry.detect(fixture('schema-dump-linkace')).framework, 'laravel');
+    });
+});

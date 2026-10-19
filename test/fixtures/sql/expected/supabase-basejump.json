@@ -1,0 +1,112 @@
+{
+  "tables": [
+    {
+      "table": "basejump.config",
+      "columns": [
+        {"name":"enable_team_accounts","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20240414161707_basejump-setup.sql","line":64},"default":true},
+        {"name":"enable_personal_account_billing","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20240414161707_basejump-setup.sql","line":65},"default":true},
+        {"name":"enable_team_account_billing","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20240414161707_basejump-setup.sql","line":66},"default":true},
+        {"name":"billing_provider","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414161707_basejump-setup.sql","line":67},"default":"stripe"}
+      ],
+      "relations": [],
+      "source": {"file":"supabase/migrations/20240414161707_basejump-setup.sql","line":62}
+    },
+    {
+      "table": "basejump.accounts",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":48},"defaultRaw":"extensions.uuid_generate_v4()"},
+        {"name":"primary_owner_user_id","type":"uuid","source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":52},"defaultRaw":"auth.uid()"},
+        {"name":"name","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":54}},
+        {"name":"slug","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":55},"unique":true},
+        {"name":"personal_account","type":"boolean","source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":56},"default":false},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":57}},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":58}},
+        {"name":"created_by","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":59}},
+        {"name":"updated_by","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":60}},
+        {"name":"private_metadata","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":61},"default":"{}"},
+        {"name":"public_metadata","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":62},"default":"{}"}
+      ],
+      "relations": [
+        {"foreignKey":"primary_owner_user_id","references":"id","on":"auth.users","type":"many-to-one"},
+        {"foreignKey":"created_by","references":"id","on":"auth.users","type":"many-to-one"},
+        {"foreignKey":"updated_by","references":"id","on":"auth.users","type":"many-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":46}
+    },
+    {
+      "table": "basejump.account_user",
+      "columns": [
+        {"name":"user_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":155}},
+        {"name":"account_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":157}},
+        {"name":"account_role","type":"basejump.account_role","source":{"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":159},"values":["owner","member"]}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"account_id","references":"id","on":"basejump.accounts","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240414161947_basejump-accounts.sql","line":152}
+    },
+    {
+      "table": "basejump.invitations",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":14},"defaultRaw":"extensions.uuid_generate_v4()"},
+        {"name":"account_role","type":"basejump.account_role","source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":16},"values":["owner","member"]},
+        {"name":"account_id","type":"uuid","source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":18}},
+        {"name":"token","type":"text","source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":20},"defaultRaw":"basejump.generate_token(30)","unique":true},
+        {"name":"invited_by_user_id","type":"uuid","source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":22}},
+        {"name":"account_name","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":24}},
+        {"name":"updated_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":26}},
+        {"name":"created_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":28}},
+        {"name":"invitation_type","type":"basejump.invitation_type","source":{"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":30},"values":["one_time","24_hour"]}
+      ],
+      "relations": [
+        {"foreignKey":"account_id","references":"id","on":"basejump.accounts","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"invited_by_user_id","references":"id","on":"auth.users","type":"many-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20240414162100_basejump-invitations.sql","line":11}
+    },
+    {
+      "table": "basejump.billing_customers",
+      "columns": [
+        {"name":"account_id","type":"uuid","source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":40}},
+        {"name":"id","type":"text","primary":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":42}},
+        {"name":"email","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":44}},
+        {"name":"active","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":46}},
+        {"name":"provider","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":48}}
+      ],
+      "relations": [
+        {"foreignKey":"account_id","references":"id","on":"basejump.accounts","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":37}
+    },
+    {
+      "table": "basejump.billing_subscriptions",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":68}},
+        {"name":"account_id","type":"uuid","source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":69}},
+        {"name":"billing_customer_id","type":"text","source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":70}},
+        {"name":"status","type":"basejump.subscription_status","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":72},"values":["trialing","active","canceled","incomplete","incomplete_expired","past_due","unpaid"]},
+        {"name":"metadata","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":74}},
+        {"name":"price_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":76}},
+        {"name":"plan_name","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":77}},
+        {"name":"quantity","type":"integer","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":79}},
+        {"name":"cancel_at_period_end","type":"boolean","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":81}},
+        {"name":"created","type":"timestamp with time zone","source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":83},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"current_period_start","type":"timestamp with time zone","source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":85},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"current_period_end","type":"timestamp with time zone","source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":87},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"ended_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":89},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"cancel_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":91},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"canceled_at","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":93},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"trial_start","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":95},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"trial_end","type":"timestamp with time zone","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":97},"defaultRaw":"timezone('utc' :: text, now())"},
+        {"name":"provider","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":98}}
+      ],
+      "relations": [
+        {"foreignKey":"account_id","references":"id","on":"basejump.accounts","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"billing_customer_id","references":"id","on":"basejump.billing_customers","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240414162131_basejump-billing.sql","line":65}
+    }
+  ],
+  "warnings": []
+}

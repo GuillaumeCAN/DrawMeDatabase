@@ -1,0 +1,107 @@
+{
+  "tables": [
+    {
+      "table": "members",
+      "columns": [
+        {"name":"member_id","type":"bigint","primary":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":32},"autoIncrement":true},
+        {"name":"Email","type":"text","source":{"file":"supabase/migrations/20240101000000_init.sql","line":13}},
+        {"name":"display_name","type":"varchar","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":14},"length":80},
+        {"name":"mood","type":"mood","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":15},"default":"ok","values":["blue","ok","happy"]},
+        {"name":"tags","type":"text[]","source":{"file":"supabase/migrations/20240101000000_init.sql","line":16},"default":"{}"},
+        {"name":"balance","type":"numeric","source":{"file":"supabase/migrations/20240101000000_init.sql","line":17},"precision":12,"scale":2,"default":0},
+        {"name":"big","type":"bigint","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":18},"defaultRaw":"9007199254740993"},
+        {"name":"created_at","type":"timestamp with time zone","source":{"file":"supabase/migrations/20240101000000_init.sql","line":19},"defaultRaw":"now()"},
+        {"name":"profile","type":"jsonb","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":20},"default":"{\"theme\": \"dark\"}"},
+        {"name":"note","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":21}},
+        {"name":"search","type":"tsvector","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":22}},
+        {"name":"fulltext","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":23}},
+        {"name":"index","type":"integer","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":25}}
+      ],
+      "relations": [],
+      "source": {"file":"supabase/migrations/20240101000000_init.sql","line":11}
+    },
+    {
+      "table": "tags",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":40}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240102000000_changes.sql","line":40},"unique":true},
+        {"name":"member_id","type":"bigint","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":40}},
+        {"name":"old_id","type":"int","nullable":true,"source":{"file":"supabase/migrations/20240103000000_drop.sql","line":8}}
+      ],
+      "relations": [
+        {"foreignKey":"member_id","references":"member_id","on":"members","type":"many-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20240102000000_changes.sql","line":40},
+      "indexes": [
+        {"columns":["name"],"type":"index","name":"tags_name_idx"}
+      ]
+    },
+    {
+      "table": "events",
+      "columns": [
+        {"name":"id","type":"bigint","source":{"file":"supabase/migrations/20240102000000_changes.sql","line":49}},
+        {"name":"at","type":"date","source":{"file":"supabase/migrations/20240102000000_changes.sql","line":49}},
+        {"name":"kind","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":49}}
+      ],
+      "relations": [],
+      "source": {"file":"supabase/migrations/20240102000000_changes.sql","line":49}
+    },
+    {
+      "table": "audit_base",
+      "columns": [
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240102000000_changes.sql","line":54},"defaultRaw":"now()"},
+        {"name":"created_by","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":54}}
+      ],
+      "relations": [],
+      "source": {"file":"supabase/migrations/20240102000000_changes.sql","line":54}
+    },
+    {
+      "table": "audited_notes",
+      "columns": [
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240102000000_changes.sql","line":55},"defaultRaw":"now()"},
+        {"name":"created_by","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":55}},
+        {"name":"id","type":"serial","primary":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":55},"autoIncrement":true},
+        {"name":"body","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":55}}
+      ],
+      "relations": [],
+      "source": {"file":"supabase/migrations/20240102000000_changes.sql","line":55}
+    },
+    {
+      "table": "app.comments",
+      "columns": [
+        {"name":"id","type":"bigserial","primary":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":64},"autoIncrement":true},
+        {"name":"post_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":64}},
+        {"name":"member_id","type":"bigint","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":64}}
+      ],
+      "relations": [
+        {"foreignKey":"post_id","references":"id","on":"posts","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"member_id","references":"member_id","on":"members","type":"many-to-one"}
+      ],
+      "source": {"file":"supabase/migrations/20240102000000_changes.sql","line":64}
+    },
+    {
+      "table": "posts",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":30},"defaultRaw":"extensions.uuid_generate_v4()"},
+        {"name":"author_id","type":"bigint","source":{"file":"supabase/migrations/20240101000000_init.sql","line":31}},
+        {"name":"parent_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240101000000_init.sql","line":32}},
+        {"name":"status","type":"app.Status","source":{"file":"supabase/migrations/20240101000000_init.sql","line":33},"default":"draft","values":["draft","published"]},
+        {"name":"title","type":"text","source":{"file":"supabase/migrations/20240101000000_init.sql","line":34},"comment":"The title; shown in lists"},
+        {"name":"slug","type":"varchar","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":28},"length":120},
+        {"name":"content","type":"text","source":{"file":"supabase/migrations/20240102000000_changes.sql","line":29},"default":""},
+        {"name":"editor_id","type":"bigint","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":18}},
+        {"name":"priority","type":"priority","nullable":true,"source":{"file":"supabase/migrations/20240102000000_changes.sql","line":26},"default":"low","values":["low","high"]}
+      ],
+      "relations": [
+        {"foreignKey":"author_id","references":"member_id","on":"members","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"editor_id","references":"member_id","on":"members","type":"many-to-one","onDelete":"no action","onUpdate":"no action"}
+      ],
+      "source": {"file":"supabase/migrations/20240101000000_init.sql","line":29},
+      "indexes": [
+        {"columns":["author_id","slug"],"type":"unique"},
+        {"columns":["lower(title)"],"type":"index","name":"posts_title_idx"}
+      ]
+    }
+  ],
+  "warnings": []
+}

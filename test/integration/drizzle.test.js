@@ -108,7 +108,7 @@ suite('DrawMeDatabase extension: a Drizzle project', () => {
         const schema = api.getSchema();
         assert.equal(schema.framework, 'drizzle');
         assert.equal(schema.basePath, workspace());
-        assert.deepEqual(api.getFrameworks().map(framework => framework.id), ['laravel', 'symfony', 'prisma', 'drizzle']);
+        assert.deepEqual(api.getFrameworks().map(framework => framework.id), ['laravel', 'symfony', 'prisma', 'drizzle', 'sql']);
         assert.equal(api.detectFramework(workspace()), 'drizzle');
         const at = (...parts) => path.join(workspace(), ...parts);
         assert.deepEqual(api.getSources(workspace(), 'drizzle'), {

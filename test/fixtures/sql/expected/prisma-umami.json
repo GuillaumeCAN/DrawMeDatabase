@@ -1,0 +1,546 @@
+{
+  "tables": [
+    {
+      "table": "user",
+      "columns": [
+        {"name":"user_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":6}},
+        {"name":"username","type":"varchar","source":{"file":"prisma/migrations/01_init/migration.sql","line":7},"length":255,"unique":true},
+        {"name":"password","type":"varchar","source":{"file":"prisma/migrations/01_init/migration.sql","line":8},"length":60},
+        {"name":"role","type":"varchar","source":{"file":"prisma/migrations/01_init/migration.sql","line":9},"length":50},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":10},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":11}},
+        {"name":"deleted_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":12}},
+        {"name":"display_name","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/04_team_redesign/migration.sql","line":12},"length":255},
+        {"name":"logo_url","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/04_team_redesign/migration.sql","line":13},"length":2183},
+        {"name":"two_factor_required","type":"boolean","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":5},"default":false}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/01_init/migration.sql","line":5}
+    },
+    {
+      "table": "session",
+      "columns": [
+        {"name":"session_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":19}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/01_init/migration.sql","line":20}},
+        {"name":"browser","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":22},"length":20},
+        {"name":"os","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":23},"length":20},
+        {"name":"device","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":24},"length":20},
+        {"name":"screen","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":25},"length":11},
+        {"name":"language","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":26},"length":35},
+        {"name":"country","type":"char","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":27},"length":2},
+        {"name":"region","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/09_update_hostname_region/migration.sql","line":16},"length":20},
+        {"name":"city","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":30},"length":50},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":31},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"distinct_id","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/10_add_distinct_id/migration.sql","line":2},"length":50}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/01_init/migration.sql","line":18},
+      "indexes": [
+        {"columns":["created_at"],"type":"index","name":"session_created_at_idx"},
+        {"columns":["website_id"],"type":"index","name":"session_website_id_idx"},
+        {"columns":["website_id","created_at"],"type":"index","name":"session_website_id_created_at_idx"},
+        {"columns":["website_id","created_at","browser"],"type":"index","name":"session_website_id_created_at_browser_idx"},
+        {"columns":["website_id","created_at","os"],"type":"index","name":"session_website_id_created_at_os_idx"},
+        {"columns":["website_id","created_at","device"],"type":"index","name":"session_website_id_created_at_device_idx"},
+        {"columns":["website_id","created_at","screen"],"type":"index","name":"session_website_id_created_at_screen_idx"},
+        {"columns":["website_id","created_at","language"],"type":"index","name":"session_website_id_created_at_language_idx"},
+        {"columns":["website_id","created_at","country"],"type":"index","name":"session_website_id_created_at_country_idx"},
+        {"columns":["website_id","created_at","city"],"type":"index","name":"session_website_id_created_at_city_idx"},
+        {"columns":["website_id","created_at","region"],"type":"index","name":"session_website_id_created_at_region_idx"}
+      ]
+    },
+    {
+      "table": "website",
+      "columns": [
+        {"name":"website_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":38}},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/01_init/migration.sql","line":39},"length":100},
+        {"name":"domain","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":40},"length":500},
+        {"name":"reset_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":42}},
+        {"name":"user_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":43}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":44},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":45}},
+        {"name":"deleted_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":46}},
+        {"name":"created_by","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/04_team_redesign/migration.sql","line":16}},
+        {"name":"team_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/04_team_redesign/migration.sql","line":17}},
+        {"name":"recorder_enabled","type":"boolean","source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":1},"default":false},
+        {"name":"replay_config","type":"jsonb","nullable":true,"source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":8}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/01_init/migration.sql","line":37},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"website_user_id_idx"},
+        {"columns":["created_at"],"type":"index","name":"website_created_at_idx"},
+        {"columns":["team_id"],"type":"index","name":"website_team_id_idx"},
+        {"columns":["created_by"],"type":"index","name":"website_created_by_idx"}
+      ]
+    },
+    {
+      "table": "website_event",
+      "columns": [
+        {"name":"event_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":53}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/01_init/migration.sql","line":54}},
+        {"name":"session_id","type":"uuid","source":{"file":"prisma/migrations/01_init/migration.sql","line":55}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":56},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"url_path","type":"varchar","source":{"file":"prisma/migrations/01_init/migration.sql","line":57},"length":500},
+        {"name":"url_query","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":58},"length":500},
+        {"name":"referrer_path","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":59},"length":500},
+        {"name":"referrer_query","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":60},"length":500},
+        {"name":"referrer_domain","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":61},"length":500},
+        {"name":"page_title","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":62},"length":500},
+        {"name":"event_type","type":"integer","source":{"file":"prisma/migrations/01_init/migration.sql","line":63},"default":1},
+        {"name":"event_name","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":64},"length":50},
+        {"name":"visit_id","type":"uuid","source":{"file":"prisma/migrations/05_add_visit_id/migration.sql","line":2}},
+        {"name":"tag","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/07_add_tag/migration.sql","line":2},"length":50},
+        {"name":"fbclid","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":3},"length":255},
+        {"name":"gclid","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":4},"length":255},
+        {"name":"li_fat_id","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":5},"length":255},
+        {"name":"msclkid","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":6},"length":255},
+        {"name":"ttclid","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":7},"length":255},
+        {"name":"twclid","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":8},"length":255},
+        {"name":"utm_campaign","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":9},"length":255},
+        {"name":"utm_content","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":10},"length":255},
+        {"name":"utm_medium","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":11},"length":255},
+        {"name":"utm_source","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":12},"length":255},
+        {"name":"utm_term","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/08_add_utm_clid/migration.sql","line":13},"length":255},
+        {"name":"hostname","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/09_update_hostname_region/migration.sql","line":2},"length":100},
+        {"name":"cls","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/18_add_performance/migration.sql","line":2},"precision":10,"scale":4},
+        {"name":"fcp","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/18_add_performance/migration.sql","line":3},"precision":10,"scale":1},
+        {"name":"inp","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/18_add_performance/migration.sql","line":4},"precision":10,"scale":1},
+        {"name":"lcp","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/18_add_performance/migration.sql","line":5},"precision":10,"scale":1},
+        {"name":"ttfb","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/18_add_performance/migration.sql","line":6},"precision":10,"scale":1}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/01_init/migration.sql","line":52},
+      "indexes": [
+        {"columns":["created_at"],"type":"index","name":"website_event_created_at_idx"},
+        {"columns":["session_id"],"type":"index","name":"website_event_session_id_idx"},
+        {"columns":["website_id"],"type":"index","name":"website_event_website_id_idx"},
+        {"columns":["website_id","created_at"],"type":"index","name":"website_event_website_id_created_at_idx"},
+        {"columns":["website_id","session_id","created_at"],"type":"index","name":"website_event_website_id_session_id_created_at_idx"},
+        {"columns":["website_id","created_at","url_path"],"type":"index","name":"website_event_website_id_created_at_url_path_idx"},
+        {"columns":["website_id","created_at","url_query"],"type":"index","name":"website_event_website_id_created_at_url_query_idx"},
+        {"columns":["website_id","created_at","referrer_domain"],"type":"index","name":"website_event_website_id_created_at_referrer_domain_idx"},
+        {"columns":["website_id","created_at","page_title"],"type":"index","name":"website_event_website_id_created_at_page_title_idx"},
+        {"columns":["website_id","created_at","event_name"],"type":"index","name":"website_event_website_id_created_at_event_name_idx"},
+        {"columns":["visit_id"],"type":"index","name":"website_event_visit_id_idx"},
+        {"columns":["website_id","visit_id","created_at"],"type":"index","name":"website_event_website_id_visit_id_created_at_idx"},
+        {"columns":["website_id","created_at","tag"],"type":"index","name":"website_event_website_id_created_at_tag_idx"},
+        {"columns":["website_id","created_at","hostname"],"type":"index","name":"website_event_website_id_created_at_hostname_idx"}
+      ]
+    },
+    {
+      "table": "event_data",
+      "columns": [
+        {"name":"event_data_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":4}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/01_init/migration.sql","line":72}},
+        {"name":"website_event_id","type":"uuid","source":{"file":"prisma/migrations/01_init/migration.sql","line":73}},
+        {"name":"data_key","type":"varchar","source":{"file":"prisma/migrations/06_session_data/migration.sql","line":5},"length":500},
+        {"name":"string_value","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":6},"length":500},
+        {"name":"number_value","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":5},"precision":19,"scale":4},
+        {"name":"date_value","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":3}},
+        {"name":"data_type","type":"integer","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":2}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":79},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/01_init/migration.sql","line":70},
+      "indexes": [
+        {"columns":["created_at"],"type":"index","name":"event_data_created_at_idx"},
+        {"columns":["website_id"],"type":"index","name":"event_data_website_id_idx"},
+        {"columns":["website_event_id"],"type":"index","name":"event_data_website_event_id_idx"},
+        {"columns":["website_id","created_at"],"type":"index","name":"event_data_website_id_created_at_idx"},
+        {"columns":["website_id","created_at","data_key"],"type":"index","name":"event_data_website_id_created_at_data_key_idx"}
+      ]
+    },
+    {
+      "table": "team",
+      "columns": [
+        {"name":"team_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":86}},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/01_init/migration.sql","line":87},"length":50},
+        {"name":"access_code","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":88},"length":50,"unique":true},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":89},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":90}},
+        {"name":"deleted_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/04_team_redesign/migration.sql","line":8}},
+        {"name":"logo_url","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/04_team_redesign/migration.sql","line":9},"length":2183},
+        {"name":"two_factor_required","type":"boolean","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":2},"default":false}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/01_init/migration.sql","line":85},
+      "indexes": [
+        {"columns":["access_code"],"type":"index","name":"team_access_code_idx"}
+      ]
+    },
+    {
+      "table": "team_user",
+      "columns": [
+        {"name":"team_user_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":97}},
+        {"name":"team_id","type":"uuid","source":{"file":"prisma/migrations/01_init/migration.sql","line":98}},
+        {"name":"user_id","type":"uuid","source":{"file":"prisma/migrations/01_init/migration.sql","line":99}},
+        {"name":"role","type":"varchar","source":{"file":"prisma/migrations/01_init/migration.sql","line":100},"length":50},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":101},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/01_init/migration.sql","line":102}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/01_init/migration.sql","line":96},
+      "indexes": [
+        {"columns":["team_id"],"type":"index","name":"team_user_team_id_idx"},
+        {"columns":["user_id"],"type":"index","name":"team_user_user_id_idx"}
+      ]
+    },
+    {
+      "table": "session_data",
+      "columns": [
+        {"name":"session_data_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":10}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":11}},
+        {"name":"session_id","type":"uuid","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":12}},
+        {"name":"data_key","type":"varchar","source":{"file":"prisma/migrations/06_session_data/migration.sql","line":9},"length":500},
+        {"name":"string_value","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":14},"length":500},
+        {"name":"number_value","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":15},"precision":19,"scale":4},
+        {"name":"date_value","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":16}},
+        {"name":"data_type","type":"integer","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":17}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":18},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"distinct_id","type":"varchar","nullable":true,"source":{"file":"prisma/migrations/10_add_distinct_id/migration.sql","line":5},"length":50}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":9},
+      "indexes": [
+        {"columns":["created_at"],"type":"index","name":"session_data_created_at_idx"},
+        {"columns":["website_id"],"type":"index","name":"session_data_website_id_idx"},
+        {"columns":["session_id"],"type":"index","name":"session_data_session_id_idx"},
+        {"columns":["session_id","created_at"],"type":"index","name":"session_data_session_id_created_at_idx"},
+        {"columns":["website_id","created_at","data_key"],"type":"index","name":"session_data_website_id_created_at_data_key_idx"},
+        {"columns":["session_id","data_key"],"type":"unique","name":"session_data_session_id_data_key_key"}
+      ]
+    },
+    {
+      "table": "report",
+      "columns": [
+        {"name":"report_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":26}},
+        {"name":"user_id","type":"uuid","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":27}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":28}},
+        {"name":"type","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":2},"length":50},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":30},"length":200},
+        {"name":"description","type":"varchar","source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":31},"length":500},
+        {"name":"parameters","type":"jsonb","source":{"file":"prisma/migrations/12_update_report_parameter/migration.sql","line":3}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":33},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":34}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/02_report_schema_session_data/migration.sql","line":25},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"report_user_id_idx"},
+        {"columns":["website_id"],"type":"index","name":"report_website_id_idx"},
+        {"columns":["type"],"type":"index","name":"report_type_idx"},
+        {"columns":["name"],"type":"index","name":"report_name_idx"}
+      ]
+    },
+    {
+      "table": "segment",
+      "columns": [
+        {"name":"segment_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/11_add_segment/migration.sql","line":3}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/11_add_segment/migration.sql","line":4}},
+        {"name":"type","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":8},"length":50},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/11_add_segment/migration.sql","line":6},"length":200},
+        {"name":"parameters","type":"jsonb","source":{"file":"prisma/migrations/11_add_segment/migration.sql","line":7}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/11_add_segment/migration.sql","line":8},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/11_add_segment/migration.sql","line":9}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/11_add_segment/migration.sql","line":2},
+      "indexes": [
+        {"columns":["website_id"],"type":"index","name":"segment_website_id_idx"}
+      ]
+    },
+    {
+      "table": "revenue",
+      "columns": [
+        {"name":"revenue_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/13_add_revenue/migration.sql","line":3}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/13_add_revenue/migration.sql","line":4}},
+        {"name":"session_id","type":"uuid","source":{"file":"prisma/migrations/13_add_revenue/migration.sql","line":5}},
+        {"name":"event_id","type":"uuid","source":{"file":"prisma/migrations/13_add_revenue/migration.sql","line":6}},
+        {"name":"event_name","type":"varchar","source":{"file":"prisma/migrations/13_add_revenue/migration.sql","line":7},"length":50},
+        {"name":"currency","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":5},"length":10},
+        {"name":"revenue","type":"decimal","nullable":true,"source":{"file":"prisma/migrations/13_add_revenue/migration.sql","line":9},"precision":19,"scale":4},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/13_add_revenue/migration.sql","line":10},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/13_add_revenue/migration.sql","line":2},
+      "indexes": [
+        {"columns":["website_id"],"type":"index","name":"revenue_website_id_idx"},
+        {"columns":["session_id"],"type":"index","name":"revenue_session_id_idx"},
+        {"columns":["website_id","created_at"],"type":"index","name":"revenue_website_id_created_at_idx"},
+        {"columns":["website_id","session_id","created_at"],"type":"index","name":"revenue_website_id_session_id_created_at_idx"}
+      ]
+    },
+    {
+      "table": "link",
+      "columns": [
+        {"name":"link_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":12}},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":13},"length":100},
+        {"name":"url","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":14},"length":500},
+        {"name":"slug","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":15},"length":100,"unique":true},
+        {"name":"user_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":16}},
+        {"name":"team_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":17}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":18},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":19}},
+        {"name":"deleted_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":20}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":11},
+      "indexes": [
+        {"columns":["slug"],"type":"index","name":"link_slug_idx"},
+        {"columns":["user_id"],"type":"index","name":"link_user_id_idx"},
+        {"columns":["team_id"],"type":"index","name":"link_team_id_idx"},
+        {"columns":["created_at"],"type":"index","name":"link_created_at_idx"}
+      ]
+    },
+    {
+      "table": "pixel",
+      "columns": [
+        {"name":"pixel_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":27}},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":28},"length":100},
+        {"name":"slug","type":"varchar","source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":29},"length":100,"unique":true},
+        {"name":"user_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":30}},
+        {"name":"team_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":31}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":32},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":33}},
+        {"name":"deleted_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":34}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/14_add_link_and_pixel/migration.sql","line":26},
+      "indexes": [
+        {"columns":["slug"],"type":"index","name":"pixel_slug_idx"},
+        {"columns":["user_id"],"type":"index","name":"pixel_user_id_idx"},
+        {"columns":["team_id"],"type":"index","name":"pixel_team_id_idx"},
+        {"columns":["created_at"],"type":"index","name":"pixel_created_at_idx"}
+      ]
+    },
+    {
+      "table": "share",
+      "columns": [
+        {"name":"share_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/15_add_share/migration.sql","line":3}},
+        {"name":"entity_id","type":"uuid","source":{"file":"prisma/migrations/15_add_share/migration.sql","line":4}},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/15_add_share/migration.sql","line":5},"length":200},
+        {"name":"share_type","type":"integer","source":{"file":"prisma/migrations/15_add_share/migration.sql","line":6}},
+        {"name":"slug","type":"varchar","source":{"file":"prisma/migrations/15_add_share/migration.sql","line":7},"length":100,"unique":true},
+        {"name":"parameters","type":"jsonb","source":{"file":"prisma/migrations/15_add_share/migration.sql","line":8}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/15_add_share/migration.sql","line":9},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/15_add_share/migration.sql","line":10}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/15_add_share/migration.sql","line":2},
+      "indexes": [
+        {"columns":["entity_id"],"type":"index","name":"share_entity_id_idx"}
+      ]
+    },
+    {
+      "table": "board",
+      "columns": [
+        {"name":"board_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/16_boards/migration.sql","line":3}},
+        {"name":"type","type":"varchar","source":{"file":"prisma/migrations/16_boards/migration.sql","line":4},"length":50},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/16_boards/migration.sql","line":5},"length":200},
+        {"name":"description","type":"varchar","source":{"file":"prisma/migrations/16_boards/migration.sql","line":6},"length":500},
+        {"name":"parameters","type":"jsonb","source":{"file":"prisma/migrations/16_boards/migration.sql","line":7}},
+        {"name":"user_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/16_boards/migration.sql","line":9}},
+        {"name":"team_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/16_boards/migration.sql","line":10}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/16_boards/migration.sql","line":11},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/16_boards/migration.sql","line":12}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/16_boards/migration.sql","line":2},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"board_user_id_idx"},
+        {"columns":["team_id"],"type":"index","name":"board_team_id_idx"},
+        {"columns":["created_at"],"type":"index","name":"board_created_at_idx"}
+      ]
+    },
+    {
+      "table": "session_replay",
+      "columns": [
+        {"name":"replay_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":12}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":13}},
+        {"name":"session_id","type":"uuid","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":14}},
+        {"name":"visit_id","type":"uuid","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":15}},
+        {"name":"chunk_index","type":"integer","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":16}},
+        {"name":"events","type":"bytea","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":17}},
+        {"name":"event_count","type":"integer","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":18}},
+        {"name":"started_at","type":"timestamptz","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":19}},
+        {"name":"ended_at","type":"timestamptz","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":20}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":21},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/19_add_session_replay/migration.sql","line":11},
+      "indexes": [
+        {"columns":["website_id"],"type":"index","name":"session_replay_website_id_idx"},
+        {"columns":["session_id"],"type":"index","name":"session_replay_session_id_idx"},
+        {"columns":["website_id","session_id"],"type":"index","name":"session_replay_website_id_session_id_idx"},
+        {"columns":["website_id","visit_id"],"type":"index","name":"session_replay_website_id_visit_id_idx"},
+        {"columns":["website_id","created_at"],"type":"index","name":"session_replay_website_id_created_at_idx"},
+        {"columns":["session_id","chunk_index"],"type":"index","name":"session_replay_session_id_chunk_index_idx"},
+        {"columns":["visit_id"],"type":"index","name":"session_replay_visit_id_idx"}
+      ]
+    },
+    {
+      "table": "session_replay_saved",
+      "columns": [
+        {"name":"saved_replay_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":36}},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":37},"length":100},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":38}},
+        {"name":"visit_id","type":"uuid","source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":39}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":40},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/19_add_session_replay/migration.sql","line":41}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/19_add_session_replay/migration.sql","line":35},
+      "indexes": [
+        {"columns":["website_id","visit_id"],"type":"unique","name":"session_replay_saved_website_id_visit_id_key"},
+        {"columns":["website_id"],"type":"index","name":"session_replay_saved_website_id_idx"},
+        {"columns":["visit_id"],"type":"index","name":"session_replay_saved_visit_id_idx"},
+        {"columns":["website_id","created_at"],"type":"index","name":"session_replay_saved_website_id_created_at_idx"}
+      ]
+    },
+    {
+      "table": "heatmap_event",
+      "columns": [
+        {"name":"heatmap_event_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":9}},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":10}},
+        {"name":"session_id","type":"uuid","source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":11}},
+        {"name":"visit_id","type":"uuid","source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":12}},
+        {"name":"url_path","type":"varchar","source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":13},"length":500},
+        {"name":"event_type","type":"integer","source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":14}},
+        {"name":"x","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":15}},
+        {"name":"y","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":16}},
+        {"name":"page_x","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":17}},
+        {"name":"page_y","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":18}},
+        {"name":"page_w","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":19}},
+        {"name":"viewport_w","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":20}},
+        {"name":"viewport_h","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":21}},
+        {"name":"page_h","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":22}},
+        {"name":"scroll_pct","type":"integer","nullable":true,"source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":23}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"prisma/migrations/20_add_heatmap/migration.sql","line":24},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/20_add_heatmap/migration.sql","line":8},
+      "indexes": [
+        {"columns":["website_id"],"type":"index","name":"heatmap_event_website_id_idx"},
+        {"columns":["visit_id"],"type":"index","name":"heatmap_event_visit_id_idx"},
+        {"columns":["website_id","created_at"],"type":"index","name":"heatmap_event_website_id_created_at_idx"},
+        {"columns":["website_id","url_path","event_type","created_at"],"type":"index","name":"heatmap_event_website_id_url_path_event_type_created_at_idx"}
+      ]
+    },
+    {
+      "table": "session_link",
+      "columns": [
+        {"name":"website_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/21_add_session_link/migration.sql","line":3}},
+        {"name":"session_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/21_add_session_link/migration.sql","line":4}},
+        {"name":"distinct_id","type":"varchar","primary":true,"source":{"file":"prisma/migrations/21_add_session_link/migration.sql","line":5},"length":50},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/21_add_session_link/migration.sql","line":6},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/21_add_session_link/migration.sql","line":2},
+      "indexes": [
+        {"columns":["website_id","session_id"],"type":"index","name":"session_link_website_id_session_id_idx"}
+      ]
+    },
+    {
+      "table": "two_factor_auth",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":9}},
+        {"name":"user_id","type":"uuid","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":10},"unique":true},
+        {"name":"secret","type":"text","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":11}},
+        {"name":"is_enabled","type":"boolean","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":12},"default":false},
+        {"name":"created_at","type":"timestamptz","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":13},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":14}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/22_add_2fa/migration.sql","line":8}
+    },
+    {
+      "table": "two_factor_backup_code",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":21}},
+        {"name":"user_id","type":"uuid","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":22}},
+        {"name":"code_hash","type":"text","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":23}},
+        {"name":"used","type":"boolean","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":24},"default":false},
+        {"name":"created_at","type":"timestamptz","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":25},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/22_add_2fa/migration.sql","line":20},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"two_factor_backup_code_user_id_idx"}
+      ]
+    },
+    {
+      "table": "two_factor_otp_used",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":32}},
+        {"name":"user_id","type":"uuid","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":33}},
+        {"name":"otp","type":"text","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":34}},
+        {"name":"expires_at","type":"timestamptz","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":35}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/22_add_2fa/migration.sql","line":31},
+      "indexes": [
+        {"columns":["user_id","otp"],"type":"unique","name":"two_factor_otp_used_user_id_otp_key"}
+      ]
+    },
+    {
+      "table": "two_factor_rate_limit",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":42}},
+        {"name":"user_id","type":"uuid","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":43},"unique":true},
+        {"name":"attempts","type":"integer","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":44},"default":0},
+        {"name":"locked_until","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":45}},
+        {"name":"updated_at","type":"timestamptz","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":46}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/22_add_2fa/migration.sql","line":41}
+    },
+    {
+      "table": "app_setting",
+      "columns": [
+        {"name":"key","type":"text","primary":true,"source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":53}},
+        {"name":"value","type":"text","source":{"file":"prisma/migrations/22_add_2fa/migration.sql","line":54}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/22_add_2fa/migration.sql","line":52}
+    },
+    {
+      "table": "annotation",
+      "columns": [
+        {"name":"annotation_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":3},"unique":true},
+        {"name":"website_id","type":"uuid","source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":4}},
+        {"name":"user_id","type":"uuid","nullable":true,"source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":5}},
+        {"name":"date","type":"timestamptz","source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":6}},
+        {"name":"all_day","type":"boolean","source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":7},"default":true},
+        {"name":"note","type":"varchar","source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":8},"length":500},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":9},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/25_add_annotation/migration.sql","line":10}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/migrations/25_add_annotation/migration.sql","line":2},
+      "indexes": [
+        {"columns":["website_id","date"],"type":"index","name":"annotation_website_id_date_idx"}
+      ]
+    },
+    {
+      "table": "api_key",
+      "columns": [
+        {"name":"api_key_id","type":"uuid","primary":true,"source":{"file":"prisma/migrations/26_add_api_key/migration.sql","line":3}},
+        {"name":"user_id","type":"uuid","source":{"file":"prisma/migrations/26_add_api_key/migration.sql","line":4}},
+        {"name":"name","type":"varchar","source":{"file":"prisma/migrations/26_add_api_key/migration.sql","line":5},"length":255},
+        {"name":"key_hash","type":"varchar","source":{"file":"prisma/migrations/26_add_api_key/migration.sql","line":6},"length":128,"unique":true},
+        {"name":"key_prefix","type":"varchar","source":{"file":"prisma/migrations/26_add_api_key/migration.sql","line":7},"length":20},
+        {"name":"last_used_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/26_add_api_key/migration.sql","line":8}},
+        {"name":"created_at","type":"timestamptz","nullable":true,"source":{"file":"prisma/migrations/26_add_api_key/migration.sql","line":9},"defaultRaw":"CURRENT_TIMESTAMP"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/migrations/26_add_api_key/migration.sql","line":2},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"api_key_user_id_idx"}
+      ]
+    }
+  ],
+  "warnings": []
+}

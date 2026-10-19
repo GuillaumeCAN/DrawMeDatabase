@@ -2,7 +2,7 @@
 
 ## About DrawMeDatabase
 
-**DrawMeDatabase** is a free and user-friendly Visual Studio Code extension designed to simplify database visualization. By leveraging reverse engineering techniques, this extension automatically analyzes your codebase to create clear and comprehensive diagrams representing your database structure. It reads the migrations of Laravel, the Doctrine entities of Symfony, the schema of Prisma and the schema files of Drizzle ORM.
+**DrawMeDatabase** is a free and user-friendly Visual Studio Code extension designed to simplify database visualization. By leveraging reverse engineering techniques, this extension automatically analyzes your codebase to create clear and comprehensive diagrams representing your database structure. It reads the migrations of Laravel, the Doctrine entities of Symfony, the schema of Prisma, the schema files of Drizzle ORM, and plain SQL: the migrations of Supabase, Flyway, dbmate, golang-migrate, goose... or a dump of the schema.
 
 Whether you're working on a complex project or managing a simple schema, DrawMeDatabase helps you understand the relationships, tables, and fields within your database without requiring manual effort. It’s an ideal tool for developers who want to improve their workflow, debug efficiently, or share a visual representation of their database design with teammates.
 
@@ -12,9 +12,10 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 ## Features
 
-**Framework Supported :** Laravel, Symfony, Prisma and Drizzle
+**Framework Supported :** Laravel, Symfony, Prisma, Drizzle and SQL (PostgreSQL, MySQL, SQLite)
 
 - **Laravel** (based on migrations): the files of `database/migrations` are replayed in filename order, like `php artisan migrate`. Only `up()` is read.
+  - The schema dump of `php artisan schema:dump` (`database/schema/mysql-schema.sql`, `pgsql-schema.sql`...) is loaded first, then the migrations it does not list, as `php artisan migrate` does on a new database: a project whose old migrations were squashed is drawn whole
   - `Schema::create`, `table`, `rename`, `drop`, `dropIfExists` (also through `Schema::connection(...)`)
   - Column types and helpers: `id()`, `timestamps()`, `softDeletes()`, `rememberToken()`, `morphs()`, `uuid()`, `ulid()`...
   - Foreign keys: `foreignId()->constrained()`, `foreignIdFor(Model::class)`, `foreignUuid()`, `foreignUlid()`, `foreign()->references()->on()`
@@ -36,6 +37,13 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
   - Relations from `.references(() => users.id, { onDelete })` and `foreignKey({ columns, foreignColumns })`: many-to-one or one-to-one (unique columns), composite, self and circular references (`(): AnyPgColumn => ...`)
   - Checked against drizzle-kit on the schemas of create-t3-app, Next.js SaaS Starter, Vercel's Chatbot, Cap, OpenStatus and Midday: the same tables, columns, keys, indexes and foreign keys
 
+- **SQL** (based on SQL files, PostgreSQL first, MySQL and SQLite): the migrations of a SQL migration tool, replayed in the order the tool applies them, or a dump of the schema. The SQL is read, never run, and no database is needed.
+  - Supported layouts: Supabase (`supabase/migrations/<timestamp>_<name>.sql`), Flyway (`V<version>__<name>.sql` in `src/main/resources/db/migration`, `db/migration` or `sql`, by version; the repeatable `R__` ones are left out), dbmate (`db/migrations`, the `-- migrate:up` section), golang-migrate (`<version>_<name>.up.sql`), goose (`-- +goose Up`), diesel (`migrations/<name>/up.sql`), numbered migrations (`migrations/001_name.sql`: sqlx, Atlas...), Rails `db/structure.sql`, a dump (`schema.sql`, `structure.sql`, `dump.sql`... at the root or in `db/`: pg_dump, mysqldump, `sqlite3 .schema`). The output of `prisma migrate` (`prisma/migrations`) and of drizzle-kit (`drizzle/`, in the order of its journal) is read when the project has no Prisma or Drizzle schema, or with `DrawMeDatabase.framework` set to `sql`. Set `DrawMeDatabase.frameworkPath` to a folder of migrations elsewhere
+  - `CREATE TABLE` (types with their length and precision, `NOT NULL`, `DEFAULT`, primary keys, `UNIQUE`, `REFERENCES` and `FOREIGN KEY` with `ON DELETE` / `ON UPDATE`), `CREATE TYPE ... AS ENUM` and `ALTER TYPE`, `CREATE [UNIQUE] INDEX`, `ALTER TABLE` (columns added, dropped, changed and renamed, constraints added and dropped, `RENAME TO`, `SET SCHEMA`), `DROP TABLE`, `DROP SCHEMA ... CASCADE`; schema-qualified and quoted names, comments, dollar-quoted bodies, the DDL of `DO` blocks, transactions. Functions, triggers, policies, grants, extensions, views and data are passed over
+  - MySQL: backticks, `AUTO_INCREMENT`, `ENGINE=...`, inline `KEY`, `INDEX`, `UNIQUE KEY` and `CONSTRAINT`, `MODIFY`, `CHANGE`, `FIRST` / `AFTER`, `RENAME TABLE`, `DELIMITER` and the executable comments of mysqldump. SQLite: `AUTOINCREMENT`, `WITHOUT ROWID`, the tables that prisma migrate and drizzle-kit rebuild to change them
+  - A click on a table opens its `CREATE TABLE`, on a column the statement that declared or last changed it; the git status follows the migrations (a new migration marks the tables it changes as modified)
+  - Checked against PostgreSQL 17, MySQL 8.4 and SQLite on the migrations of Chatbot UI, Basejump, Next.js Subscription Payments, Harness, OpenFGA, Umami (prisma migrate), OpenStatus (drizzle-kit), Atala PRISM (Flyway), and the dumps of Feedbin (Rails), Pagila, listmonk, Sakila and GitLab: the same tables, columns, keys, foreign keys and indexes as the database
+
 **Diagram viewer:**
 
 - Mermaid 12 entity-relationship diagram: columns with their type (`type?` when nullable), primary and foreign keys, one-to-many / one-to-one / many-to-many relations
@@ -48,7 +56,7 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
   ![The inspector of a table: its columns with their keys, types and git status, the tables that reference it, and what DrawMeDatabase Pro adds](images/screenshots/inspector.png)
 
 - Search: keep the tables whose name or columns contain a text, with the tables they are linked to
-- Live: the diagram follows what you type in a migration, an entity, a Prisma schema or a Drizzle schema file (and the files its columns come from), before you save it
+- Live: the diagram follows what you type in a migration (PHP or SQL), an entity, a Prisma schema or a Drizzle schema file (and the files its columns come from), before you save it
 - Git status of the tables: new, modified, and changed in an editor but not saved yet, in the colors of the git decorations of VS Code (when the project is a git repository)
 
 **DrawMeDatabase in the Activity Bar** (the database icon), like GitLens:
@@ -118,10 +126,10 @@ In the panel:
 **Settings:**
 
 - `DrawMeDatabase.frameworkPath`: path to the framework folder, relative to the workspace folder. Leave it empty if the framework is at the root of the workspace. Example: `my-project/app/symfony`
-- `DrawMeDatabase.framework`: `auto` (default) detects the framework of the project; `laravel`, `symfony`, `prisma` or `drizzle` chooses it, for a project that matches several of them (the **DrawMeDatabase** output lists the frameworks found)
+- `DrawMeDatabase.framework`: `auto` (default) detects the framework of the project; `laravel`, `symfony`, `prisma`, `drizzle` or `sql` chooses it, for a project that matches several of them (the **DrawMeDatabase** output lists the frameworks found). `sql` also draws the history of a Prisma or Drizzle project from its SQL migrations
 - `DrawMeDatabase.layout`: `elk` (default) or `dagre`
 - `DrawMeDatabase.direction`: `TB` (top to bottom, default) or `LR` (left to right)
-- `DrawMeDatabase.autoRefresh`: draw the open diagram again while you edit a migration, an entity, the Prisma schema or a Drizzle schema file, and when one is saved, created, deleted or committed (default: on)
+- `DrawMeDatabase.autoRefresh`: draw the open diagram again while you edit a migration, an entity, the Prisma schema, a Drizzle schema file or a SQL file, and when one is saved, created, deleted or committed (default: on)
 - `DrawMeDatabase.showGitStatus`: show the git status of the tables in the diagram (default: on, also the **Git** button of the toolbar)
 - `DrawMeDatabase.keysOnly`, `DrawMeDatabase.relationLabels`: only the keys of each table, the names of the relations (also in the options panel)
 - `DrawMeDatabase.language`: `auto` (the language of VS Code), `en` or `fr`
@@ -135,7 +143,8 @@ DrawMeDatabase reads your code, it does not execute it nor connect to a database
 
 - **Laravel**
   - Conditional code (`if`, loops, `Schema::whenTableHasColumn()`...) is applied as if every branch ran. Names computed at runtime (`config()`, variables, concatenations) are skipped, with a warning.
-  - Only the top-level files of `database/migrations` are read: sub-folders, package migrations (`loadMigrationsFrom()`) and schema dumps (`database/schema/*.sql`) are not.
+  - Only the top-level files of `database/migrations` are read: sub-folders and package migrations (`loadMigrationsFrom()`) are not.
+  - A schema dump is read for the default connection (`DB_CONNECTION` of `.env`, else the default of `config/database.php`, else the only dump; a warning names the one read when several dumps exist). Its tables have the SQL types of the dump (`varchar`, `bigint`), the migrations after it the Blueprint types (`string`). A binary dump (`pg_dump --format=custom`, Laravel 8) is not read. With the time machine of DrawMeDatabase Pro, the schema after a migration that the dump lists is replayed from the migration files alone.
   - Relations come from foreign key constraints only (`constrained()`, `foreign()->references()->on()`), not from Eloquent models. Without a table name, `constrained()` guesses it like Laravel (plural of the column name) and `foreignIdFor(Model::class)` assumes the model's default table and key.
 - **Symfony**
   - Only the attributes and annotations of `src/Entity` are read: XML/YAML mappings, other mapping folders, and traits or parent classes declared elsewhere (for example Gedmo's `TimestampableEntity`) are not. A warning names each trait or parent class that could not be read.
@@ -149,14 +158,19 @@ DrawMeDatabase reads your code, it does not execute it nor connect to a database
   - The types are those of Prisma (`String`, `DateTime`, the name of an enum): the native type of the database (`@db.VarChar(255)`) is in the details, for the exports of DrawMeDatabase Pro and the API. Scalar lists are drawn `String[]?`, as `prisma migrate` creates them nullable.
   - Models and fields with `@@ignore` / `@ignore` are drawn: `prisma migrate` still creates them. With `relationMode = "prisma"`, the relations are drawn although the database has no foreign key.
   - The values that Prisma Client generates (`uuid()`, `cuid()`, `@updatedAt`...) and the defaults of scalar lists (`@default([])`) are not given as defaults.
-  - The history of the schema (`prisma/migrations`) and Prisma 8 (`contract.prisma`, a release candidate) are not read yet.
+  - Prisma 8 (`contract.prisma`, a release candidate) is not read yet. The SQL of `prisma/migrations` is drawn with `DrawMeDatabase.framework` set to `sql`.
 - **Drizzle**
   - The schema files and `drizzle.config.ts` are read, not run: a table name, a column name, a schema path or a casing computed at run time (an environment variable, a function of a package) is named in the output, and the table is skipped (the key names the column, the usual locations are read). The helpers of a package (not of the project) are not read: their spreads are skipped with a warning.
   - As drizzle-kit, only the exported tables are drawn (a table that is not exported is named in the output), and not the tables of a `mysqlSchema()` (another database). Views are not drawn.
   - `relations()` and `defineRelations()` are the relations of the ORM, not foreign keys: a relation without `.references()` or `foreignKey()` is not drawn.
   - The types are the names of the column builders (`varchar`, `timestamp`, `serial`): the options that change the SQL type (`withTimezone`, `mode`) are not shown. The `{ enum: [...] }` of a text column only types it in TypeScript: its values are not given.
   - The casing set in the code of the app (`drizzle({ casing })`) is not read: drizzle-kit reads the one of `drizzle.config.ts`. drizzle-kit 1.0 ignores that one, and DrawMeDatabase too, with a warning (`snakeCase.table()` sets it).
-  - Imports are followed through relative paths and the path aliases of `tsconfig.json` (not those of a `tsconfig.json` it extends), not into the packages of a monorepo. The SQL migrations of drizzle-kit are not read.
+  - Imports are followed through relative paths and the path aliases of `tsconfig.json` (not those of a `tsconfig.json` it extends), not into the packages of a monorepo. The SQL migrations of drizzle-kit are drawn with `DrawMeDatabase.framework` set to `sql`.
+- **SQL**
+  - The SQL is read, not run: procedural code is applied as if every branch ran (the DDL of the branches of a `DO` block, not of its exception handlers), dynamic SQL (`EXECUTE format(...)`) is skipped with a warning, the bodies of functions and triggers are never applied. Views, materialized views, partitions, sequences, virtual tables (SQLite FTS) and temporary tables are not drawn, nor the tables of the migration tools (`schema_migrations`, `flyway_schema_history`, `_prisma_migrations`...).
+  - Tables created outside of the files (in the Supabase dashboard, by the application) are missing: an `ALTER TABLE` of such a table adds it with the columns it adds, with a warning, and a foreign key to it (`auth.users`) draws it without columns.
+  - The types are those of the SQL, as written (`character varying`, `int4`, `timestamptz`): they are not normalized. Unquoted names are folded to lower case on PostgreSQL only. The dialect is read from the files (or the lock file of prisma migrate, the journal of drizzle-kit, a folder named `postgres`, `mysql`, `sqlite`); SQL that does not tell it is read as PostgreSQL, without folding the names.
+  - Only the first layout found is read (migrations before a dump). dbmate's `db/schema.sql` is read only without migrations, Flyway's repeatable migrations (`R__`) and Liquibase changelogs are not read, nor T-SQL (`GO`, `[dbo]`). Each migration file starts with the default search path (`public`).
 - **Every framework**
   - The diagram shows the column type, the primary key and the nullable flag. Lengths, default values, indexes and `ON DELETE` are read too, for the exports of DrawMeDatabase Pro and the API (`details` option). Many-to-many join tables are drawn as a single link.
   - In the diagram, characters that Mermaid cannot read in an attribute name or type (spaces, `$`, `#`...) are replaced with `_` (the JSON viewer always shows the exact names).

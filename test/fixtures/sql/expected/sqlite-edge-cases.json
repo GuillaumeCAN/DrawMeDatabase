@@ -1,0 +1,55 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"integer","primary":true,"source":{"file":"migrations/1_init.up.sql","line":3},"autoIncrement":true},
+        {"name":"email","type":"text","source":{"file":"migrations/1_init.up.sql","line":4},"unique":true},
+        {"name":"display_name","type":"varchar","nullable":true,"source":{"file":"migrations/10_alter.up.sql","line":3},"length":100},
+        {"name":"created_at","type":"datetime","source":{"file":"migrations/1_init.up.sql","line":6},"defaultRaw":"(datetime('now'))"},
+        {"name":"bio","type":"text","source":{"file":"migrations/10_alter.up.sql","line":2},"default":""}
+      ],
+      "relations": [],
+      "source": {"file":"migrations/1_init.up.sql","line":2}
+    },
+    {
+      "table": "post_tags",
+      "columns": [
+        {"name":"post_id","type":"integer","primary":true,"nullable":true,"source":{"file":"migrations/1_init.up.sql","line":18}},
+        {"name":"tag","type":"text","primary":true,"nullable":true,"source":{"file":"migrations/1_init.up.sql","line":19}}
+      ],
+      "relations": [
+        {"foreignKey":"post_id","references":"id","on":"posts","type":"many-to-one"},
+        {"foreignKey":"tag","references":"name","on":"labels","type":"many-to-one","onUpdate":"cascade"}
+      ],
+      "source": {"file":"migrations/1_init.up.sql","line":17}
+    },
+    {
+      "table": "posts",
+      "columns": [
+        {"name":"id","type":"integer","primary":true,"source":{"file":"migrations/2_redefine_posts.up.sql","line":6},"autoIncrement":true},
+        {"name":"user_id","type":"integer","source":{"file":"migrations/2_redefine_posts.up.sql","line":7}},
+        {"name":"title","type":"text","source":{"file":"migrations/2_redefine_posts.up.sql","line":8}},
+        {"name":"body","type":"text","nullable":true,"source":{"file":"migrations/2_redefine_posts.up.sql","line":9}},
+        {"name":"published","type":"boolean","source":{"file":"migrations/2_redefine_posts.up.sql","line":10},"default":false}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"users","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"migrations/2_redefine_posts.up.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"posts_user_id_idx"}
+      ]
+    },
+    {
+      "table": "labels",
+      "columns": [
+        {"name":"name","type":"text","primary":true,"source":{"file":"migrations/1_init.up.sql","line":16}},
+        {"name":"color","type":"text","nullable":true,"source":{"file":"migrations/1_init.up.sql","line":16}}
+      ],
+      "relations": [],
+      "source": {"file":"migrations/1_init.up.sql","line":16}
+    }
+  ],
+  "warnings": []
+}
