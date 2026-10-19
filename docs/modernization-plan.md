@@ -167,7 +167,7 @@ Findings in `extension.js`: each render replaces `panel.webview.html`, which rel
 
 - Workstream 5 (see above).
 - ~~PNG export: with labels in `foreignObject`, the canvas gets "tainted". SVG and `.mmd` are enough.~~ Done in 1.2.0 with `htmlLabels: false` (see decisions).
-- Other frameworks (Django, commented out in `parsers/parser.js`, Rails, Prisma…).
+- Other frameworks (Django, Rails, Prisma…): the parsers are pluggable since 1.8.0, see [parsers.md](parsers.md).
 - Relations inferred from Eloquent models, Doctrine XML/YAML mappings and embeddables.
 - Connecting to a real database, and editing the schema from the diagram.
 - Moving to TypeScript or to a bundler: plain CommonJS JS without a build step, with `jsconfig`, is enough, and every workstream above works with it.

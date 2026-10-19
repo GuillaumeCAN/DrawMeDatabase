@@ -217,7 +217,8 @@
             if (info.source) {
                 const open = element('button', { type: 'button', className: 'panel-button primary', title: `${info.source.file}:${info.source.line}` }, [
                     icon('file'),
-                    element('span', { text: t(info.framework === 'laravel' ? 'inspector.open.laravel' : info.framework === 'symfony' ? 'inspector.open.symfony' : 'inspector.open') }),
+                    // 'Open the migration' (inspector.open.laravel), else 'Open the file'
+                    element('span', { text: t(typeof info.framework === 'string' && t.has && t.has(`inspector.open.${info.framework}`) ? `inspector.open.${info.framework}` : 'inspector.open') }),
                 ]);
                 open.addEventListener('click', () => action('open'));
                 buttons.push(open);

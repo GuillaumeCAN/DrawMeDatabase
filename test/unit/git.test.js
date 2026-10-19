@@ -14,7 +14,7 @@ const os = require('os');
 const path = require('path');
 const childProcess = require('child_process');
 
-const { lineMapping, tableStatus, createStatusReader } = require('../../parsers/git');
+const { lineMapping, tableStatus, createStatusReader, sourcePaths } = require('../../parsers/git');
 const laravel = require('../../parsers/laravel');
 
 const TMP = fs.realpathSync(os.tmpdir());
@@ -120,6 +120,52 @@ describe('createStatusReader without git', () => {
         const removed = createStatusReader(dir, { git: false, overrides: new Map([[file('a.php'), 'one\nthree\n']]) });
         assert.equal(removed.statusOf(file('a.php'))(1, 2), 'unsaved');
         assert.equal(removed.statusOf(file('a.php'))(2, 2), null);
+    });
+});
+
+describe('createStatusReader with the sources of a parser', () => {
+    it('reads the folders and the files of the sources, the missing ones left out', () => {
+        const { dir, file } = repository({ 'a.php': 'one\ntwo\n' });
+        fs.mkdirSync(path.join(dir, 'schema'));
+        fs.writeFileSync(path.join(dir, 'schema', 'main.x'), 'model\n');
+        fs.writeFileSync(path.join(dir, 'config.x'), 'path\n');
+        fs.writeFileSync(path.join(dir, 'other.x'), 'not read\n');
+        commitAll(dir);
+        fs.writeFileSync(file('a.php'), 'one\nTWO\n');
+        fs.writeFileSync(path.join(dir, 'schema', 'main.x'), 'model\nfield\n');
+        fs.writeFileSync(path.join(dir, 'config.x'), 'other path\n');
+        fs.writeFileSync(path.join(dir, 'other.x'), 'changed, not read\n');
+        fs.writeFileSync(path.join(dir, 'schema', 'new.x'), 'new\n');
+
+        const sources = {
+            folders: [{ path: path.join(dir, 'database', 'migrations'), recursive: false }, { path: path.join(dir, 'schema'), recursive: true }],
+            files: [path.join(dir, 'config.x'), path.join(dir, 'missing.x')],
+            extensions: ['.php', '.x'],
+        };
+        const cache = new Map();
+        const reader = createStatusReader(sources, { cache });
+        assert.equal(reader.warning, null);
+        assert.equal(reader.statusOf(file('a.php'))(1, 1), 'committed');
+        assert.equal(reader.statusOf(file('a.php'))(2, 2), 'modified');
+        assert.equal(reader.statusOf(path.join(dir, 'schema', 'main.x'))(1, 1), 'committed');
+        assert.equal(reader.statusOf(path.join(dir, 'schema', 'main.x'))(2, 2), 'modified');
+        assert.equal(reader.statusOf(path.join(dir, 'schema', 'new.x'))(1, 1), 'untracked');
+        assert.equal(reader.statusOf(path.join(dir, 'config.x'))(1, 1), 'modified');
+        // A file outside of the sources: git did not read it
+        assert.equal(reader.statusOf(path.join(dir, 'other.x'))(1, 1), 'committed');
+        assert.equal(cache.size, 1, 'one git run for all the sources');
+
+        // Only missing files: no git status, and nothing to tell
+        const none = createStatusReader({ folders: [], files: [path.join(dir, 'missing.x')] });
+        assert.equal(none.warning, null);
+        assert.equal(none.statusOf(file('a.php'))(1, 1), null);
+    });
+
+    it('takes a folder, a list of paths, or sources', () => {
+        assert.deepEqual(sourcePaths('/app/db'), ['/app/db']);
+        assert.deepEqual(sourcePaths(['/app/db', 3, '/app/x']), ['/app/db', '/app/x']);
+        assert.deepEqual(sourcePaths({ folders: [{ path: '/app/db', recursive: false }, '/app/src', { path: '' }], files: ['/app/schema.x', ''] }), ['/app/db', '/app/src', '/app/schema.x']);
+        assert.deepEqual(sourcePaths(undefined), []);
     });
 });
 

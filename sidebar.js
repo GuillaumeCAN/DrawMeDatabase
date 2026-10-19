@@ -113,7 +113,8 @@ function tableNode(table, t, { git, columnGit, framework }) {
     const relations = list(table.relations).filter(relation => relation && typeof relation.on === 'string');
     const status = gitStatus(table.git, git);
     const file = table.source && typeof table.source.file === 'string' ? table.source.file : '';
-    const open = framework === 'laravel' || framework === 'symfony' ? `inspector.open.${framework}` : 'inspector.open';
+    // 'Open the migration' (inspector.open.laravel), else 'Open the file'
+    const open = typeof framework === 'string' && t.has && t.has(`inspector.open.${framework}`) ? `inspector.open.${framework}` : 'inspector.open';
     return {
         id: `table:${table.table}`,
         table: table.table,

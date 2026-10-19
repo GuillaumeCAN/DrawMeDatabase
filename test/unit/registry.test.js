@@ -1,0 +1,352 @@
+//
+// Copyright (c) 2025 Guillaume Cancalon - All rights reserved
+//
+// This file is part of DrawMeDatabase, and is released under the "GNU GENERAL PUBLIC LICENSE".
+// Please see the LICENSE file that should have been included as part of this package.
+//
+
+// The registry of the parsers (parsers/registry.js): the contract of the parsers, the detection of
+// the stack of a folder (scores, ties, the DrawMeDatabase.framework setting) and their sources
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const registry = require('../../parsers/registry');
+const { detectFramework, createRegistry, covers, watchPatterns } = registry;
+const { ParserError } = require('../../parsers/errors');
+const pkg = require('../../package.json');
+
+let tmpRoot;
+
+test.before(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dmdb-detect-'));
+});
+
+test.after(() => {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
+
+// Creates a project folder with the given files (relative path -> content)
+function project(name, files) {
+    const dir = path.join(tmpRoot, name);
+    for (const [file, content] of Object.entries(files)) {
+        fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+        fs.writeFileSync(path.join(dir, file), content);
+    }
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+}
+
+const composer = (dependencies, extra = {}) => JSON.stringify({ name: 'acme/app', require: dependencies, ...extra }, null, 4);
+
+test('detects Laravel: artisan + laravel/framework', () => {
+    const dir = project('laravel', {
+        artisan: '#!/usr/bin/env php',
+        'composer.json': composer({ php: '^8.2', 'laravel/framework': '^12.0' }),
+    });
+    assert.equal(detectFramework(dir), 'laravel');
+});
+
+test('detects Symfony: bin/console + symfony/framework-bundle', () => {
+    const dir = project('symfony', {
+        'bin/console': '#!/usr/bin/env php',
+        'composer.json': composer({ php: '>=8.2', 'symfony/framework-bundle': '7.4.*', 'doctrine/orm': '^3.3' }),
+    });
+    assert.equal(detectFramework(dir), 'symfony');
+});
+
+test('detects Symfony with another symfony/* package', () => {
+    const dir = project('symfony-console', {
+        'bin/console': '',
+        'composer.json': composer({ 'symfony/console': '^7.4', 'doctrine/orm': '^3.3' }),
+    });
+    assert.equal(detectFramework(dir), 'symfony');
+});
+
+test('a symfony polyfill alone is not Symfony', () => {
+    const dir = project('polyfill', {
+        'bin/console': '',
+        'composer.json': composer({ 'symfony/polyfill-mbstring': '^1.31' }),
+    });
+    assert.equal(detectFramework(dir), 'Unknown');
+});
+
+test('packages only in require-dev are ignored', () => {
+    const dir = project('require-dev', {
+        artisan: '',
+        'bin/console': '',
+        'composer.json': composer({ php: '^8.2' }, { 'require-dev': { 'laravel/framework': '^12.0', 'symfony/framework-bundle': '^7.4' } }),
+    });
+    assert.equal(detectFramework(dir), 'Unknown');
+});
+
+test('Laravel needs artisan, Symfony needs bin/console', () => {
+    const noArtisan = project('no-artisan', { 'composer.json': composer({ 'laravel/framework': '^12.0' }) });
+    assert.equal(detectFramework(noArtisan), 'Unknown');
+    const noConsole = project('no-console', { 'composer.json': composer({ 'symfony/framework-bundle': '^7.4' }) });
+    assert.equal(detectFramework(noConsole), 'Unknown');
+});
+
+test('Laravel wins when both markers are present', () => {
+    const dir = project('both', {
+        artisan: '',
+        'bin/console': '',
+        'composer.json': composer({ 'laravel/framework': '^12.0', 'symfony/console': '^7.4' }),
+    });
+    assert.equal(detectFramework(dir), 'laravel');
+});
+
+test('unknown project, missing composer.json or missing folder', () => {
+    assert.equal(detectFramework(project('empty', {})), 'Unknown');
+    assert.equal(detectFramework(project('no-composer', { artisan: '' })), 'Unknown');
+    assert.equal(detectFramework(path.join(tmpRoot, 'does-not-exist')), 'Unknown');
+    assert.equal(detectFramework(''), 'Unknown');
+    assert.equal(detectFramework(undefined), 'Unknown');
+});
+
+test('invalid composer.json is reported with the reason', () => {
+    const trailingComma = project('bad-json', {
+        artisan: '',
+        'composer.json': '{"require": {"laravel/framework": "^12.0",}}',
+    });
+    assert.throws(() => detectFramework(trailingComma), error => error instanceof ParserError
+        && error.message.startsWith(`composer.json in "${trailingComma}" could not be read: `)
+        && /JSON/.test(error.message));
+
+    const empty = project('empty-json', { artisan: '', 'composer.json': '' });
+    assert.throws(() => detectFramework(empty), ParserError);
+});
+
+test('composer.json without a usable "require" is Unknown', () => {
+    for (const [name, content] of [['null-json', 'null'], ['array-require', '{"require": ["laravel/framework"]}'], ['no-require', '{}']]) {
+        assert.equal(detectFramework(project(name, { artisan: '', 'composer.json': content })), 'Unknown', name);
+    }
+});
+
+test('composer.json with a UTF-8 BOM is read', () => {
+    const laravel = project('bom-laravel', {
+        artisan: '',
+        'composer.json': '\uFEFF' + composer({ 'laravel/framework': '^12.0' }),
+    });
+    assert.equal(detectFramework(laravel), 'laravel');
+
+    const symfony = project('bom-symfony', {
+        'bin/console': '',
+        'composer.json': Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from(composer({ 'symfony/framework-bundle': '^7.4' }))]),
+    });
+    assert.equal(detectFramework(symfony), 'symfony');
+});
+
+test('artisan must be a file', () => {
+    const dir = project('artisan-dir', {
+        'artisan/readme.txt': '',
+        'composer.json': composer({ 'laravel/framework': '^12.0' }),
+    });
+    assert.equal(detectFramework(dir), 'Unknown');
+});
+
+// ---------------------------------------------------------------------------------------------
+// Registry
+
+// A parser of the contract that gives `score` (or runs it, when it is a function)
+const fake = (id, score, extra = {}) => ({
+    id,
+    label: id.toUpperCase(),
+    detect: typeof score === 'function' ? score : () => score,
+    sources: () => ({ folders: [], files: [], extensions: [] }),
+    parse: () => ({ tables: [], warnings: [] }),
+    ...extra,
+});
+
+// Both markers and both framework packages: Laravel and Symfony both give 100
+const BOTH = {
+    artisan: '',
+    'bin/console': '',
+    'composer.json': composer({ 'laravel/framework': '^12.0', 'symfony/framework-bundle': '^7.4' }),
+};
+
+test('every parser follows the contract: id, label, detect(), sources(), parse()', () => {
+    const parsers = registry.getParsers();
+    assert.deepEqual(parsers.map(parser => parser.id), ['laravel', 'symfony'], 'Laravel first: it wins the ties');
+    assert.deepEqual(registry.labels(), ['Laravel', 'Symfony']);
+    const missing = path.join(tmpRoot, 'does-not-exist');
+    for (const parser of parsers) {
+        assert.match(parser.id, /^[a-z][a-z0-9-]*$/, parser.id);
+        assert.notEqual(parser.id, 'auto', 'auto is the value of the setting that detects');
+        assert.ok(typeof parser.label === 'string' && parser.label.trim(), parser.id);
+        for (const member of ['detect', 'sources', 'parse']) {
+            assert.equal(typeof parser[member], 'function', `${parser.id}.${member}`);
+        }
+        assert.equal(parser.detect(missing), 0, `${parser.id}: no score for a missing folder`);
+        assert.equal(registry.getParser(parser.id), parser);
+        const sources = registry.getSources(parser.id, tmpRoot);
+        assert.ok(sources.folders.length + sources.files.length > 0, `${parser.id} reads something`);
+        assert.ok([...sources.folders.map(folder => folder.path), ...sources.files].every(item => path.isAbsolute(item) && item.startsWith(tmpRoot + path.sep)));
+    }
+    assert.equal(new Set(parsers.map(parser => parser.id)).size, parsers.length, 'unique ids');
+    assert.equal(registry.getParser('rails'), undefined);
+    assert.equal(registry.getParser(undefined), undefined);
+});
+
+test('scores: Laravel 100, Symfony 100 with its framework bundle and 80 with another symfony/* package', () => {
+    const laravel = registry.getParser('laravel');
+    const symfony = registry.getParser('symfony');
+    const bundle = project('score-bundle', { 'bin/console': '', 'composer.json': composer({ 'symfony/framework-bundle': '^7.4' }) });
+    const consoleOnly = project('score-console', { 'bin/console': '', 'composer.json': composer({ 'symfony/console': '^7.4' }) });
+    const app = project('score-laravel', { artisan: '', 'composer.json': composer({ 'laravel/framework': '^12.0' }) });
+    assert.equal(laravel.detect(app), 100);
+    assert.equal(symfony.detect(app), 0);
+    assert.equal(symfony.detect(bundle), 100);
+    assert.equal(symfony.detect(consoleOnly), 80);
+    assert.equal(laravel.detect(bundle), 0);
+    assert.deepEqual(registry.detect(consoleOnly), { framework: 'symfony', forced: false, matches: [{ id: 'symfony', label: 'Symfony', score: 80 }] });
+    assert.deepEqual(registry.detect(project('score-none', {})), { framework: 'Unknown', forced: false, matches: [] });
+});
+
+test('Laravel wins a tie with Symfony, as before the registry; both are listed', () => {
+    const dir = project('tie', BOTH);
+    assert.deepEqual(registry.detect(dir).matches.map(match => [match.id, match.score]), [['laravel', 100], ['symfony', 100]]);
+    assert.equal(detectFramework(dir), 'laravel');
+});
+
+test('the best score wins, the order of the registry breaks the ties', () => {
+    const scored = createRegistry([fake('a', 50), fake('b', 80), fake('c', 80), fake('d', 0)]);
+    assert.deepEqual(scored.detect(tmpRoot), {
+        framework: 'b',
+        forced: false,
+        matches: [{ id: 'b', label: 'B', score: 80 }, { id: 'c', label: 'C', score: 80 }, { id: 'a', label: 'A', score: 50 }],
+    });
+    assert.equal(createRegistry([fake('a', 80), fake('b', 80)]).detectFramework(tmpRoot), 'a');
+    assert.equal(createRegistry([fake('b', 80), fake('a', 80)]).detectFramework(tmpRoot), 'b');
+    assert.equal(createRegistry([fake('low', 1), fake('high', 2)]).detectFramework(tmpRoot), 'high');
+    // Not a positive finite number: not this stack
+    assert.equal(createRegistry([fake('a', 'yes'), fake('b', -1), fake('c', NaN), fake('d', Infinity), fake('e', null)]).detectFramework(tmpRoot), 'Unknown');
+    // A number as text counts
+    assert.equal(createRegistry([fake('a', '30')]).detectFramework(tmpRoot), 'a');
+    // Parsers given as functions are loaded on use
+    let loaded = 0;
+    const lazy = createRegistry([() => {
+        loaded++;
+        return fake('lazy', 10);
+    }]);
+    assert.equal(loaded, 0);
+    assert.equal(lazy.detectFramework(tmpRoot), 'lazy');
+    assert.ok(loaded > 0);
+});
+
+test('the error of a parser is thrown only when no other parser recognizes the folder', () => {
+    const broken = fake('broken', () => {
+        throw new ParserError('broken config');
+    });
+    assert.equal(createRegistry([broken, fake('ok', 10)]).detectFramework(tmpRoot), 'ok');
+    assert.throws(() => createRegistry([fake('none', 0), broken]).detectFramework(tmpRoot), error => error instanceof ParserError && error.message === 'broken config');
+    // The first error is thrown
+    const other = fake('other', () => {
+        throw new ParserError('other config');
+    });
+    assert.throws(() => createRegistry([broken, other]).detectFramework(tmpRoot), /broken config/);
+    // No detection without a folder
+    assert.equal(createRegistry([broken]).detectFramework(''), 'Unknown');
+    assert.equal(createRegistry([broken]).detectFramework(tmpRoot, { framework: 'broken' }), 'broken', 'set, it is not detected');
+});
+
+test('options.framework (the DrawMeDatabase.framework setting) wins over the detection', () => {
+    const dir = project('tie-setting', BOTH);
+    assert.equal(detectFramework(dir, { framework: 'symfony' }), 'symfony');
+    assert.deepEqual(registry.detect(dir, { framework: 'symfony' }), { framework: 'symfony', forced: true, matches: [] });
+    assert.equal(detectFramework(dir, { framework: 'laravel' }), 'laravel');
+    // Even for a folder that does not look like it: the parser then tells what is missing
+    assert.equal(detectFramework(project('forced-empty', {}), { framework: 'symfony' }), 'symfony');
+    // An invalid composer.json is not read
+    const bad = project('forced-bad-json', { artisan: '', 'composer.json': '{,}' });
+    assert.equal(detectFramework(bad, { framework: 'laravel' }), 'laravel');
+    assert.throws(() => detectFramework(bad), ParserError);
+    // 'auto', a value that names no parser, or no value: detected
+    for (const framework of ['auto', 'rails', 'Laravel', '', undefined, null, 42]) {
+        assert.equal(detectFramework(dir, { framework }), 'laravel', String(framework));
+        assert.equal(registry.detect(dir, { framework }).forced, false, String(framework));
+    }
+    assert.equal(detectFramework(dir, null), 'laravel');
+    assert.equal(detectFramework(dir, 'symfony'), 'laravel', 'options is an object');
+});
+
+test('the DrawMeDatabase.framework setting lists auto and the parsers, each one described', () => {
+    const setting = pkg.contributes.configuration.properties['DrawMeDatabase.framework'];
+    assert.deepEqual(setting.enum, ['auto', ...registry.getParsers().map(parser => parser.id)]);
+    assert.equal(setting.default, 'auto');
+    assert.equal(setting.scope, 'resource', 'per workspace folder, like the framework folder');
+    assert.equal(setting.enumDescriptions.length, setting.enum.length);
+    const english = require('../../package.nls.json');
+    const french = require('../../package.nls.fr.json');
+    for (const key of [setting.markdownDescription, ...setting.enumDescriptions].map(text => text.replace(/^%|%$/g, ''))) {
+        assert.ok(english[key] && french[key], key);
+    }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Sources
+
+test('the sources of Laravel and Symfony: database/migrations and src/Entity (with its sub-folders)', () => {
+    const base = path.join(tmpRoot, 'app');
+    assert.deepEqual(registry.getSources('laravel', base), { folders: [{ path: path.join(base, 'database', 'migrations'), recursive: false }], files: [], extensions: ['.php'] });
+    assert.deepEqual(registry.getSources('symfony', base), { folders: [{ path: path.join(base, 'src', 'Entity'), recursive: true }], files: [], extensions: ['.php'] });
+    assert.equal(registry.getSources('rails', base), undefined);
+});
+
+test('getSources() cleans the sources of a parser: absolute paths, recursive or not, extensions with a dot', () => {
+    const base = path.join(tmpRoot, 'app');
+    const custom = createRegistry([fake('x', 1, {
+        sources: (basePath) => ({
+            folders: ['db', { path: path.join(basePath, 'src'), recursive: true }, { path: 'lib', recursive: 'yes' }, { path: '' }, null, 3],
+            files: ['schema.x', '', 3, path.join(basePath, 'config.x')],
+            extensions: ['x', '.y', 'x', ''],
+        }),
+    }), fake('none', 1, { sources: () => undefined })]);
+    assert.deepEqual(custom.getSources('x', base), {
+        folders: [{ path: path.join(base, 'db'), recursive: false }, { path: path.join(base, 'src'), recursive: true }, { path: path.join(base, 'lib'), recursive: false }],
+        files: [path.join(base, 'schema.x'), path.join(base, 'config.x')],
+        extensions: ['.x', '.y'],
+    });
+    assert.deepEqual(custom.getSources('none', base), { folders: [], files: [], extensions: [] });
+});
+
+test('covers(): the files of the folders with the extensions, the sub-folders of the recursive ones, the listed files', () => {
+    const base = path.join(tmpRoot, 'app');
+    const at = (...segments) => path.join(base, ...segments);
+    const laravel = registry.getSources('laravel', base);
+    assert.equal(covers(laravel, at('database', 'migrations', '2024_01_01_000000_create_users_table.php')), true);
+    assert.equal(covers(laravel, at('database', 'migrations', 'old', '2024_01_01_000000_create_users_table.php')), false, 'not read by Laravel');
+    assert.equal(covers(laravel, at('database', 'migrations', 'notes.md')), false);
+    assert.equal(covers(laravel, at('database', 'migrations.php')), false);
+    assert.equal(covers(laravel, at('database', 'migrations', '..', 'seeders', 'a.php')), false);
+
+    const symfony = registry.getSources('symfony', base);
+    assert.equal(covers(symfony, at('src', 'Entity', 'Blog', 'Post.php')), true);
+    assert.equal(covers(symfony, at('src', 'Entity', 'Post.php')), true);
+    assert.equal(covers(symfony, at('src', 'EntityListener', 'Post.php')), false, 'a folder of the same prefix');
+    assert.equal(covers(symfony, at('src', 'Entity')), false);
+
+    const other = { folders: [{ path: at('prisma'), recursive: false }], files: [at('package.json')], extensions: ['.prisma'] };
+    assert.equal(covers(other, at('package.json')), true, 'a listed file, whatever its extension');
+    assert.equal(covers(other, at('prisma', 'schema.prisma')), true);
+    assert.equal(covers(other, at('prisma', 'seed.ts')), false);
+    assert.equal(covers({ folders: [{ path: at('sql'), recursive: true }], files: [], extensions: [] }, at('sql', 'v1', 'init.sql')), true, 'no extensions: every file');
+    assert.equal(covers(null, at('a.php')), false);
+    assert.equal(covers(laravel, ''), false);
+    assert.equal(covers(laravel, undefined), false);
+});
+
+test('watchPatterns(): a glob per folder (its sub-folders when recursive) and per file', () => {
+    const base = path.join(tmpRoot, 'app');
+    assert.deepEqual(watchPatterns(registry.getSources('laravel', base)), [{ base: path.join(base, 'database', 'migrations'), pattern: '*.php' }]);
+    assert.deepEqual(watchPatterns(registry.getSources('symfony', base)), [{ base: path.join(base, 'src', 'Entity'), pattern: '**/*.php' }]);
+    assert.deepEqual(watchPatterns({ folders: [{ path: path.join(base, 'prisma'), recursive: true }], files: [path.join(base, 'prisma.config.ts')], extensions: ['.prisma', '.sql'] }), [
+        { base: path.join(base, 'prisma'), pattern: '**/*.{prisma,sql}' },
+        { base, pattern: 'prisma.config.ts' },
+    ]);
+    assert.deepEqual(watchPatterns({ folders: [{ path: path.join(base, 'sql'), recursive: false }], files: [], extensions: [] }), [{ base: path.join(base, 'sql'), pattern: '*' }]);
+    assert.deepEqual(watchPatterns(undefined), []);
+});

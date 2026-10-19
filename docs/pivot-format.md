@@ -1,6 +1,6 @@
 # Pivot format
 
-Both parsers (`parsers/laravel.js`, `parsers/symfony.js`) return the schema in the same format, the "pivot". The viewers only read this format: a new framework only needs a parser that produces it. The JSON viewer shows it as is.
+Every parser (`parsers/laravel.js`, `parsers/symfony.js`, see [parsers.md](parsers.md)) returns the schema in the same format, the "pivot". The viewers only read this format: a new framework only needs a parser that produces it, and declares what it reads (`sources()`). The JSON viewer shows it as is.
 
 ```js
 parse(basePath, options) // → { tables, warnings }
@@ -15,6 +15,7 @@ parse(basePath, options) // → { tables, warnings }
   - `until` (Laravel): a migration file name, the schema right after it;
   - `details: true`: the column details, indexes and referential actions below (for exports and tools; the JSON viewer does not ask for them).
 - A missing migrations or entities folder, or a folder without PHP files, throws a `ParserError` (`parsers/errors.js`), whose message is shown to the user as is.
+- The parser of a framework root is chosen by the registry (`parsers/registry.js`): the `DrawMeDatabase.framework` setting, else the best `detect()` score. Its id is `framework` in the API.
 
 ## `tables`
 
@@ -48,7 +49,7 @@ One object per table, in the order of the code (migrations by file name, entitie
 | Field | Type | Meaning |
 |-------|------|---------|
 | `name` | string | Column name |
-| `type` | string | Laravel: the Blueprint method (`string`, `foreignId`...). Symfony: the Doctrine type (`string`, `datetime_immutable`...) |
+| `type` | string | The name the stack gives to the type. Laravel: the Blueprint method (`string`, `foreignId`...). Symfony: the Doctrine type (`string`, `datetime_immutable`...) |
 | `primary` | `true`, optional | Part of the primary key |
 | `nullable` | `true`, optional | Accepts `NULL` (drawn as `type?`) |
 | `git` | string, optional | Status of the lines that declare the column (Laravel: the statement that created, changed or renamed it last; Symfony: the property): `committed`, `modified`, `untracked` or `unsaved`, like the table |

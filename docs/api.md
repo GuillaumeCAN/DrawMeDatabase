@@ -18,12 +18,12 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 
 | Member | Description |
 |--------|-------------|
-| `apiVersion` | `2` since DrawMeDatabase 1.6.0 (`1` in 1.5.0). A new member raises it; members are never removed within a major version of the extension |
-| `getSchema()` | The schema on screen: `{ tables, framework, basePath, project: { name, folder } }` (`folder` is the URI of the workspace folder as a string), or `null` before the first drawing. A copy: changing it changes nothing |
+| `apiVersion` | `3` since DrawMeDatabase 1.8.0 (`2` in 1.6.0 and 1.7.0, `1` in 1.5.0). A new member raises it; members are never removed within a major version of the extension |
+| `getSchema()` | The schema on screen: `{ tables, framework, basePath, project: { name, folder } }` (`framework` is the id of the parser that read it, see `getFrameworks()`; `folder` is the URI of the workspace folder as a string), or `null` before the first drawing. A copy: changing it changes nothing |
 | `onDidChangeSchema(listener)` | Event fired with the new schema after each drawing (command, refresh, live edit). Returns a `Disposable` |
 | `showDiagram()` | Draws the schema of the workspace, like the DrawMeDatabase command. Resolves to the parsed tables |
-| `detectFramework(basePath)` | `'laravel'`, `'symfony'` or another value for an unsupported folder |
-| `parseSchema(basePath, framework, options)` | Parses a framework folder: `{ tables, warnings }`. Options: `git`, `overrides`, `gitCache`, `columnSources`, `until` (Laravel), `details` (lengths, defaults, indexes, ON DELETE...), see [pivot-format.md](pivot-format.md). Throws a `ParserError` for a missing folder or an unknown framework |
+| `detectFramework(basePath, options)` | The id of the stack of a framework root (`'laravel'`, `'symfony'`, see `getFrameworks()`), or `'Unknown'` for an unsupported folder. 1.8.0: `options.framework`, an id that wins over the detection, like the `DrawMeDatabase.framework` setting (the API does not read the setting: `getSchema().framework` follows it) |
+| `parseSchema(basePath, framework, options)` | Parses a framework folder with the parser `framework` (an id of `getFrameworks()`): `{ tables, warnings }`. Options: `git`, `overrides`, `gitCache`, `columnSources`, `until` (Laravel), `details` (lengths, defaults, indexes, ON DELETE...), see [pivot-format.md](pivot-format.md). Throws a `ParserError` for a missing folder or an unknown framework |
 | `viewsUri`, `viewScripts` | The folder of the page files and the scripts that draw a diagram, in loading order (`vendor/mermaid.min.js`, `i18n.js`, `appearance.js`, `mermaid/generator.js`, `mermaid/zoom.js`, `exporters.js`, `search.js`, `mermaid/diagram.js`, `sidepanel.js`), with `theme.css`. Add `viewsUri` to the `localResourceRoots` of your panel to reuse them, see [Pages](#pages) |
 | `registerExporter({ id, label, extension, export, pro })` | Adds an item to the Export menu of the diagram and to the Exports view of the sidebar (1.6.0: the Export section of the side panel). `export(schema)` gets the tables on screen (the search result when there is one) and returns the text of the file (or a promise), saved with the Save dialog. `pro: true`: locked in the Exports view once the trial of DrawMeDatabase Pro has ended. Returns a `Disposable` |
 | `focusTables({ tables, highlight, label })` | Shows only these tables (and the relations between them) in the diagram, `highlight` standing out, with `label` and a button to go back to the whole schema. Opens the diagram when needed |
@@ -40,6 +40,15 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 | `registerTableInfoProvider({ id, provide })` | Adds sections to the inspector of a table (a click on a table in the diagram). `provide(table, schema)` returns, or resolves to within 10 s, a list of sections: `{ title, items: [{ label, value, hint, badge, tone }], actions: [{ label, command, args }], note, locked }`. `tone`: `'added'`, `'modified'`, `'removed'`, `'muted'` or `'accent'`; an action runs `command` with `args` (strings, numbers, booleans); `locked: true` greys the section with a PRO badge. Without any provider, the inspector shows what DrawMeDatabase Pro would add. Returns a `Disposable` |
 | `getDisplaySettings()` | The appearance and the language chosen by the user: `{ theme, palette, colors, font, customFont, fontSize, grid, language }` (`language`: `'en'` or `'fr'`, already resolved) |
 | `onDidChangeDisplaySettings(listener)` | Event fired with the new display settings. Returns a `Disposable` |
+
+## Version 3 (DrawMeDatabase 1.8.0)
+
+The parsers are pluggable ([parsers.md](parsers.md)): a stack is an id (`framework` everywhere in the API) with its label and its sources. More stacks will follow: code that branches on `framework` keeps a default for the ids it does not know (for example, no Laravel migration written for a stack that is not `laravel`).
+
+| Member | Description |
+|--------|-------------|
+| `getFrameworks()` | The supported stacks, in the order of detection (the first one wins a tie): `[{ id, label }]`, today `[{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }]` |
+| `getSources(basePath, framework)` | What the parser of a stack reads in a framework root: `{ folders: [{ path, recursive }], files, extensions }`, absolute paths (`recursive`: its sub-folders too; `extensions`: of the files of the folders, `['.php']`; `files`: single files, whatever their extension). For example the files to copy for a version of the schema, or to watch. Throws a `ParserError` for an unknown framework |
 
 ## Sidebar (DrawMeDatabase 1.7.0)
 
@@ -58,7 +67,7 @@ DrawMeDatabase has a view container in the Activity Bar, with the views *Schema*
 | Context key | Value |
 |-------------|-------|
 | `drawMeDatabase.sidebar` | `true` once the container exists. Put it in the `when` clause of your views: with a DrawMeDatabase older than 1.7.0, VS Code would move them to the Explorer |
-| `drawMeDatabase.schemaState` | What the Schema view shows: `loading`, `noFolder`, `noProject` (no Laravel or Symfony project found), `noTables`, `error` (see the output) or `ready` |
+| `drawMeDatabase.schemaState` | What the Schema view shows: `loading`, `noFolder`, `noProject` (no supported project found), `noTables`, `error` (see the output) or `ready` |
 | `drawMeDatabase.license` | The `kind` of the license of DrawMeDatabase Pro (see [below](#license-of-drawmedatabase-pro)), or `free` |
 
 - `workbench.view.extension.drawMeDatabase` opens the container, `<view id>.focus` one of its views.

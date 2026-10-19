@@ -31,7 +31,7 @@ Appearance, Settings), with a button that opens the sidebar for the tools, expor
 - `contributes.viewsContainers.activitybar`: id **`drawMeDatabase`**, title *DrawMeDatabase*, icon
   `images/activitybar.svg` (a database, monochrome: VS Code draws it as a mask in the color of the
   theme).
-- It is shown in every workspace, like GitLens: without a Laravel or Symfony project the Schema view
+- It is shown in every workspace, like GitLens: without a supported project the Schema view
   says why and how to fix it. Users can hide it from the context menu of the Activity Bar.
 - Its views are native tree views (`vscode.window.createTreeView`), not webviews: no page to load,
   native keyboard navigation, type-to-filter, and the look of the rest of VS Code.
@@ -61,9 +61,9 @@ DrawMeDatabase Pro (read from its exports, see `connectPro()` in api.md) fills t
   view follows the edits of the migrations and entities live while it, or the diagram, is visible.
 - Welcome content (`viewsWelcome`), from the context key `drawMeDatabase.schemaState`:
   - no folder open: *Open Folder*;
-  - no Laravel or Symfony project found: what DrawMeDatabase reads, and *Set the Framework Folder*
-    (the `DrawMeDatabase.frameworkPath` setting);
-  - a project without tables: what DrawMeDatabase reads, and *Refresh*;
+  - no supported project found: *Set the Framework Folder* (the `DrawMeDatabase.frameworkPath`
+    setting), and *Show Output*, which lists the supported frameworks;
+  - a project without tables: *Show Output*, which names the files read, and *Refresh*;
   - an error while reading: *Show Output* and *Refresh*;
   - while reading: a short message.
 

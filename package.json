@@ -3,7 +3,7 @@
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "icon": "images/logo_128.png",
   "engines": {
     "vscode": "^1.96.0"
@@ -135,6 +135,23 @@
           "default": "",
           "scope": "resource",
           "markdownDescription": "%setting.frameworkPath%",
+          "order": 0
+        },
+        "DrawMeDatabase.framework": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "laravel",
+            "symfony"
+          ],
+          "enumDescriptions": [
+            "%setting.framework.auto%",
+            "%setting.framework.laravel%",
+            "%setting.framework.symfony%"
+          ],
+          "default": "auto",
+          "scope": "resource",
+          "markdownDescription": "%setting.framework%",
           "order": 0
         },
         "DrawMeDatabase.autoRefresh": {

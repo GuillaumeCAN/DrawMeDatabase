@@ -188,3 +188,16 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 
 ### Fixed
 - A button of DrawMeDatabase Pro (PRO badge, Discover, a Pro tool or export) no longer fails with "Extension not found" while Pro is not on the Marketplace: a message tells that it is not published yet, or that VS Code is offline
+
+## [v1.8.0] - 2026-10-19
+
+### Added
+- Pluggable parsers: each framework is a parser module with an id, a label, a detection score, the files it reads (`sources()`) and its `parse()`, listed in `parsers/registry.js` (`docs/parsers.md`). The file watcher, the live refresh of the unsaved editors and the git status follow the files each parser declares, instead of the PHP files of two fixed folders
+- `DrawMeDatabase.framework` setting: `auto` (the default) detects the framework, `laravel` or `symfony` chooses it for a project that matches several of them. The output lists the frameworks found, with their score
+- API version 3 (`docs/api.md`): `getFrameworks()` (the supported stacks, `{ id, label }`), `getSources(basePath, framework)` (what a parser reads), and an `options.framework` for `detectFramework()`
+
+### Changed
+- The messages and the Schema view no longer name Laravel and Symfony only: the message of a folder without a supported project lists the supported frameworks, and the output names the files read when no table is found
+- The Markdown export names the framework from the label given by the extension
+
+Laravel and Symfony projects are read as before: same tables, warnings and git status, and Laravel still wins when a project is both.

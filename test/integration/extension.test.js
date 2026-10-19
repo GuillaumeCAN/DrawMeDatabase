@@ -167,6 +167,20 @@ suite('DrawMeDatabase extension', () => {
         assert.equal(await settledTabCount(), 1);
     });
 
+    test('the parsers: the stacks of the API, their sources, and the DrawMeDatabase.framework setting', () => {
+        const api = vscode.extensions.getExtension(EXTENSION_ID).exports;
+        assert.equal(api.apiVersion, 3);
+        assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }]);
+        const schema = api.getSchema();
+        assert.equal(schema.framework, 'laravel');
+        assert.deepEqual(api.getSources(schema.basePath, schema.framework),
+            { folders: [{ path: path.join(schema.basePath, 'database', 'migrations'), recursive: false }], files: [], extensions: ['.php'] });
+        // VS Code knows the setting, per workspace folder
+        const setting = vscode.workspace.getConfiguration('DrawMeDatabase', vscode.workspace.workspaceFolders[0].uri).inspect('framework');
+        assert.equal(setting.defaultValue, 'auto');
+        assert.equal(setting.workspaceFolderValue, undefined);
+    });
+
     test('a new migration refreshes the open diagram (DrawMeDatabase.autoRefresh)', async function () {
         this.timeout(60000);
         const extension = vscode.extensions.getExtension(EXTENSION_ID);

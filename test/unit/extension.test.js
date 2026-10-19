@@ -5,8 +5,9 @@
 // Please see the LICENSE file that should have been included as part of this package.
 //
 
-// extension.js with a mocked 'vscode' module (and stubbed framework parsers): the command flow,
-// the messages shown to the user and the webview panel, without VS Code.
+// extension.js with a mocked 'vscode' module (and stubbed framework parsers: their real detection
+// and sources, a stubbed parse()): the command flow, the messages shown to the user and the
+// webview panel, without VS Code.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -42,6 +43,7 @@ const DEFAULT_SETTINGS = {
     pro: false,
 };
 const EXTENSION = path.join(ROOT, 'extension.js');
+const REGISTRY = path.join(ROOT, 'parsers', 'registry.js');
 const PRO_ID = 'GuillaumeCancalon.draw-me-database-pro';
 const WEBVIEW_ROOT = 'https://webview.test/';
 
@@ -332,7 +334,7 @@ function createVscode(state) {
     };
 }
 
-// 'vscode' and the framework parsers, as extension.js requires them
+// 'vscode' as extension.js requires it, and the framework parsers as the registry requires them
 let mocks;
 const originalLoad = Module._load;
 
@@ -341,7 +343,7 @@ test.before(() => {
         if (mocks && request === 'vscode') {
             return mocks.vscode;
         }
-        if (mocks && parent && parent.filename === EXTENSION && Object.prototype.hasOwnProperty.call(mocks.parsers, request)) {
+        if (mocks && parent && parent.filename === REGISTRY && Object.prototype.hasOwnProperty.call(mocks.parsers, request)) {
             return mocks.parsers[request];
         }
         return originalLoad.call(this, request, parent, ...rest);
@@ -352,8 +354,9 @@ test.after(() => {
     Module._load = originalLoad;
 });
 
-// Activates a fresh copy of extension.js. parse(basePath) is the stubbed parser of both frameworks,
-// initial overrides the initial state (e.g. gitExtension, read when the extension activates).
+// Activates a fresh copy of extension.js. parse(basePath) is the stubbed parse() of both frameworks
+// (their detect() and sources() are the real ones), initial overrides the initial state (e.g.
+// gitExtension, read when the extension activates).
 function activate(parse = () => ({ tables: TABLES, warnings: [] }), initial = {}) {
     const state = {
         answer: undefined,
@@ -390,14 +393,18 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] }), initial = {}
         context: {},
         ...initial,
     };
-    const parser = {
+    const stub = (real) => ({
+        ...real,
         parse: (basePath, options) => {
             state.parsed.push(basePath);
             state.parseOptions.push(options);
             return parse(basePath, options);
         },
+    });
+    mocks = {
+        vscode: createVscode(state),
+        parsers: { './laravel': stub(require('../../parsers/laravel')), './symfony': stub(require('../../parsers/symfony')) },
     };
-    mocks = { vscode: createVscode(state), parsers: { './parsers/laravel': parser, './parsers/symfony': parser } };
 
     delete require.cache[EXTENSION];
     const extension = require(EXTENSION);
@@ -433,6 +440,7 @@ const TABLES = [
 // Workspaces on disk, for the real framework detection
 let tmpRoot;
 const LARAVEL = { artisan: '', 'composer.json': JSON.stringify({ require: { 'laravel/framework': '^12.0' } }) };
+const SYMFONY = { 'bin/console': '', 'composer.json': JSON.stringify({ require: { 'symfony/framework-bundle': '^7.4' } }) };
 
 function folder(name, files = {}) {
     const dir = path.join(tmpRoot, name);
@@ -808,6 +816,81 @@ test('live diagram: an unsaved edit of a migration is drawn, with the git status
     ext.context.subscriptions.forEach(item => item.dispose());
 });
 
+test('live diagram of a Symfony project: the unsaved entities of src/Entity and of its sub-folders', async () => {
+    const ext = activate();
+    const dir = folder('live-symfony', SYMFONY);
+    ext.openFolders(dir);
+    ext.run();
+    ext.state.panels[0].postFromPage({ type: 'ready' });
+    assert.equal(ext.state.watchers.length, 1);
+    assert.equal(ext.state.watchers[0].pattern.base.fsPath, path.join(dir, 'src', 'Entity'));
+    assert.equal(ext.state.watchers[0].pattern.pattern, '**/*.php');
+
+    const entity = path.join(dir, 'src', 'Entity', 'Blog', 'Post.php');
+    const typed = editor(entity, '<?php // typing');
+    const repository = editor(path.join(dir, 'src', 'Repository', 'PostRepository.php'), '<?php // not an entity');
+    ext.state.documents = [typed, repository, editor(path.join(dir, 'src', 'Entity', 'notes.md'), 'not PHP')];
+    ext.vscode.editDocument(typed);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2);
+    assert.deepEqual([...ext.state.parseOptions[1].overrides], [[path.resolve(entity), '<?php // typing']], 'only the watched entities');
+
+    ext.vscode.editDocument(repository);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2, 'a file outside of src/Entity is not followed');
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('DrawMeDatabase.framework chooses the parser of a project that matches several of them', async () => {
+    const ext = activate();
+    const dir = folder('framework-setting', {
+        artisan: '',
+        'bin/console': '',
+        'composer.json': JSON.stringify({ require: { 'laravel/framework': '^12.0', 'symfony/framework-bundle': '^7.4' } }),
+    });
+    ext.openFolders(dir);
+
+    // Detected: Laravel wins the tie, and the output names the setting
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.equal(ext.context.api.getSchema().framework, 'laravel');
+    assert.ok(ext.state.output.includes(`Framework: laravel (${dir})`));
+    assert.ok(ext.state.output.includes('Frameworks found: laravel (100), symfony (100). DrawMeDatabase.framework chooses another one.'));
+    assert.equal(ext.state.watchers.at(-1).pattern.pattern, '*.php');
+
+    // Set for the folder: the change reads the project again with the parser of Symfony, whose
+    // entities are watched instead of the migrations
+    ext.state.settings[path.resolve(dir)] = { 'DrawMeDatabase.framework': 'symfony' };
+    ext.vscode.changeConfiguration('DrawMeDatabase.framework');
+    await settle();
+    assert.equal(ext.state.parsed.length, 2);
+    assert.equal(ext.context.api.getSchema().framework, 'symfony');
+    assert.ok(ext.state.output.includes(`Framework: symfony, set by DrawMeDatabase.framework (${dir})`));
+    assert.equal(panel.sent('schema').at(-1).project.frameworkLabel, 'Symfony');
+    const live = ext.state.watchers.filter(watcher => !watcher.disposed);
+    assert.deepEqual(live.map(watcher => [watcher.pattern.base.fsPath, watcher.pattern.pattern]), [[path.join(dir, 'src', 'Entity'), '**/*.php']]);
+
+    // A value that names no parser: detected, and the output says so
+    ext.state.settings[path.resolve(dir)] = { 'DrawMeDatabase.framework': 'rails' };
+    ext.run();
+    assert.equal(ext.context.api.getSchema().framework, 'laravel');
+    assert.ok(ext.state.output.includes('DrawMeDatabase.framework: "rails" is not a supported framework, the framework is detected.'));
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('DrawMeDatabase.framework set for a folder the parser cannot read: its error is shown', () => {
+    const ext = activate(() => {
+        throw new ParserError('No src/Entity folder found.');
+    });
+    const dir = folder('framework-forced', LARAVEL);
+    ext.openFolders(dir);
+    ext.state.settings[path.resolve(dir)] = { 'DrawMeDatabase.framework': 'symfony' };
+    assert.equal(ext.run(), undefined);
+    assert.deepEqual(ext.state.errors, [{ text: 'No src/Entity folder found.', items: [] }]);
+    assert.deepEqual(ext.state.parsed, [dir]);
+});
+
 test('a commit or a checkout (built-in Git extension) refreshes the git status of the diagram', async () => {
     const onState = emitter();
     const onRepository = emitter();
@@ -877,7 +960,7 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     const api = ext.context.api;
     const dir = folder('api', LARAVEL);
     ext.openFolders(dir);
-    assert.equal(api.apiVersion, 2);
+    assert.equal(api.apiVersion, 3);
     assert.equal(api.getSchema(), null);
 
     const seen = [];
@@ -897,6 +980,14 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     assert.deepEqual(ext.state.parseOptions.at(-1), { git: false });
     assert.throws(() => api.parseSchema(dir, 'rails'), ParserError);
     assert.equal(api.detectFramework(dir), 'laravel');
+    assert.equal(api.detectFramework(dir, { framework: 'symfony' }), 'symfony', 'an id wins over the detection');
+    assert.equal(api.detectFramework(folder('api-none')), 'Unknown');
+
+    // Version 3: the supported stacks, and what their parsers read
+    assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }]);
+    assert.deepEqual(api.getSources(dir, 'laravel'), { folders: [{ path: path.join(dir, 'database', 'migrations'), recursive: false }], files: [], extensions: ['.php'] });
+    assert.deepEqual(api.getSources(dir, 'symfony').folders, [{ path: path.join(dir, 'src', 'Entity'), recursive: true }]);
+    assert.throws(() => api.getSources(dir, 'rails'), error => error instanceof ParserError && error.message === 'Unknown framework: rails');
     assert.ok(api.viewScripts.includes('vendor/mermaid.min.js') && api.viewScripts.includes('mermaid/diagram.js'));
     assert.ok(!api.viewScripts.includes('app.js'));
     assert.equal(api.viewsUri.fsPath, path.join(ROOT, 'views'));
@@ -1036,6 +1127,7 @@ test('an empty schema shows a message and no panel', () => {
     assert.equal(ext.state.panels.length, 0);
     assert.equal(ext.state.infos.length, 1);
     assert.match(ext.state.infos[0].text, /^No tables found in ".*empty"\. Nothing to draw\.$/);
+    assert.ok(ext.state.output.includes('Files read: database/migrations/*.php'), 'the output tells what was read');
     assert.deepEqual(ext.state.errors, []);
     assert.deepEqual(ext.state.warnings, []);
 });
@@ -1150,10 +1242,11 @@ test('a folder without project suggests the setting only when it is empty', () =
     ext.setFrameworkPath(workspace, 'backend');
     assert.equal(ext.run(), undefined);
     assert.deepEqual(ext.state.errors.map(error => error.text), [
-        `No Laravel or Symfony project found in "${workspace}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`,
-        `No Laravel or Symfony project found in "${path.join(workspace, 'backend')}". Check the DrawMeDatabase.frameworkPath setting. Unable to draw the schema.`,
+        `No supported project (Laravel, Symfony) found in "${workspace}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`,
+        `No supported project (Laravel, Symfony) found in "${path.join(workspace, 'backend')}". Check the DrawMeDatabase.frameworkPath setting. Unable to draw the schema.`,
     ]);
     assert.deepEqual(ext.state.parsed, []);
+    assert.ok(ext.state.output.includes('Supported frameworks: Laravel, Symfony.'), 'the output lists the supported frameworks');
 });
 
 test('an invalid composer.json is reported as such', () => {

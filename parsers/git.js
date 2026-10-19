@@ -5,11 +5,11 @@
 // Please see the LICENSE file that should have been included as part of this package.
 //
 
-// Git status of the lines that declare tables and columns, shared by both parsers:
+// Git status of the lines that declare tables and columns, shared by the parsers:
 // 'committed', 'modified' (changed since HEAD), 'untracked' (not in HEAD: new, ignored or
 // staged-new) and 'unsaved' (changed in an editor and not saved yet, see `overrides`).
-// git runs a fixed number of times per folder (never with a shell), and its result can be cached
-// while only unsaved editors change.
+// git runs a fixed number of times for the sources of a parser (never with a shell), and its
+// result can be cached while only unsaved editors change.
 
 const fs = require('fs');
 const path = require('path');
@@ -117,11 +117,12 @@ function parseDiff(output) {
     return files;
 }
 
-// Reads into `state` the files under `relDir` of the repository at `root` that are not in HEAD
-// (untracked, ignored, staged-new) and the changed lines of the others, as paths from `root` prefixed
-// with `prefix`. A changed submodule is read the same way, against its own HEAD.
-function readRepository(root, relDir, prefix, hasHead, state) {
-    const entries = git(root, ['status', '--porcelain=v1', '-z', '-uall', '--ignored', '--ignore-submodules=none', '--', relDir]).split('\0');
+// Reads into `state` the files under the paths `relPaths` (folders or files, from `root`) of the
+// repository at `root` that are not in HEAD (untracked, ignored, staged-new) and the changed lines
+// of the others, as paths from `root` prefixed with `prefix`. A changed submodule is read the same
+// way, against its own HEAD.
+function readRepository(root, relPaths, prefix, hasHead, state) {
+    const entries = git(root, ['status', '--porcelain=v1', '-z', '-uall', '--ignored', '--ignore-submodules=none', '--', ...relPaths]).split('\0');
     for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
         if (entry.length < 4) {
@@ -132,7 +133,7 @@ function readRepository(root, relDir, prefix, hasHead, state) {
         if (xy === '??' || xy === '!!' || 'ARC'.includes(xy[0]) || xy[1] === 'A') {
             state.notInHead.add(prefix + file);
         } else if (xy.includes('M') && fs.existsSync(path.join(root, file, '.git'))) {
-            readRepository(path.join(root, file), '.', `${prefix}${file}/`, true, state);
+            readRepository(path.join(root, file), ['.'], `${prefix}${file}/`, true, state);
         }
         if (xy[0] === 'R' || xy[0] === 'C') {
             i++; // the original path follows
@@ -141,23 +142,30 @@ function readRepository(root, relDir, prefix, hasHead, state) {
 
     if (hasHead) {
         const diff = git(root, ['diff', 'HEAD', '--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '--text',
-            '--unified=0', '--src-prefix=a/', '--dst-prefix=b/', '--', relDir]);
+            '--unified=0', '--src-prefix=a/', '--dst-prefix=b/', '--', ...relPaths]);
         for (const [file, change] of parseDiff(diff)) {
             state.changes.set(prefix + file, change);
         }
     }
 }
 
-// Returns a function (filePath) → (firstLine, lastLine) → 'committed' | 'modified' | 'untracked'.
-// Throws when git is not usable for this folder.
-function readGitStatus(entityDir) {
-    const dir = fs.realpathSync(entityDir);
-    const root = git(dir, ['rev-parse', '--show-toplevel']).trim();
+// Returns a function (filePath) → (firstLine, lastLine) → 'committed' | 'modified' | 'untracked'
+// for the files under `paths` (a folder, or a list of folders and files that exist). The repository
+// is the one of the first path; the paths outside of it are left out. Throws when git is not usable
+// for these paths.
+function readGitStatus(paths) {
+    const real = (Array.isArray(paths) ? paths : [paths]).map(item => fs.realpathSync(item));
+    if (real.length === 0) {
+        throw new Error('no folder to read');
+    }
+    const first = fs.statSync(real[0]).isDirectory() ? real[0] : path.dirname(real[0]);
+    const root = git(first, ['rev-parse', '--show-toplevel']).trim();
     if (!root) {
         throw new Error('no work tree');
     }
-    const relDir = toPosix(path.relative(root, dir)) || '.';
-    if (relDir.startsWith('..')) {
+    const relPaths = [...new Set(real.map(item => toPosix(path.relative(root, item)) || '.'))]
+        .filter(relPath => !relPath.startsWith('..'));
+    if (relPaths.length === 0) {
         throw new Error('the entity folder is outside of the repository');
     }
 
@@ -170,7 +178,7 @@ function readGitStatus(entityDir) {
 
     const notInHead = new Set();
     const changes = new Map();
-    readRepository(root, relDir, '', hasHead, { notInHead, changes });
+    readRepository(root, relPaths, '', hasHead, { notInHead, changes });
 
     return (filePath) => {
         const rel = toPosix(path.relative(root, fs.realpathSync(filePath)));
@@ -268,28 +276,56 @@ function lineMapping(savedText, editorText) {
 // ---------------------------------------------------------------------------------------------
 // Status reader
 
-// Status of line ranges of the files of `dir`: reader.statusOf(filePath)(firstLine, lastLine)
-// returns 'unsaved', 'untracked', 'modified', 'committed', or null when there is no information
-// (git disabled or unavailable, and no unsaved change). Lines are those of the parsed text, which
-// is the editor text for the files of `overrides` (Map: absolute path → text).
+// The paths git reads for `sources`: a folder, a list of paths, or the { folders, files } of the
+// sources() of a parser (docs/parsers.md)
+function sourcePaths(sources) {
+    if (typeof sources === 'string') {
+        return [sources];
+    }
+    if (Array.isArray(sources)) {
+        return sources.filter(item => typeof item === 'string');
+    }
+    const folders = sources && Array.isArray(sources.folders) ? sources.folders : [];
+    const files = sources && Array.isArray(sources.files) ? sources.files : [];
+    return [...folders.map(folder => (typeof folder === 'string' ? folder : folder && folder.path)), ...files]
+        .filter(item => typeof item === 'string' && item !== '');
+}
+
+const exists = (filePath) => {
+    try {
+        fs.statSync(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+// Status of line ranges of the files of `sources` (a folder, or the sources() of a parser: git
+// reads its folders and files, the missing ones left out): reader.statusOf(filePath)(firstLine,
+// lastLine) returns 'unsaved', 'untracked', 'modified', 'committed', or null when there is no
+// information (git disabled or unavailable, and no unsaved change). Lines are those of the parsed
+// text, which is the editor text for the files of `overrides` (Map: absolute path → text).
 // options: git (false: no git), overrides, cache (Map reused between parses: git runs again only
 // once the cache is cleared). reader.warning: why the git status is missing, if it should be told.
-function createStatusReader(dir, { git: useGit = true, overrides = null, cache = null } = {}) {
+function createStatusReader(sources, { git: useGit = true, overrides = null, cache = null } = {}) {
     let gitStatus = null;
     let warning = null;
-    if (useGit) {
-        const key = (() => {
+    const paths = sourcePaths(sources);
+    if (useGit && paths.length > 0) {
+        const key = paths.map(item => {
             try {
-                return fs.realpathSync(dir);
+                return fs.realpathSync(item);
             } catch {
-                return dir;
+                return item;
             }
-        })();
+        }).join('\0');
         if (cache && cache.has(key)) {
             ({ gitStatus, warning } = cache.get(key));
         } else {
+            // The missing folders and files (a config file the project does not have) are left out
+            const existing = paths.filter(exists);
             try {
-                gitStatus = readGitStatus(dir);
+                gitStatus = existing.length > 0 ? readGitStatus(existing) : null;
             } catch (error) {
                 // Outside a repository there is simply no git status: only real failures are told
                 const reason = gitErrorReason(error);
@@ -369,4 +405,4 @@ function tableStatus(declaration, columns) {
     return declaration || (known.length > 0 ? 'committed' : null);
 }
 
-module.exports = { readGitStatus, gitErrorReason, parseDiff, lineMapping, createStatusReader, tableStatus };
+module.exports = { readGitStatus, gitErrorReason, parseDiff, lineMapping, createStatusReader, sourcePaths, tableStatus };

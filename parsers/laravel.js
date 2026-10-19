@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
 const { createStatusReader, tableStatus } = require('./git');
+const { composerPackages } = require('./composer');
 const {
     skipLiteral,
     stripComments,
@@ -1248,6 +1249,29 @@ function stat(file) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Parser contract (docs/parsers.md)
+
+module.exports.id = 'laravel';
+module.exports.label = 'Laravel';
+
+// 100 for a Laravel application: artisan, and laravel/framework in the "require" of composer.json
+// (ParserError: invalid composer.json)
+module.exports.detect = function (basePath) {
+    const packages = composerPackages(basePath);
+    return stat(path.join(basePath, 'artisan'))?.isFile() && packages.includes('laravel/framework') ? 100 : 0;
+};
+
+// The files read: the PHP files of database/migrations, not its sub-folders
+function sources(basePath) {
+    return {
+        folders: [{ path: path.resolve(basePath, 'database', 'migrations'), recursive: false }],
+        files: [],
+        extensions: ['.php'],
+    };
+}
+module.exports.sources = sources;
+
 // Returns { tables, warnings }. Options:
 // - git: false skips the git status of the tables and columns
 // - overrides: Map of absolute file path → text of an unsaved editor, read instead of the file
@@ -1287,7 +1311,7 @@ module.exports.parse = function (basePath, options = {}) {
     }
 
     // Git status (and unsaved changes) of the lines that create and change each table and column
-    const reader = createStatusReader(migrationsPath, { git: options.git !== false, overrides, cache: options.gitCache });
+    const reader = createStatusReader(sources(basePath), { git: options.git !== false, overrides, cache: options.gitCache });
     if (reader.warning) {
         state.warnings.push(reader.warning);
     }

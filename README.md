@@ -38,14 +38,14 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 - Search: keep the tables whose name or columns contain a text, with the tables they are linked to
 - Live: the diagram follows what you type in a migration or an entity, before you save it
-- Git status of the tables: new, modified, and changed in an editor but not saved yet, in the colors of the git decorations of VS Code (Laravel and Symfony, when the project is a git repository)
+- Git status of the tables: new, modified, and changed in an editor but not saved yet, in the colors of the git decorations of VS Code (when the project is a git repository)
 
 **DrawMeDatabase in the Activity Bar** (the database icon), like GitLens:
 
 - **Schema**: the tables of the project and their columns (keys, types, foreign keys, git status), read from the code without opening the diagram. A click opens the migration or the entity, or the line of a column; *Show in Diagram* selects the table in the diagram
 - **Tools** and **Exports**: the exports of the diagram, and the tools and exports of DrawMeDatabase Pro, greyed with PRO until it is installed
 - **License**: the state of DrawMeDatabase Pro, once it is installed
-- Without a Laravel or Symfony project, the Schema view tells why and how to set the framework folder
+- Without a supported project, the Schema view tells why and how to set the framework folder
 
 ![The DrawMeDatabase sidebar: the tables and columns of the project, the tools of DrawMeDatabase Pro greyed with PRO, the exports, and the diagram](images/screenshots/sidebar.png)
 
@@ -107,6 +107,7 @@ In the panel:
 **Settings:**
 
 - `DrawMeDatabase.frameworkPath`: path to the framework folder, relative to the workspace folder. Leave it empty if the framework is at the root of the workspace. Example: `my-project/app/symfony`
+- `DrawMeDatabase.framework`: `auto` (default) detects the framework of the project; `laravel` or `symfony` chooses it, for a project that matches several of them (the **DrawMeDatabase** output lists the frameworks found)
 - `DrawMeDatabase.layout`: `elk` (default) or `dagre`
 - `DrawMeDatabase.direction`: `TB` (top to bottom, default) or `LR` (left to right)
 - `DrawMeDatabase.autoRefresh`: draw the open diagram again while you edit a migration or an entity, and when one is saved, created, deleted or committed (default: on)
@@ -129,7 +130,7 @@ DrawMeDatabase reads your code, it does not execute it nor connect to a database
   - Only the attributes and annotations of `src/Entity` are read: XML/YAML mappings, other mapping folders, and traits or parent classes declared elsewhere (for example Gedmo's `TimestampableEntity`) are not. A warning names each trait or parent class that could not be read.
   - Embeddables are not shown, and Symfony's default naming strategy is assumed.
   - Backed enums declared outside `src/Entity` are shown as `string`.
-- **Both**
+- **Every framework**
   - The diagram shows the column type, the primary key and the nullable flag. Lengths, default values, indexes and `ON DELETE` are read too, for the exports of DrawMeDatabase Pro and the API (`details` option). Many-to-many join tables are drawn as a single link.
   - In the diagram, characters that Mermaid cannot read in an attribute name or type (spaces, `$`, `#`...) are replaced with `_` (the JSON viewer always shows the exact names).
   - Very large schemas (hundreds of tables) take a few seconds to draw.
@@ -148,9 +149,11 @@ VSCODE_TEST_VERSION=1.96.0 npm test   # the same on another VS Code version (def
 npm run package        # builds builds/draw-me-database-<version>.vsix
 ```
 
+Each framework has a parser in `parsers/`, listed in `parsers/registry.js`: to add one, see [docs/parsers.md](docs/parsers.md) (the parser contract) and [docs/pivot-format.md](docs/pivot-format.md) (what it returns).
+
 GitHub Actions runs these checks on every pull request, the integration tests also on the oldest VS Code version allowed by `engines.vscode`, and keeps the `.vsix` as an artifact. Releases are published from a version tag to GitHub Releases and Open VSX; the VS Code Marketplace is updated by hand. See [docs/publishing.md](docs/publishing.md).
 
 ## Changelog
 
-Latest release : **v1.7.0**
+Latest release : **v1.8.0**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

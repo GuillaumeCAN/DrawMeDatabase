@@ -8,7 +8,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
-const { detectFramework } = require('./parsers/parser');
+const registry = require('./parsers/registry');
 const { ParserError } = require('./parsers/errors');
 const html = require('./views/html');
 const i18n = require('./views/i18n');
@@ -17,13 +17,11 @@ const sidebar = require('./sidebar');
 
 const VIEW_TYPE = 'drawMeDatabase';
 
-// Parsers by detected framework (loaded on first use)
-const PARSERS = {
-    laravel: () => require('./parsers/laravel'),
-    symfony: () => require('./parsers/symfony'),
-};
-
-const FRAMEWORK_LABELS = { laravel: 'Laravel', symfony: 'Symfony' };
+// The label of a stack id of the parsers ('Laravel'), or ''
+function frameworkLabel(id) {
+    const parser = registry.getParser(id);
+    return parser ? parser.label : '';
+}
 
 // Settings the page (toolbar and side panel) can change: their allowed values (first = default),
 // or their default and a function that returns the cleaned value (undefined when it is invalid)
@@ -88,7 +86,7 @@ const MAX_EXPORT_LENGTH = 200 * 1024 * 1024;
 
 // DrawMeDatabase Pro adds its exports and tools through the API below
 const PRO_EXTENSION_ID = 'GuillaumeCancalon.draw-me-database-pro';
-const API_VERSION = 2;
+const API_VERSION = 3;
 
 // Tools and exports of DrawMeDatabase Pro, shown greyed in the side panel until it adds them
 const PRO_TOOLS = ['pro.canvas', 'pro.timeline', 'pro.designer', 'pro.addColumns', 'pro.compare', 'pro.compareRefs', 'pro.drift', 'pro.migrationChanges', 'pro.checks', 'pro.findPath', 'pro.saveView', 'pro.openView', 'pro.models'];
@@ -309,7 +307,7 @@ function activate(context) {
                     name: folder.name,
                     folder: folder.uri.toString(),
                     framework: schema.framework,
-                    frameworkLabel: FRAMEWORK_LABELS[schema.framework] || '',
+                    frameworkLabel: frameworkLabel(schema.framework),
                 },
             }, { reveal: !auto });
             watcher.watch(current);
@@ -365,8 +363,9 @@ function activate(context) {
         });
     };
 
-    // Refreshes the open diagram after the migrations or entities change: on disk (and in git,
-    // after a commit or a checkout) the git status is read again, while typing it is not
+    // Refreshes the open diagram after the sources of the schema change (the migrations, the
+    // entities...: sources() of the parser): on disk (and in git, after a commit or a checkout)
+    // the git status is read again, while typing it is not
     const watcher = createWatcher(({ disk }) => {
         if (disk) {
             gitCache.clear();
@@ -379,7 +378,7 @@ function activate(context) {
     });
     context.subscriptions.push(watcher);
 
-    // Text of the unsaved editors of the watched migrations or entities (absolute path → text)
+    // Text of the unsaved editors of the watched sources (absolute path → text)
     const unsavedEditors = () => {
         const overrides = new Map();
         for (const document of vscode.workspace.textDocuments) {
@@ -390,7 +389,7 @@ function activate(context) {
         return overrides;
     };
 
-    // Live diagram: an edit of a migration or an entity, before it is saved
+    // Live diagram: an edit of a source of the schema (a migration, an entity...), before it is saved
     const onEditor = (document, disk) => {
         if (document.uri.scheme === 'file' && watcher.covers(document.uri.fsPath)) {
             watcher.schedule({ disk });
@@ -449,7 +448,7 @@ function activate(context) {
     const views = sidebar.createSidebar(vscode, {
         translator,
         schema: () => current,
-        project: () => (current ? [FRAMEWORK_LABELS[current.framework], current.folder.name].filter(Boolean).join(' · ') : ''),
+        project: () => (current ? [frameworkLabel(current.framework), current.folder.name].filter(Boolean).join(' · ') : ''),
         features,
         showGit: () => vscode.workspace.getConfiguration('DrawMeDatabase').get('showGitStatus', true) !== false,
         // As in the diagram: the git status of the columns comes with DrawMeDatabase Pro
@@ -548,9 +547,11 @@ function activate(context) {
             if (['language', 'showGitStatus', 'showColumnGitStatus'].some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
                 views.refresh();
             }
+            // The framework folder, or the framework chosen for it
+            const projectChanged = ['frameworkPath', 'framework'].some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`));
             if (!current || !watching()) {
                 // The Schema view did not find the project: maybe in the new framework folder
-                if (event.affectsConfiguration('DrawMeDatabase.frameworkPath') && views.schemaVisible() && !viewer.isOpen()) {
+                if (projectChanged && views.schemaVisible() && !viewer.isOpen()) {
                     readForViews(500);
                 }
                 return;
@@ -562,8 +563,8 @@ function activate(context) {
             if (event.affectsConfiguration('DrawMeDatabase.showGitStatus')) {
                 watcher.schedule({ disk: true });
             }
-            // Another framework folder: draw it (after a pause, the setting may be typed)
-            if (event.affectsConfiguration('DrawMeDatabase.frameworkPath')) {
+            // Another framework folder or framework: draw it (after a pause, the setting may be typed)
+            if (projectChanged) {
                 watcher.schedule({ disk: true });
             }
         }),
@@ -652,13 +653,26 @@ function activate(context) {
         onDidChangeSchema: schemaChanged.event,
         // Opens the diagram of the workspace (like the DrawMeDatabase command): the parsed tables
         showDiagram: () => vscode.commands.executeCommand('DMDB.parseSchema'),
-        detectFramework,
+        // The stack id of a framework root ('laravel', 'symfony'... or 'Unknown'); options.framework:
+        // an id that wins over the detection, like the DrawMeDatabase.framework setting
+        detectFramework: (basePath, options) => registry.detectFramework(basePath, options),
         // Parses a framework folder ({ tables, warnings }), options as in docs/pivot-format.md
         parseSchema(basePath, framework, options = {}) {
-            if (!Object.prototype.hasOwnProperty.call(PARSERS, framework)) {
+            const parser = registry.getParser(framework);
+            if (!parser) {
                 throw new ParserError(`Unknown framework: ${framework}`);
             }
-            return PARSERS[framework]().parse(basePath, options);
+            return parser.parse(basePath, options);
+        },
+        // The supported stacks, in the order of detection (version 3): [{ id, label }]
+        getFrameworks: () => registry.getParsers().map(({ id, label }) => ({ id, label })),
+        // What the parser of a stack reads in a framework root (version 3): { folders: [{ path,
+        // recursive }], files, extensions }, absolute paths (docs/parsers.md)
+        getSources(basePath, framework) {
+            if (!registry.getParser(framework)) {
+                throw new ParserError(`Unknown framework: ${framework}`);
+            }
+            return registry.getSources(framework, basePath);
         },
         // The page files, for the panels of other extensions (localResourceRoots, script order)
         viewsUri: vscode.Uri.joinPath(context.extensionUri, 'views'),
@@ -769,6 +783,12 @@ function activate(context) {
 function readSchema(folder, output, { notify = true, overrides = null, gitCache = null, git = true, onFailure = () => {} } = {}) {
     const tell = (show, text, ...items) => (notify ? show(text, ...items) : output.appendLine(text));
     const showError = (text) => tell(vscode.window.showErrorMessage, text);
+    // No project to read: the Schema view sends the user to the output, which lists the frameworks
+    const frameworks = () => registry.labels().join(', ');
+    const noProject = () => {
+        output.appendLine(`Supported frameworks: ${frameworks()}.`);
+        onFailure('noProject');
+    };
 
     const frameworkPath = getFrameworkPath(folder);
     const basePath = resolveBasePath(folder.uri.fsPath, frameworkPath);
@@ -778,26 +798,35 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         showError(frameworkPath
             ? tr('message.frameworkPathMissing', { path: frameworkPath, folder: folder.uri.fsPath, elsewhere })
             : tr('message.folderMissing', { path: basePath }));
-        onFailure('noProject');
+        noProject();
         return undefined;
     }
 
     let result;
     let framework;
     try {
-        // Framework detection
-        framework = detectFramework(basePath);
-        output.appendLine(`Framework: ${framework} (${basePath})`);
-        if (!Object.prototype.hasOwnProperty.call(PARSERS, framework)) {
+        // Framework detection, unless the DrawMeDatabase.framework setting names a parser
+        const setting = getFrameworkSetting(folder);
+        const detection = registry.detect(basePath, { framework: setting });
+        framework = detection.framework;
+        if (setting !== 'auto' && !detection.forced) {
+            output.appendLine(`DrawMeDatabase.framework: "${setting}" is not a supported framework, the framework is detected.`);
+        }
+        output.appendLine(detection.forced ? `Framework: ${framework}, set by DrawMeDatabase.framework (${basePath})` : `Framework: ${framework} (${basePath})`);
+        if (detection.matches.length > 1) {
+            output.appendLine(`Frameworks found: ${detection.matches.map(match => `${match.id} (${match.score})`).join(', ')}. DrawMeDatabase.framework chooses another one.`);
+        }
+        const parser = registry.getParser(framework);
+        if (!parser) {
             const hint = tr(frameworkPath ? 'message.noFramework.checkSetting' : 'message.noFramework.setSetting');
-            showError(tr('message.noFramework', { path: basePath, hint }));
-            onFailure('noProject');
+            showError(tr('message.noFramework', { path: basePath, hint, frameworks: frameworks() }));
+            noProject();
             return undefined;
         }
 
         // Parsing
         // columnSources: the line of each column, opened from the inspector of the page
-        result = PARSERS[framework]().parse(basePath, { overrides, gitCache, git, columnSources: true });
+        result = parser.parse(basePath, { overrides, gitCache, git, columnSources: true });
     } catch (err) {
         if (err instanceof ParserError) {
             output.appendLine(`Error: ${err.message}`);
@@ -822,9 +851,23 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         reportWarnings(output, warnings.length);
     }
     if (tables.length === 0) {
+        // What was read, for the Schema view that sends the user to the output
+        output.appendLine(`Files read: ${describeSources(framework, basePath)}`);
         tell(vscode.window.showInformationMessage, tr('message.noTables', { path: basePath }));
     }
     return { tables, warnings: warnings.length, framework, basePath };
+}
+
+// The files the parser of a framework reads in basePath, as globs relative to it
+// ('database/migrations/*.php'), or '' when the parser cannot tell
+function describeSources(framework, basePath) {
+    try {
+        return registry.watchPatterns(registry.getSources(framework, basePath))
+            .map(({ base, pattern }) => [path.relative(basePath, base).split(path.sep).join('/'), pattern].filter(Boolean).join('/'))
+            .join(', ');
+    } catch {
+        return '';
+    }
 }
 
 // The workspace folder of the active editor, else the one of the last run, else the first one
@@ -843,6 +886,12 @@ function getWorkspaceFolder(lastFolder) {
 function getFrameworkPath(folder) {
     const setting = vscode.workspace.getConfiguration('DrawMeDatabase', folder.uri).get('frameworkPath', '');
     return typeof setting === 'string' ? setting.trim() : '';
+}
+
+// The DrawMeDatabase.framework setting of the folder: 'auto' (detected) or the id of a parser
+function getFrameworkSetting(folder) {
+    const setting = vscode.workspace.getConfiguration('DrawMeDatabase', folder.uri).get('framework', 'auto');
+    return typeof setting === 'string' && setting.trim() ? setting.trim() : 'auto';
 }
 
 // The framework root. The setting is relative to the workspace folder, even with a leading
@@ -882,14 +931,14 @@ function reportWarnings(output, count) {
     });
 }
 
-// Watches the migrations (Laravel) or the entities (Symfony) of the schema on screen, while
-// DrawMeDatabase.autoRefresh is on. onChange({ disk }) runs once the changes pause: 300 ms after
-// an edit in an editor, 500 ms after a change on disk (disk: true, the git status may change too).
+// Watches the sources of the parser of the schema on screen (the migrations of Laravel, the
+// entities of Symfony...: see sources() in docs/parsers.md), while DrawMeDatabase.autoRefresh is on.
+// onChange({ disk }) runs once the changes pause: 300 ms after an edit in an editor, 500 ms after a
+// change on disk (disk: true, the git status may change too).
 function createWatcher(onChange) {
-    let watcher;
+    let watchers = [];
     let watched = '';
-    let folder = '';
-    let framework = '';
+    let sources = null;
     let timer;
     let disk = false;
 
@@ -908,20 +957,25 @@ function createWatcher(onChange) {
 
     const stop = () => {
         clearTimeout(timer);
-        if (watcher) {
-            watcher.dispose();
-        }
-        watcher = undefined;
+        watchers.forEach(watcher => watcher.dispose());
+        watchers = [];
         watched = '';
+        sources = null;
         disk = false;
     };
 
     return {
-        watch({ basePath, framework: newFramework }) {
+        watch({ basePath, framework }) {
             const enabled = vscode.workspace.getConfiguration('DrawMeDatabase').get('autoRefresh', true) !== false;
-            const newFolder = newFramework === 'laravel' ? path.join(basePath, 'database', 'migrations')
-                : newFramework === 'symfony' ? path.join(basePath, 'src', 'Entity') : '';
-            const target = enabled && newFolder ? `${newFramework}:${newFolder}` : '';
+            let newSources;
+            try {
+                newSources = enabled ? registry.getSources(framework, basePath) : undefined;
+            } catch {
+                // A parser that cannot tell its sources: nothing to follow
+                newSources = undefined;
+            }
+            const patterns = registry.watchPatterns(newSources);
+            const target = patterns.length > 0 ? `${framework}:${JSON.stringify(newSources)}` : '';
             if (target === watched) {
                 return;
             }
@@ -930,22 +984,19 @@ function createWatcher(onChange) {
                 return;
             }
             watched = target;
-            folder = path.resolve(newFolder);
-            framework = newFramework;
-            // Laravel reads the files of database/migrations only, Symfony its sub-folders too
-            watcher = vscode.workspace.createFileSystemWatcher(
-                new vscode.RelativePattern(vscode.Uri.file(newFolder), framework === 'laravel' ? '*.php' : '**/*.php'));
-            watcher.onDidChange(() => schedule({ disk: true }));
-            watcher.onDidCreate(() => schedule({ disk: true }));
-            watcher.onDidDelete(() => schedule({ disk: true }));
+            sources = newSources;
+            // A folder ('*.php' for Laravel, its sub-folders too for Symfony) or a file per pattern
+            watchers = patterns.map(({ base, pattern }) => {
+                const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(base), pattern));
+                watcher.onDidChange(() => schedule({ disk: true }));
+                watcher.onDidCreate(() => schedule({ disk: true }));
+                watcher.onDidDelete(() => schedule({ disk: true }));
+                return watcher;
+            });
         },
-        // Whether the file is one of the migrations or entities watched
+        // Whether the file is one of the sources watched
         covers(filePath) {
-            if (!watched || !filePath.endsWith('.php')) {
-                return false;
-            }
-            const file = path.resolve(filePath);
-            return framework === 'laravel' ? path.dirname(file) === folder : file.startsWith(folder + path.sep);
+            return Boolean(watched) && registry.covers(sources, filePath);
         },
         schedule,
         stop,

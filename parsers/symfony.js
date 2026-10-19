@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
 const { createStatusReader, tableStatus } = require('./git');
+const { composerPackages } = require('./composer');
 const {
     skipLiteral,
     stripComments,
@@ -793,6 +794,36 @@ function assignDetails(column, details) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Parser contract (docs/parsers.md)
+
+module.exports.id = 'symfony';
+module.exports.label = 'Symfony';
+
+// For bin/console: 100 with symfony/framework-bundle in the "require" of composer.json, 80 with
+// another symfony/* package except the polyfills (they are pulled by many non-Symfony projects)
+// (ParserError: invalid composer.json)
+module.exports.detect = function (basePath) {
+    const packages = composerPackages(basePath);
+    if (!isFile(path.join(basePath, 'bin', 'console'))) {
+        return 0;
+    }
+    if (packages.includes('symfony/framework-bundle')) {
+        return 100;
+    }
+    return packages.some(name => name.startsWith('symfony/') && !name.startsWith('symfony/polyfill-')) ? 80 : 0;
+};
+
+// The files read: the PHP files of src/Entity and its sub-folders
+function sources(basePath) {
+    return {
+        folders: [{ path: path.resolve(basePath, 'src', 'Entity'), recursive: true }],
+        files: [],
+        extensions: ['.php'],
+    };
+}
+module.exports.sources = sources;
+
+// ---------------------------------------------------------------------------------------------
 // Tables
 
 // Returns { tables, warnings }. Options:
@@ -964,7 +995,7 @@ module.exports.parse = function (basePath, options = {}) {
     }
 
     // Git status (and unsaved changes) of lines of the file declaring `cls`, null when unknown
-    const reader = createStatusReader(entityDir, { git: options.git !== false, overrides: options.overrides, cache: options.gitCache });
+    const reader = createStatusReader(sources(basePath), { git: options.git !== false, overrides: options.overrides, cache: options.gitCache });
     if (reader.warning) {
         warnings.push(reader.warning);
     }

@@ -96,6 +96,9 @@ describe('sidebar: Schema view', () => {
         const posts = sidebar.schemaNodes({ ...SCHEMA, framework: 'symfony' }, fr)[1];
         assert.equal(posts.description, '3 colonnes');
         assert.match(posts.tooltip, /Ouvrir l'entité$/);
+        // A framework without its own text: the file
+        assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: 'prisma' }, t)[1].tooltip, /\nOpen the file$/);
+        assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: undefined }, t)[1].tooltip, /\nOpen the file$/);
     });
 });
 
