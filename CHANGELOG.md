@@ -163,7 +163,7 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - The schema time machine and the comparison with a database of DrawMeDatabase Pro in the tools of the options panel
 - An inspector of the tables, in its own panel on the left: a click on a table shows its columns (keys, types, nullable, git status, and the line of each column), the tables it references and the ones that reference it, with buttons to open its file and to show its neighbours; a double-click (or Ctrl+click) opens its file. DrawMeDatabase Pro adds its indexes, defaults, history and actions
 - French: the diagram, the messages, and the commands and settings in VS Code (`DrawMeDatabase.language`: `auto`, `en` or `fr`)
-- API version 2: `registerTool()`, `setLicenseStatus()`, `registerTableInfoProvider()`, `getDisplaySettings()` and `onDidChangeDisplaySettings`, and the page scripts `i18n.js`, `appearance.js` and `sidepanel.js` for the panels of other extensions (`docs/api.md`)
+- API version 2: `registerTool()`, `connectPro()`, `registerTableInfoProvider()`, `getDisplaySettings()` and `onDidChangeDisplaySettings`, and the page scripts `i18n.js`, `appearance.js` and `sidepanel.js` for the panels of other extensions (`docs/api.md`)
 
 ### Fixed
 - A column note or a git label holding two '~' (such as the comparisons of DrawMeDatabase Pro, `~ default: a~b`) no longer makes Mermaid reject the whole diagram, and a table name holding '~x~' is no longer drawn as '<x>': the first '~' is written as is, the next ones as the look-alike '∼'

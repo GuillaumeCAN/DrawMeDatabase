@@ -572,6 +572,72 @@ function activate(context) {
         readForViews();
     }
 
+    // The license of DrawMeDatabase Pro, shown at the bottom of the side panel and in the License
+    // view: { kind: 'licensed' | 'trial' | 'expired' | 'development', daysLeft, commands: { buy,
+    // enter, manage } }, or null (not installed)
+    const setLicense = (status) => {
+        if (status && LICENSE_KINDS.includes(status.kind)) {
+            const commands = {};
+            for (const action of ['buy', 'enter', 'manage']) {
+                if (status.commands && typeof status.commands[action] === 'string') {
+                    commands[action] = status.commands[action];
+                }
+            }
+            license = { kind: status.kind, daysLeft: Number.isFinite(status.daysLeft) ? Math.max(0, Math.round(status.daysLeft)) : undefined, commands };
+        } else {
+            license = null;
+        }
+        viewer.licenseChanged();
+        // The License view, the greyed tools and the git status of the columns follow
+        views.refresh();
+    };
+    // Every extension can call the API, so the API cannot set the license: it is read from the
+    // exports of the extension GuillaumeCancalon.draw-me-database-pro, which VS Code keeps for that
+    // extension only, and only when they are frozen (no other extension can put its own functions
+    // there): { licenseStatus() → status or null, onDidChangeLicenseStatus(listener) → Disposable }
+    let proExports = null;
+    let proSubscription = null;
+    const followPro = (exports) => {
+        if (exports === proExports) {
+            return true;
+        }
+        if (!exports || !Object.isFrozen(exports) || typeof exports.licenseStatus !== 'function' || typeof exports.onDidChangeLicenseStatus !== 'function') {
+            output.appendLine('DrawMeDatabase Pro: no license in its exports');
+            return false;
+        }
+        if (proSubscription) {
+            proSubscription.dispose();
+        }
+        const readLicense = () => {
+            try {
+                setLicense(exports.licenseStatus());
+            } catch (err) {
+                output.appendLine(`DrawMeDatabase Pro: ${err && err.message ? err.message : err}`);
+                setLicense(null);
+            }
+        };
+        proExports = exports;
+        const subscription = exports.onDidChangeLicenseStatus(readLicense);
+        proSubscription = subscription && typeof subscription.dispose === 'function' ? subscription : null;
+        readLicense();
+        return true;
+    };
+    // Resolves to true once the license of Pro is followed. Pro calls it while it activates: its
+    // exports exist once its activation has ended, which extension.activate() waits for.
+    const connectPro = async () => {
+        const extension = vscode.extensions && vscode.extensions.getExtension(PRO_EXTENSION_ID);
+        if (!extension) {
+            return false;
+        }
+        try {
+            return followPro(extension.isActive ? extension.exports : await extension.activate());
+        } catch (err) {
+            output.appendLine(`DrawMeDatabase Pro: ${err && err.message ? err.message : err}`);
+            return false;
+        }
+    };
+    context.subscriptions.push({ dispose: () => proSubscription && proSubscription.dispose() });
+
     // API of the extension: vscode.extensions.getExtension('GuillaumeCancalon.draw-me-database').exports.
     // Used by DrawMeDatabase Pro and the integration test; documented in docs/api.md.
     return {
@@ -677,25 +743,8 @@ function activate(context) {
                 },
             };
         },
-        // The license of DrawMeDatabase Pro, shown at the bottom of the side panel:
-        // { kind: 'licensed' | 'trial' | 'expired' | 'development', daysLeft, commands: { buy, enter, manage } },
-        // or null (not installed)
-        setLicenseStatus(status) {
-            if (status && LICENSE_KINDS.includes(status.kind)) {
-                const commands = {};
-                for (const action of ['buy', 'enter', 'manage']) {
-                    if (status.commands && typeof status.commands[action] === 'string') {
-                        commands[action] = status.commands[action];
-                    }
-                }
-                license = { kind: status.kind, daysLeft: Number.isFinite(status.daysLeft) ? Math.max(0, Math.round(status.daysLeft)) : undefined, commands };
-            } else {
-                license = null;
-            }
-            viewer.licenseChanged();
-            // The License view, the greyed tools and the git status of the columns follow
-            views.refresh();
-        },
+        // Reads the license of DrawMeDatabase Pro from its own exports (see followPro above)
+        connectPro,
         // Shows these tables only (with the relations between them), the highlighted ones standing
         // out, and a label to go back to the whole schema: { tables, highlight, label }
         focusTables(focus) {

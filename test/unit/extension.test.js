@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS = {
     pro: false,
 };
 const EXTENSION = path.join(ROOT, 'extension.js');
+const PRO_ID = 'GuillaumeCancalon.draw-me-database-pro';
 const WEBVIEW_ROOT = 'https://webview.test/';
 
 class Uri {
@@ -293,7 +294,7 @@ function createVscode(state) {
             },
         },
         extensions: {
-            getExtension: (id) => (id === 'vscode.git' ? state.gitExtension : undefined),
+            getExtension: (id) => (id === 'vscode.git' ? state.gitExtension : id === PRO_ID ? state.proExtension : undefined),
         },
         env: {
             clipboard: {
@@ -452,6 +453,31 @@ test.after(() => {
 });
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
+
+// DrawMeDatabase Pro as VS Code gives it to other extensions: activate() resolves to its exports,
+// frozen like the ones of Pro (frozen: false, exports that another extension could change).
+// connect() calls connectPro() as Pro does; set(status) changes its license and fires its event.
+function installPro(ext, status, { frozen = true } = {}) {
+    let current = status;
+    const listeners = new Set();
+    const exports = {
+        licenseStatus: () => current,
+        onDidChangeLicenseStatus: (listener) => {
+            listeners.add(listener);
+            return { dispose: () => listeners.delete(listener) };
+        },
+    };
+    ext.state.proExtension = { id: PRO_ID, isActive: false, exports: undefined, activate: () => Promise.resolve(frozen ? Object.freeze(exports) : exports) };
+    return {
+        exports,
+        listeners,
+        connect: () => ext.context.api.connectPro(),
+        set(value) {
+            current = value;
+            [...listeners].forEach(listener => listener());
+        },
+    };
+}
 
 // The script and stylesheet URLs of a page
 const pageUrls = (page) => [...page.matchAll(/(?:src|href)="([^"]*)"/g)].map(match => match[1]);
@@ -1219,9 +1245,10 @@ test('side panel: the tools and exports of DrawMeDatabase Pro are listed greyed 
     assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.openCanvas', args: [] }, { id: 'acme.audit', args: ['users', 3] }]);
 
     // Its license: the trial, then the end of the trial locks its tools and exports
-    api.setLicenseStatus({ kind: 'trial', daysLeft: 9.4, commands: { buy: 'DMDBPro.buyLicense', enter: 'DMDBPro.enterLicense', manage: 'DMDBPro.licenseStatus' } });
+    const pro = installPro(ext, { kind: 'trial', daysLeft: 9.4, commands: { buy: 'DMDBPro.buyLicense', enter: 'DMDBPro.enterLicense', manage: 'DMDBPro.licenseStatus' } });
+    assert.equal(await pro.connect(), true);
     assert.deepEqual(panel.sent('features').at(-1).license, { kind: 'trial', daysLeft: 9, actions: ['buy', 'enter'] });
-    api.setLicenseStatus({ kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
+    pro.set({ kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
     const expired = panel.sent('features').at(-1);
     assert.deepEqual(expired.license, { kind: 'expired', daysLeft: undefined, actions: ['buy'] });
     assert.equal(expired.tools.find(tool => tool.id === 'pro.canvas').state, 'locked');
@@ -1233,15 +1260,69 @@ test('side panel: the tools and exports of DrawMeDatabase Pro are listed greyed 
     await flush();
     assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.buyLicense', args: [] }]);
 
-    api.setLicenseStatus({ kind: 'licensed', commands: { manage: 'DMDBPro.licenseStatus' } });
+    pro.set({ kind: 'licensed', commands: { manage: 'DMDBPro.licenseStatus' } });
     assert.deepEqual(panel.sent('features').at(-1).license.actions, ['manage']);
-    api.setLicenseStatus({ kind: 'stolen' });
+    pro.set({ kind: 'stolen' });
     assert.equal(panel.sent('features').at(-1).license.kind, 'free');
 
     canvas.update({ locked: true, label: 'Canvas' });
     assert.deepEqual(panel.sent('features').at(-1).tools.find(tool => tool.id === 'pro.canvas'), { id: 'pro.canvas', label: 'Canvas', hint: '', icon: undefined, pro: true, state: 'locked' });
     canvas.dispose();
     assert.equal(panel.sent('features').at(-1).tools.find(tool => tool.id === 'pro.canvas').state, 'missing');
+});
+
+test('API: the license of DrawMeDatabase Pro comes from the frozen exports of Pro only', async () => {
+    const ext = activate();
+    const api = ext.context.api;
+    ext.openFolders(folder('license-handshake', LARAVEL));
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    const unlocked = () => panel.sent('settings').at(-1).pro;
+
+    // Any extension can call the API: nothing in it sets the license
+    assert.equal(api.setLicenseStatus, undefined);
+    assert.equal(await api.connectPro({ licenseStatus: () => ({ kind: 'licensed' }) }), false, 'Pro is not installed');
+    assert.equal(unlocked(), false);
+    assert.equal(ext.state.context['drawMeDatabase.license'], 'free');
+
+    // Exports that are not frozen: another extension could have put its own functions there
+    const open = installPro(ext, { kind: 'licensed' }, { frozen: false });
+    assert.equal(await open.connect(), false);
+    assert.equal(unlocked(), false);
+    assert.equal(open.listeners.size, 0);
+    assert.ok(ext.state.output.includes('DrawMeDatabase Pro: no license in its exports'));
+
+    // Pro: its license, followed once however many times connectPro() is called
+    const pro = installPro(ext, { kind: 'trial', daysLeft: 5 });
+    assert.equal(await pro.connect(), true);
+    assert.equal(await pro.connect(), true);
+    assert.equal(pro.listeners.size, 1);
+    assert.equal(unlocked(), true);
+    assert.equal(ext.state.context['drawMeDatabase.license'], 'trial');
+    pro.set({ kind: 'expired' });
+    assert.equal(unlocked(), false);
+
+    // An error of Pro is a free version, until its event brings its license back
+    pro.set({ get kind() { throw new Error('broken'); } });
+    assert.equal(ext.state.context['drawMeDatabase.license'], 'free');
+    assert.ok(ext.state.output.includes('DrawMeDatabase Pro: broken'));
+    pro.set({ kind: 'licensed' });
+    assert.equal(unlocked(), true);
+
+    // Pro activated again (new exports): the old ones are no longer followed
+    const again = installPro(ext, { kind: 'expired' });
+    assert.equal(await again.connect(), true);
+    assert.equal(pro.listeners.size, 0);
+    assert.equal(unlocked(), false);
+    again.set({ kind: 'licensed' });
+    assert.equal(unlocked(), true);
+
+    // Pro deactivated (its exports give null), then DrawMeDatabase itself
+    again.set(null);
+    assert.equal(ext.state.context['drawMeDatabase.license'], 'free');
+    ext.context.subscriptions.forEach(subscription => subscription.dispose());
+    assert.equal(again.listeners.size, 0);
 });
 
 test('side panel: appearance, options and language are saved globally, after validation', async () => {
@@ -1401,7 +1482,8 @@ test('free version: the page gets the git status of the tables, the columns come
     assert.equal(api.getSchema().tables[0].columns[1].git, 'unsaved', 'other extensions get everything');
 
     // The trial of Pro: the columns get their status, the page knows it
-    api.setLicenseStatus({ kind: 'trial', daysLeft: 14 });
+    const pro = installPro(ext, { kind: 'trial', daysLeft: 14 });
+    await pro.connect();
     assert.equal(panel.sent('settings').at(-1).pro, true);
     assert.deepEqual(panel.sent('schema').at(-1).tables[0].columns.map(column => column.git), ['committed', 'unsaved']);
 
@@ -1412,7 +1494,7 @@ test('free version: the page gets the git status of the tables, the columns come
     ext.state.settings[''] = {};
     ext.vscode.changeConfiguration('DrawMeDatabase.showColumnGitStatus');
     assert.equal(panel.sent('schema').at(-1).tables[0].columns[1].git, 'unsaved');
-    api.setLicenseStatus({ kind: 'expired' });
+    pro.set({ kind: 'expired' });
     assert.equal(panel.sent('settings').at(-1).pro, false);
     assert.equal(panel.sent('schema').at(-1).tables[0].columns[1].git, undefined);
 });
@@ -1485,7 +1567,7 @@ test('views: the container has its views; the Schema view reads the schema itsel
     const decoration = ext.state.decorations[0].provideFileDecoration(users.resourceUri);
     assert.deepEqual({ badge: decoration.badge, tooltip: decoration.tooltip, color: decoration.color.id }, { badge: 'U', tooltip: 'Not in the last commit', color: 'gitDecoration.untrackedResourceForeground' });
     assert.equal(ext.state.decorations[0].provideFileDecoration(Uri.file('/x.php')), undefined);
-    ext.context.api.setLicenseStatus({ kind: 'trial', daysLeft: 3 });
+    await installPro(ext, { kind: 'trial', daysLeft: 3 }).connect();
     assert.equal(schema.items()[1].children[0].resourceUri.query, 'git=untracked');
     ext.state.settings[''] = { 'DrawMeDatabase.showGitStatus': false };
     assert.equal(schema.items()[1].resourceUri, undefined, 'git status hidden');
@@ -1578,7 +1660,8 @@ test('views: the tools, exports and license of the side panel, Pro ones greyed u
 
     // The license: the view is hidden without Pro (context key), then follows its state
     assert.equal(ext.state.context['drawMeDatabase.license'], 'free');
-    api.setLicenseStatus({ kind: 'trial', daysLeft: 9, commands: { buy: 'DMDBPro.buyLicense', enter: 'DMDBPro.enterLicense' } });
+    const pro = installPro(ext, { kind: 'trial', daysLeft: 9, commands: { buy: 'DMDBPro.buyLicense', enter: 'DMDBPro.enterLicense' } });
+    await pro.connect();
     assert.equal(ext.state.context['drawMeDatabase.license'], 'trial');
     assert.deepEqual(license.items().map(item => item.label), ['Pro trial: 9 days left', 'Buy a license', 'Enter a license key']);
     ext.state.executed = [];
@@ -1586,9 +1669,9 @@ test('views: the tools, exports and license of the side panel, Pro ones greyed u
     command('DMDB.licenseAction')('manage');
     await flush();
     assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.buyLicense', args: [] }]);
-    api.setLicenseStatus({ kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
+    pro.set({ kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
     assert.equal(tools.items().find(item => item.id === 'tool:pro.canvas').iconPath.id, 'lock');
-    api.setLicenseStatus(null);
+    pro.set(null);
     assert.equal(ext.state.context['drawMeDatabase.license'], 'free');
 });
 

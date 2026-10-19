@@ -36,7 +36,7 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 | Member | Description |
 |--------|-------------|
 | `registerTool({ id, label, command, args, hint, icon, pro })` | Adds a tool to the Tools view of the sidebar (1.6.0: the Tools section of the side panel of the diagram): a click runs `command` with `args` (strings, numbers, booleans). The ids of DrawMeDatabase Pro (`pro.canvas`, `pro.designer`...) replace the greyed items shown before it is installed, and their texts come from the translations of DrawMeDatabase. `icon`: a codicon (`plug`), or an icon of `views/sidepanel.js` (`history`, `compare`...). Returns `{ update({ label, hint, locked }), dispose() }` |
-| `setLicenseStatus({ kind, daysLeft, commands })` | The license of DrawMeDatabase Pro, in the License view of the sidebar (1.6.0: at the bottom of the side panel), which is only shown while it is set. `kind`: `'licensed'`, `'trial'` (with `daysLeft`), `'expired'` (its tools and exports are then shown locked) or `'development'`. `commands`: `{ buy, enter, manage }`, the commands of its buttons. `null`: not installed |
+| `connectPro()` | Shows the license of DrawMeDatabase Pro in the License view of the sidebar (1.6.0: at the bottom of the side panel), which is only shown while it is set. DrawMeDatabase reads it from the exports of DrawMeDatabase Pro, not from the caller: see [License of DrawMeDatabase Pro](#license-of-drawmedatabase-pro). Resolves to `true` once it follows it |
 | `registerTableInfoProvider({ id, provide })` | Adds sections to the inspector of a table (a click on a table in the diagram). `provide(table, schema)` returns, or resolves to within 10 s, a list of sections: `{ title, items: [{ label, value, hint, badge, tone }], actions: [{ label, command, args }], note, locked }`. `tone`: `'added'`, `'modified'`, `'removed'`, `'muted'` or `'accent'`; an action runs `command` with `args` (strings, numbers, booleans); `locked: true` greys the section with a PRO badge. Without any provider, the inspector shows what DrawMeDatabase Pro would add. Returns a `Disposable` |
 | `getDisplaySettings()` | The appearance and the language chosen by the user: `{ theme, palette, colors, font, customFont, fontSize, grid, language }` (`language`: `'en'` or `'fr'`, already resolved) |
 | `onDidChangeDisplaySettings(listener)` | Event fired with the new display settings. Returns a `Disposable` |
@@ -59,11 +59,24 @@ DrawMeDatabase has a view container in the Activity Bar, with the views *Schema*
 |-------------|-------|
 | `drawMeDatabase.sidebar` | `true` once the container exists. Put it in the `when` clause of your views: with a DrawMeDatabase older than 1.7.0, VS Code would move them to the Explorer |
 | `drawMeDatabase.schemaState` | What the Schema view shows: `loading`, `noFolder`, `noProject` (no Laravel or Symfony project found), `noTables`, `error` (see the output) or `ready` |
-| `drawMeDatabase.license` | The `kind` given to `setLicenseStatus()`, or `free` |
+| `drawMeDatabase.license` | The `kind` of the license of DrawMeDatabase Pro (see [below](#license-of-drawmedatabase-pro)), or `free` |
 
 - `workbench.view.extension.drawMeDatabase` opens the container, `<view id>.focus` one of its views.
 - The Schema view reads the schema itself when it is shown, without the diagram: `getSchema()` and `onDidChangeSchema` then give its schema too, and it follows the edits of the code while the Schema view or the diagram is visible.
 - The commands of the views can be used in the menus of your views: `DMDB.refreshSchema` (read the schema again), `DMDB.showInDiagram` (with a table name: open the diagram on it and inspect it), `DMDB.openTable` (a table name, and optionally a column name: open its file at its line), `DMDB.runExport` (an export id, see `registerExporter`), `DMDB.openSettings`, `DMDB.showOutput`.
+
+## License of DrawMeDatabase Pro
+
+Every extension can call the API, so the API cannot unlock what DrawMeDatabase keeps for DrawMeDatabase Pro (the git status of the columns, the palettes, the custom colors and the fonts). DrawMeDatabase reads the license from the exports of the extension **`GuillaumeCancalon.draw-me-database-pro`**, which VS Code keeps for that extension:
+
+1. Pro returns **frozen** exports from its `activate()` (`Object.freeze`), with:
+   - `licenseStatus()`: `{ kind, daysLeft, commands }`, or `null` once it is deactivated. `kind`: `'licensed'`, `'trial'` (with `daysLeft`), `'expired'` (its tools and exports are then shown locked) or `'development'`. `commands`: `{ buy, enter, manage }`, the commands of its buttons;
+   - `onDidChangeLicenseStatus(listener)`: an event fired when its license changes (and every hour during the trial). Returns a `Disposable`.
+2. Pro calls `connectPro()` while it activates, **without awaiting it** in `activate()`: DrawMeDatabase waits for the end of the activation of Pro (`extension.activate()`), then follows its license.
+
+Exports that are not frozen are ignored: another extension could have replaced their functions. Calling `connectPro()` from another extension only makes DrawMeDatabase read the exports of Pro again.
+
+This stops an extension from unlocking Pro with one line of code. It is not a lock: DrawMeDatabase is free software, and a modified copy of it can show anything.
 
 ## Pages
 
