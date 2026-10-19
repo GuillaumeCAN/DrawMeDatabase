@@ -34,4 +34,11 @@ export default defineConfig([
 		// Workspace with a Prisma project at its root, its schema in several files
 		workspaceFolder: 'test/fixtures/integration/prisma-workspace',
 	},
+	{
+		...common,
+		label: 'drizzle',
+		files: 'test/integration/drizzle.test.js',
+		// Workspace with a Drizzle project at its root, its schema files set by drizzle.config.ts
+		workspaceFolder: 'test/fixtures/integration/drizzle-workspace',
+	},
 ]);

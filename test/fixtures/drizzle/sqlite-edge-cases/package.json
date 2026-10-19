@@ -1,0 +1,7 @@
+{
+  "name": "sqlite-edge-cases",
+  "devDependencies": {
+    "drizzle-kit": "~0.31.0",
+    "drizzle-orm": "~0.45.0"
+  }
+}

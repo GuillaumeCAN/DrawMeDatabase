@@ -1,0 +1,428 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "serial",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 12
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 13
+          },
+          "length": 100
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 14
+          },
+          "length": 255,
+          "unique": true
+        },
+        {
+          "name": "password_hash",
+          "type": "text",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 16
+          },
+          "length": 20,
+          "default": "member"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 17
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 18
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 19
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 11
+      }
+    },
+    {
+      "table": "teams",
+      "columns": [
+        {
+          "name": "id",
+          "type": "serial",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 23
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 24
+          },
+          "length": 100
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 25
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 26
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "stripe_customer_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 27
+          },
+          "unique": true
+        },
+        {
+          "name": "stripe_subscription_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 28
+          },
+          "unique": true
+        },
+        {
+          "name": "stripe_product_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 29
+          }
+        },
+        {
+          "name": "plan_name",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 30
+          },
+          "length": 50
+        },
+        {
+          "name": "subscription_status",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 31
+          },
+          "length": 20
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 22
+      }
+    },
+    {
+      "table": "team_members",
+      "columns": [
+        {
+          "name": "id",
+          "type": "serial",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 35
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 36
+          }
+        },
+        {
+          "name": "team_id",
+          "type": "integer",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 39
+          }
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 42
+          },
+          "length": 50
+        },
+        {
+          "name": "joined_at",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 43
+          },
+          "defaultRaw": "now()"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "team_id",
+          "references": "id",
+          "on": "teams",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 34
+      }
+    },
+    {
+      "table": "activity_logs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "serial",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 47
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "team_id",
+          "type": "integer",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 48
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 51
+          }
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "timestamp",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 53
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "ip_address",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 54
+          },
+          "length": 45
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "team_id",
+          "references": "id",
+          "on": "teams",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 46
+      }
+    },
+    {
+      "table": "invitations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "serial",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 58
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "team_id",
+          "type": "integer",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 59
+          }
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 62
+          },
+          "length": 255
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 63
+          },
+          "length": 50
+        },
+        {
+          "name": "invited_by",
+          "type": "integer",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 64
+          }
+        },
+        {
+          "name": "invited_at",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 67
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "status",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 68
+          },
+          "length": 20,
+          "default": "pending"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "team_id",
+          "references": "id",
+          "on": "teams",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "invited_by",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 57
+      }
+    }
+  ],
+  "warnings": []
+}

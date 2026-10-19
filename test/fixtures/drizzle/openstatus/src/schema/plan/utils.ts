@@ -1,0 +1,189 @@
+import type { WorkspacePlan } from "../workspaces/validation";
+import { allPlans } from "./config";
+import {
+  type Addons,
+  type AddonQuantityKey,
+  addonQuantityConfig,
+  type BillingInterval,
+  type Limits,
+  limitsSchema,
+} from "./schema";
+
+export function getLimit<T extends keyof Limits>(limits: Limits, limit: T) {
+  return limits[limit] || allPlans.free.limits[limit];
+}
+
+export function getLimits(plan: WorkspacePlan | null) {
+  return allPlans[plan || "free"].limits;
+}
+
+export function getPlanConfig(plan: WorkspacePlan | null) {
+  return allPlans[plan || "free"];
+}
+
+export function getCurrency({
+  continent,
+}: {
+  continent: string;
+  country: string;
+}) {
+  if (continent === "EU") {
+    return "EUR";
+  }
+  return "USD";
+}
+
+type PriceObject = {
+  USD: number;
+  EUR: number;
+};
+
+type PriceConfig = {
+  value: number;
+  locale: string;
+  currency: string;
+};
+
+function getLocaleForCurrency(currency: string): string {
+  return currency === "EUR" ? "fr-FR" : "en-US";
+}
+
+function resolvePriceConfig(
+  price: PriceObject,
+  currency?: string,
+): PriceConfig {
+  const effectiveCurrency = currency && currency in price ? currency : "USD";
+  const value = price[effectiveCurrency as keyof PriceObject];
+  const locale = getLocaleForCurrency(effectiveCurrency);
+
+  return { value, locale, currency: effectiveCurrency };
+}
+
+export function getPriceConfig(
+  plan: WorkspacePlan,
+  currency?: string,
+  interval: BillingInterval = "monthly",
+) {
+  const planConfig = allPlans[plan];
+  return resolvePriceConfig(planConfig.price[interval], currency);
+}
+
+export function isAddonQuantityKey(
+  addon: keyof Addons,
+): addon is AddonQuantityKey {
+  return addon in addonQuantityConfig;
+}
+
+export function getAddonQuantityConfig(addon: keyof Addons) {
+  return isAddonQuantityKey(addon) ? addonQuantityConfig[addon] : null;
+}
+
+export function getAddonPackSize(addon: keyof Addons): number {
+  return getAddonQuantityConfig(addon)?.packSize ?? 1;
+}
+
+export function getAddonMaxQuantity(addon: keyof Addons): number | null {
+  return getAddonQuantityConfig(addon)?.maxQuantity ?? null;
+}
+
+// Yearly addon prices in Stripe are the monthly price ×10 — the same "2 months
+// free" as the plans — so they are derived rather than stored per addon.
+export const YEARLY_ADDON_MULTIPLIER = 10;
+
+export function getAddonPriceConfig(
+  plan: WorkspacePlan,
+  addon: keyof Addons,
+  currency?: string,
+  interval: BillingInterval = "monthly",
+) {
+  const addonConfig = allPlans[plan].addons[addon];
+  if (!addonConfig) {
+    return null;
+  }
+  const price = resolvePriceConfig(addonConfig.price, currency);
+  return interval === "yearly"
+    ? { ...price, value: price.value * YEARLY_ADDON_MULTIPLIER }
+    : price;
+}
+
+export function getPlansForLimit(
+  currentPlan: WorkspacePlan,
+  limit: keyof Limits,
+): WorkspacePlan[] {
+  const currentLimitValue = allPlans[currentPlan].limits[limit];
+  const planOrder: WorkspacePlan[] = ["free", "starter", "team", "scale"];
+
+  // Get plans that come after the current plan
+  const availablePlans = planOrder.filter((plan) => {
+    const planIndex = planOrder.indexOf(plan);
+    const currentIndex = planOrder.indexOf(currentPlan);
+    return planIndex > currentIndex;
+  });
+
+  // Filter plans based on the limit feature value
+  return availablePlans.filter((plan) => {
+    const planLimitValue = allPlans[plan].limits[limit];
+
+    // For boolean limits, only show plans where the feature is enabled — either
+    // bundled or purchasable as an addon (e.g. SSO on every paid plan).
+    if (typeof currentLimitValue === "boolean") {
+      return planLimitValue === true || limit in allPlans[plan].addons;
+    }
+
+    // For numeric limits, show plans with higher values
+    if (
+      typeof currentLimitValue === "number" &&
+      typeof planLimitValue === "number"
+    ) {
+      return planLimitValue > currentLimitValue;
+    }
+
+    // For array limits (e.g., periodicity, regions), show plans with more options
+    if (Array.isArray(currentLimitValue) && Array.isArray(planLimitValue)) {
+      return planLimitValue.length > currentLimitValue.length;
+    }
+
+    // For string limits (e.g., data-retention), check if it's "better"
+    // This is a simple heuristic - could be improved based on specific needs
+    if (
+      typeof currentLimitValue === "string" &&
+      typeof planLimitValue === "string"
+    ) {
+      return planLimitValue !== currentLimitValue;
+    }
+
+    // For "Unlimited" string literal in members
+    if (planLimitValue === "Unlimited") {
+      return true;
+    }
+
+    return false;
+  });
+}
+
+/**
+ * Update an addon value in limits
+ * @param limits - Current workspace limits
+ * @param addon - Addon key to update
+ * @param value - The value to set (boolean for toggle addons, number for quantity addons)
+ * @returns Updated limits object
+ */
+export function updateAddonInLimits(
+  limits: Limits,
+  addon: keyof Addons,
+  value: boolean | number,
+): Limits {
+  const currentValue = limits[addon];
+  const newLimits = { ...limits };
+
+  // Infer addon type from the limit field type and set the value
+  if (typeof currentValue === "boolean" && typeof value === "boolean") {
+    // Toggle addon: set boolean value
+    (newLimits[addon] as boolean) = value;
+  } else if (typeof currentValue === "number" && typeof value === "number") {
+    // Quantity addon: set numeric value (ensure it doesn't go below 0)
+    (newLimits[addon] as number) = Math.max(0, value);
+  }
+
+  return limitsSchema.parse(newLimits);
+}

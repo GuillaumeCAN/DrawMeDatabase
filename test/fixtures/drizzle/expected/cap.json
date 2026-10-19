@@ -1,0 +1,6077 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 85
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 86
+          },
+          "length": 255
+        },
+        {
+          "name": "lastName",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 87
+          },
+          "length": 255
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 88
+          },
+          "length": 255,
+          "unique": true
+        },
+        {
+          "name": "emailVerified",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 89
+          }
+        },
+        {
+          "name": "image",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 90
+          },
+          "length": 255
+        },
+        {
+          "name": "stripeCustomerId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 91
+          },
+          "length": 255
+        },
+        {
+          "name": "stripeSubscriptionId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 92
+          },
+          "length": 255
+        },
+        {
+          "name": "thirdPartyStripeSubscriptionId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 95
+          },
+          "length": 255
+        },
+        {
+          "name": "stripeSubscriptionStatus",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 98
+          },
+          "length": 255
+        },
+        {
+          "name": "stripeSubscriptionPriceId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 101
+          },
+          "length": 255
+        },
+        {
+          "name": "preferences",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 104
+          },
+          "default": "null"
+        },
+        {
+          "name": "activeOrganizationId",
+          "type": "nanoId",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 118
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 121
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 122
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "onboardingSteps",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 123
+          }
+        },
+        {
+          "name": "onboarding_completed_at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 130
+          }
+        },
+        {
+          "name": "customBucket",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 131
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "inviteQuota",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 132
+          },
+          "default": 1
+        },
+        {
+          "name": "defaultOrgId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 133
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "authSessionVersion",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 135
+          },
+          "default": 0
+        },
+        {
+          "name": "marketingOrigin",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 136
+          },
+          "length": 20,
+          "default": "unknown"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 82
+      }
+    },
+    {
+      "table": "loops_sync_jobs",
+      "columns": [
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 148
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "revision",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 149
+          },
+          "default": 1
+        },
+        {
+          "name": "nextAttemptAt",
+          "type": "datetime",
+          "source": {
+            "file": "schema.ts",
+            "line": 150
+          }
+        },
+        {
+          "name": "leaseToken",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 151
+          },
+          "length": 36
+        },
+        {
+          "name": "leaseUntil",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 152
+          }
+        },
+        {
+          "name": "failures",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 153
+          },
+          "default": 0
+        },
+        {
+          "name": "lastError",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 154
+          },
+          "length": 64
+        },
+        {
+          "name": "profileHash",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 155
+          },
+          "length": 64
+        },
+        {
+          "name": "teammateJoinedAt",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 156
+          }
+        },
+        {
+          "name": "syncedEmail",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 157
+          },
+          "length": 255
+        },
+        {
+          "name": "lastSyncedAt",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 158
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 145
+      },
+      "indexes": [
+        {
+          "columns": [
+            "nextAttemptAt"
+          ],
+          "type": "index",
+          "name": "loops_sync_due_idx"
+        }
+      ]
+    },
+    {
+      "table": "accounts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 168
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 169
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "type",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 170
+          },
+          "length": 255
+        },
+        {
+          "name": "provider",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 171
+          },
+          "length": 255
+        },
+        {
+          "name": "providerAccountId",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 172
+          },
+          "length": 255
+        },
+        {
+          "name": "access_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 173
+          }
+        },
+        {
+          "name": "expires_in",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 174
+          }
+        },
+        {
+          "name": "id_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 175
+          }
+        },
+        {
+          "name": "refresh_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 176
+          }
+        },
+        {
+          "name": "refresh_token_expires_in",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 177
+          }
+        },
+        {
+          "name": "scope",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 178
+          },
+          "length": 255
+        },
+        {
+          "name": "token_type",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 179
+          },
+          "length": 255
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 180
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 181
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "tempColumn",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 182
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 165
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId"
+          ],
+          "type": "index",
+          "name": "user_id_idx"
+        },
+        {
+          "columns": [
+            "providerAccountId"
+          ],
+          "type": "index",
+          "name": "provider_account_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "sessions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 195
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "sessionToken",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 196
+          },
+          "length": 255,
+          "unique": true
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 197
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "expires",
+          "type": "datetime",
+          "source": {
+            "file": "schema.ts",
+            "line": 198
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 199
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 200
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 192
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId"
+          ],
+          "type": "index",
+          "name": "user_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "verification_tokens",
+      "columns": [
+        {
+          "name": "identifier",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 209
+          },
+          "length": 255
+        },
+        {
+          "name": "token",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 210
+          },
+          "length": 255,
+          "unique": true
+        },
+        {
+          "name": "expires",
+          "type": "datetime",
+          "source": {
+            "file": "schema.ts",
+            "line": 211
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 212
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 213
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 208
+      }
+    },
+    {
+      "table": "organizations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 219
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 223
+          },
+          "length": 255
+        },
+        {
+          "name": "ownerId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 224
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 225
+          }
+        },
+        {
+          "name": "tombstoneAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 226
+          }
+        },
+        {
+          "name": "allowedEmailDomain",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 227
+          },
+          "length": 255
+        },
+        {
+          "name": "defaultVideoVisibility",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 228
+          },
+          "length": 7
+        },
+        {
+          "name": "customDomain",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 231
+          },
+          "length": 255
+        },
+        {
+          "name": "domainVerified",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 232
+          }
+        },
+        {
+          "name": "settings",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 233
+          }
+        },
+        {
+          "name": "iconUrl",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 245
+          },
+          "length": 1024
+        },
+        {
+          "name": "shareableLinkIconUrl",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 248
+          },
+          "length": 1024
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 251
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 252
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "workosOrganizationId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 253
+          },
+          "length": 255,
+          "unique": true
+        },
+        {
+          "name": "workosConnectionId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 254
+          },
+          "length": 255
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 216
+      },
+      "indexes": [
+        {
+          "columns": [
+            "ownerId",
+            "tombstoneAt"
+          ],
+          "type": "index",
+          "name": "owner_id_tombstone_idx"
+        },
+        {
+          "columns": [
+            "customDomain"
+          ],
+          "type": "index",
+          "name": "custom_domain_idx"
+        }
+      ]
+    },
+    {
+      "table": "organization_sso",
+      "columns": [
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 271
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "purchasedByUserId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 275
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "stripeCustomerId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 278
+          },
+          "length": 255
+        },
+        {
+          "name": "stripeSubscriptionId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 279
+          },
+          "length": 255,
+          "unique": true
+        },
+        {
+          "name": "stripePriceId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 280
+          },
+          "length": 255
+        },
+        {
+          "name": "status",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 281
+          },
+          "length": 32,
+          "default": "unpaid"
+        },
+        {
+          "name": "paidThrough",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 282
+          }
+        },
+        {
+          "name": "currentPeriodEnd",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 283
+          }
+        },
+        {
+          "name": "cancelAtPeriodEnd",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 284
+          },
+          "default": false
+        },
+        {
+          "name": "checkoutAttemptId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 285
+          },
+          "length": 36
+        },
+        {
+          "name": "checkoutCurrency",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 286
+          },
+          "length": 3
+        },
+        {
+          "name": "checkoutPriceId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 287
+          },
+          "length": 255
+        },
+        {
+          "name": "checkoutSessionId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 288
+          },
+          "length": 255
+        },
+        {
+          "name": "checkoutStartedAt",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 289
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 290
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 291
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 268
+      }
+    },
+    {
+      "table": "organization_members",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 304
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 305
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 306
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 309
+          },
+          "length": 255
+        },
+        {
+          "name": "hasProSeat",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 312
+          },
+          "default": false
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 313
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 314
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 301
+      },
+      "indexes": [
+        {
+          "columns": [
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "organization_id_idx"
+        },
+        {
+          "columns": [
+            "userId",
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "user_id_organization_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "integration_installations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 328
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "provider",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 329
+          },
+          "length": 64
+        },
+        {
+          "name": "externalId",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 330
+          },
+          "length": 255
+        },
+        {
+          "name": "displayName",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 331
+          },
+          "length": 255
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 332
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "installedByUserId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 335
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "encryptedCredentials",
+          "type": "encryptedText",
+          "source": {
+            "file": "schema.ts",
+            "line": 338
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 339
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 340
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 341
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 325
+      },
+      "indexes": [
+        {
+          "columns": [
+            "provider",
+            "externalId"
+          ],
+          "type": "unique",
+          "name": "provider_external_id_idx"
+        },
+        {
+          "columns": [
+            "organizationId",
+            "provider",
+            "displayName"
+          ],
+          "type": "index",
+          "name": "organization_provider_display_name_idx"
+        }
+      ]
+    },
+    {
+      "table": "organization_invites",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 357
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 358
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "invitedEmail",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 361
+          },
+          "length": 255
+        },
+        {
+          "name": "invitedByUserId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 362
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 363
+          },
+          "length": 255
+        },
+        {
+          "name": "status",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 366
+          },
+          "length": 255,
+          "default": "pending"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 367
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 368
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 369
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 354
+      },
+      "indexes": [
+        {
+          "columns": [
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "organization_id_idx"
+        },
+        {
+          "columns": [
+            "invitedEmail"
+          ],
+          "type": "index",
+          "name": "invited_email_idx"
+        },
+        {
+          "columns": [
+            "invitedByUserId"
+          ],
+          "type": "index",
+          "name": "invited_by_user_id_idx"
+        },
+        {
+          "columns": [
+            "status"
+          ],
+          "type": "index",
+          "name": "status_idx"
+        }
+      ]
+    },
+    {
+      "table": "folders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 384
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 385
+          },
+          "length": 255
+        },
+        {
+          "name": "color",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 386
+          },
+          "length": 16,
+          "default": "normal"
+        },
+        {
+          "name": "public",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 393
+          },
+          "default": false
+        },
+        {
+          "name": "settings",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 394
+          }
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 397
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "createdById",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 400
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "parentId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 401
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "spaceId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 402
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 403
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 404
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 381
+      },
+      "indexes": [
+        {
+          "columns": [
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "organization_id_idx"
+        },
+        {
+          "columns": [
+            "createdById"
+          ],
+          "type": "index",
+          "name": "created_by_id_idx"
+        },
+        {
+          "columns": [
+            "parentId"
+          ],
+          "type": "index",
+          "name": "parent_id_idx"
+        },
+        {
+          "columns": [
+            "spaceId"
+          ],
+          "type": "index",
+          "name": "space_id_idx"
+        },
+        {
+          "columns": [
+            "public",
+            "parentId"
+          ],
+          "type": "index",
+          "name": "public_parent_id_idx"
+        },
+        {
+          "columns": [
+            "public",
+            "spaceId",
+            "parentId"
+          ],
+          "type": "index",
+          "name": "public_space_parent_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "videos",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 426
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "ownerId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 427
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "orgId",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 428
+          },
+          "length": 15
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 429
+          },
+          "length": 255,
+          "default": "My Video"
+        },
+        {
+          "name": "bucket",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 430
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "storageIntegrationId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 431
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "duration",
+          "type": "float",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 435
+          }
+        },
+        {
+          "name": "width",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 436
+          }
+        },
+        {
+          "name": "height",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 437
+          }
+        },
+        {
+          "name": "fps",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 438
+          }
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 439
+          }
+        },
+        {
+          "name": "public",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 440
+          },
+          "default": true
+        },
+        {
+          "name": "settings",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 441
+          }
+        },
+        {
+          "name": "transcriptionStatus",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 451
+          },
+          "length": 255
+        },
+        {
+          "name": "source",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 454
+          },
+          "default": "{\"type\":\"MediaConvert\"}"
+        },
+        {
+          "name": "folderId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 478
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 479
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "effectiveCreatedAt",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 480
+          }
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 486
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "password",
+          "type": "encryptedTextNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 488
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "xStreamInfo",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 490
+          }
+        },
+        {
+          "name": "firstViewEmailSentAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 491
+          }
+        },
+        {
+          "name": "isScreenshot",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 492
+          },
+          "default": false
+        },
+        {
+          "name": "awsRegion",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 494
+          },
+          "length": 255
+        },
+        {
+          "name": "awsBucket",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 495
+          },
+          "length": 255
+        },
+        {
+          "name": "videoStartTime",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 496
+          },
+          "length": 255
+        },
+        {
+          "name": "audioStartTime",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 497
+          },
+          "length": 255
+        },
+        {
+          "name": "jobId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 498
+          },
+          "length": 255
+        },
+        {
+          "name": "jobStatus",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 499
+          },
+          "length": 255
+        },
+        {
+          "name": "skipProcessing",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 500
+          },
+          "default": false
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "storageIntegrationId",
+          "references": "id",
+          "on": "storage_integrations",
+          "type": "many-to-one",
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 423
+      },
+      "indexes": [
+        {
+          "columns": [
+            "ownerId"
+          ],
+          "type": "index",
+          "name": "owner_id_idx"
+        },
+        {
+          "columns": [
+            "ownerId",
+            "updatedAt",
+            "id"
+          ],
+          "type": "index",
+          "name": "owner_updated_id_idx"
+        },
+        {
+          "columns": [
+            "public"
+          ],
+          "type": "index",
+          "name": "is_public_idx"
+        },
+        {
+          "columns": [
+            "folderId"
+          ],
+          "type": "index",
+          "name": "folder_id_idx"
+        },
+        {
+          "columns": [
+            "storageIntegrationId"
+          ],
+          "type": "index",
+          "name": "storage_integration_id_idx"
+        },
+        {
+          "columns": [
+            "orgId",
+            "ownerId",
+            "folderId"
+          ],
+          "type": "index",
+          "name": "org_owner_folder_idx"
+        },
+        {
+          "columns": [
+            "orgId",
+            "effectiveCreatedAt"
+          ],
+          "type": "index",
+          "name": "org_effective_created_idx"
+        },
+        {
+          "columns": [
+            "isScreenshot",
+            "transcriptionStatus",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "screenshot_transcription_created_idx"
+        }
+      ]
+    },
+    {
+      "table": "video_edits",
+      "columns": [
+        {
+          "name": "videoId",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 526
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "sourceKey",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 531
+          },
+          "length": 512
+        },
+        {
+          "name": "editSpec",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 532
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 533
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 534
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "videoId",
+          "references": "id",
+          "on": "videos",
+          "type": "one-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 525
+      }
+    },
+    {
+      "table": "shared_videos",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 540
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "videoId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 541
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "folderId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 542
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 543
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "sharedByUserId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 546
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "sharedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 547
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 537
+      },
+      "indexes": [
+        {
+          "columns": [
+            "folderId"
+          ],
+          "type": "index",
+          "name": "folder_id_idx"
+        },
+        {
+          "columns": [
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "organization_id_idx"
+        },
+        {
+          "columns": [
+            "sharedByUserId"
+          ],
+          "type": "index",
+          "name": "shared_by_user_id_idx"
+        },
+        {
+          "columns": [
+            "videoId",
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "video_id_organization_id_idx"
+        },
+        {
+          "columns": [
+            "videoId",
+            "folderId"
+          ],
+          "type": "index",
+          "name": "video_id_folder_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "video_viewer_grants",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 569
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "videoId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 570
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 574
+          },
+          "length": 255
+        },
+        {
+          "name": "invitedByUserId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 575
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 576
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "revokedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 577
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "videoId",
+          "references": "id",
+          "on": "videos",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 566
+      },
+      "indexes": [
+        {
+          "columns": [
+            "videoId",
+            "email"
+          ],
+          "type": "unique",
+          "name": "video_email_idx"
+        }
+      ]
+    },
+    {
+      "table": "comments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 590
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "type",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 591
+          },
+          "length": 6
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "source": {
+            "file": "schema.ts",
+            "line": 595
+          }
+        },
+        {
+          "name": "timestamp",
+          "type": "float",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 596
+          }
+        },
+        {
+          "name": "authorId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 597
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "videoId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 598
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 599
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 600
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "parentCommentId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 601
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "mediaKey",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 606
+          },
+          "length": 512
+        },
+        {
+          "name": "mediaDuration",
+          "type": "float",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 607
+          }
+        },
+        {
+          "name": "mediaMeta",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 608
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 587
+      },
+      "indexes": [
+        {
+          "columns": [
+            "videoId",
+            "type",
+            "createdAt",
+            "id"
+          ],
+          "type": "index",
+          "name": "video_type_created_idx"
+        },
+        {
+          "columns": [
+            "authorId"
+          ],
+          "type": "index",
+          "name": "author_id_idx"
+        },
+        {
+          "columns": [
+            "parentCommentId"
+          ],
+          "type": "index",
+          "name": "parent_comment_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "notifications",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 627
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "orgId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 628
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "recipientId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 629
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "type",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 630
+          },
+          "length": 16
+        },
+        {
+          "name": "data",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 635
+          }
+        },
+        {
+          "name": "videoId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 647
+          },
+          "length": 50
+        },
+        {
+          "name": "dedupKey",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 648
+          },
+          "length": 128,
+          "unique": true
+        },
+        {
+          "name": "readAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 649
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 650
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 624
+      },
+      "indexes": [
+        {
+          "columns": [
+            "orgId"
+          ],
+          "type": "index",
+          "name": "org_id_idx"
+        },
+        {
+          "columns": [
+            "type"
+          ],
+          "type": "index",
+          "name": "type_idx"
+        },
+        {
+          "columns": [
+            "readAt"
+          ],
+          "type": "index",
+          "name": "read_at_idx"
+        },
+        {
+          "columns": [
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "created_at_idx"
+        },
+        {
+          "columns": [
+            "recipientId",
+            "readAt"
+          ],
+          "type": "index",
+          "name": "recipient_read_idx"
+        },
+        {
+          "columns": [
+            "recipientId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "recipient_created_idx"
+        },
+        {
+          "columns": [
+            "type",
+            "recipientId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "type_recipient_created_idx"
+        },
+        {
+          "columns": [
+            "type",
+            "recipientId",
+            "videoId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "type_recipient_video_created_idx"
+        }
+      ]
+    },
+    {
+      "table": "messenger_conversations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 684
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "agent",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 685
+          },
+          "length": 32
+        },
+        {
+          "name": "mode",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 691
+          },
+          "length": 16,
+          "default": "agent"
+        },
+        {
+          "name": "userId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 698
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "anonymousId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 699
+          },
+          "length": 64
+        },
+        {
+          "name": "takeoverByUserId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 700
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "takeoverAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 701
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 702
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 703
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "lastMessageAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 704
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 681
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId",
+            "lastMessageAt"
+          ],
+          "type": "index",
+          "name": "user_last_message_idx"
+        },
+        {
+          "columns": [
+            "anonymousId",
+            "lastMessageAt"
+          ],
+          "type": "index",
+          "name": "anonymous_last_message_idx"
+        },
+        {
+          "columns": [
+            "mode",
+            "lastMessageAt"
+          ],
+          "type": "index",
+          "name": "mode_last_message_idx"
+        },
+        {
+          "columns": [
+            "updatedAt"
+          ],
+          "type": "index",
+          "name": "updated_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "messenger_messages",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 726
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "conversationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 727
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 730
+          },
+          "length": 16
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "source": {
+            "file": "schema.ts",
+            "line": 736
+          }
+        },
+        {
+          "name": "userId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 737
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "anonymousId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 738
+          },
+          "length": 64
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 739
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "conversationId",
+          "references": "id",
+          "on": "messenger_conversations",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 723
+      },
+      "indexes": [
+        {
+          "columns": [
+            "conversationId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "conversation_created_at_idx"
+        },
+        {
+          "columns": [
+            "role",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "role_created_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "messenger_support_emails",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 756
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "conversationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 757
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 758
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userEmail",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 759
+          },
+          "length": 255
+        },
+        {
+          "name": "subject",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 760
+          },
+          "length": 255
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "source": {
+            "file": "schema.ts",
+            "line": 761
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 762
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "conversationId",
+          "references": "id",
+          "on": "messenger_conversations",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 753
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "support_email_user_created_at_idx"
+        },
+        {
+          "columns": [
+            "conversationId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "support_email_conversation_created_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "signed_baas",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 783
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 784
+          },
+          "length": 15,
+          "unique": true,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 787
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "status",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 788
+          },
+          "length": 255,
+          "default": "pending"
+        },
+        {
+          "name": "stripeSubscriptionId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 789
+          },
+          "length": 255
+        },
+        {
+          "name": "entityName",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 790
+          },
+          "length": 255
+        },
+        {
+          "name": "entityType",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 791
+          },
+          "length": 255
+        },
+        {
+          "name": "entityAddress",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 792
+          },
+          "length": 500
+        },
+        {
+          "name": "signerName",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 793
+          },
+          "length": 255
+        },
+        {
+          "name": "signerTitle",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 794
+          },
+          "length": 255
+        },
+        {
+          "name": "noticesEmail",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 795
+          },
+          "length": 255
+        },
+        {
+          "name": "signatureData",
+          "type": "longtext",
+          "source": {
+            "file": "schema.ts",
+            "line": 796
+          }
+        },
+        {
+          "name": "signedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 797
+          }
+        },
+        {
+          "name": "emailSentAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 798
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 799
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 800
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 780
+      },
+      "indexes": [
+        {
+          "columns": [
+            "stripeSubscriptionId"
+          ],
+          "type": "index",
+          "name": "signed_baa_stripe_subscription_idx"
+        }
+      ]
+    },
+    {
+      "table": "s3_buckets",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 815
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "ownerId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 816
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 817
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "region",
+          "type": "encryptedText",
+          "source": {
+            "file": "schema.ts",
+            "line": 819
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "endpoint",
+          "type": "encryptedTextNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 820
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "bucketName",
+          "type": "encryptedText",
+          "source": {
+            "file": "schema.ts",
+            "line": 821
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "accessKeyId",
+          "type": "encryptedText",
+          "source": {
+            "file": "schema.ts",
+            "line": 822
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "secretAccessKey",
+          "type": "encryptedText",
+          "source": {
+            "file": "schema.ts",
+            "line": 823
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "source": {
+            "file": "schema.ts",
+            "line": 824
+          },
+          "default": "aws"
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 825
+          },
+          "default": true
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 826
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 827
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 812
+      },
+      "indexes": [
+        {
+          "columns": [
+            "ownerId",
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "owner_organization_idx"
+        },
+        {
+          "columns": [
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "organization_id_idx"
+        },
+        {
+          "columns": [
+            "organizationId",
+            "active",
+            "updatedAt"
+          ],
+          "type": "index",
+          "name": "organization_active_idx"
+        }
+      ]
+    },
+    {
+      "table": "storage_integrations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 846
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "ownerId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 850
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 851
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "provider",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 853
+          },
+          "length": 64
+        },
+        {
+          "name": "displayName",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 856
+          },
+          "length": 255
+        },
+        {
+          "name": "status",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 857
+          },
+          "length": 32,
+          "default": "active"
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 861
+          },
+          "default": false
+        },
+        {
+          "name": "encryptedConfig",
+          "type": "encryptedText",
+          "source": {
+            "file": "schema.ts",
+            "line": 862
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "googleDriveAccessToken",
+          "type": "encryptedTextNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 863
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "googleDriveAccessTokenExpiresAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 864
+          }
+        },
+        {
+          "name": "googleDriveTokenRefreshLeaseId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 867
+          },
+          "length": 64
+        },
+        {
+          "name": "googleDriveTokenRefreshLeaseExpiresAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 870
+          }
+        },
+        {
+          "name": "googleDriveStorageQuotaCache",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 873
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 876
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 877
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 843
+      },
+      "indexes": [
+        {
+          "columns": [
+            "ownerId",
+            "provider"
+          ],
+          "type": "index",
+          "name": "owner_provider_idx"
+        },
+        {
+          "columns": [
+            "ownerId",
+            "active"
+          ],
+          "type": "index",
+          "name": "owner_active_idx"
+        },
+        {
+          "columns": [
+            "organizationId",
+            "provider"
+          ],
+          "type": "index",
+          "name": "organization_provider_idx"
+        },
+        {
+          "columns": [
+            "organizationId",
+            "active",
+            "status"
+          ],
+          "type": "index",
+          "name": "organization_active_idx"
+        }
+      ]
+    },
+    {
+      "table": "storage_objects",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 900
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "integrationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 901
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "ownerId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 905
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "videoId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 906
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "objectKey",
+          "type": "text",
+          "source": {
+            "file": "schema.ts",
+            "line": 907
+          }
+        },
+        {
+          "name": "objectKeyHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 908
+          },
+          "length": 64
+        },
+        {
+          "name": "providerObjectId",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 909
+          },
+          "length": 255
+        },
+        {
+          "name": "uploadSessionUrl",
+          "type": "encryptedTextNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 910
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "uploadStatus",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 911
+          },
+          "length": 32,
+          "default": "pending"
+        },
+        {
+          "name": "contentType",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 915
+          },
+          "length": 255
+        },
+        {
+          "name": "contentLength",
+          "type": "bigint",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 916
+          },
+          "unsigned": true
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 917
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 918
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 919
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "integrationId",
+          "references": "id",
+          "on": "storage_integrations",
+          "type": "many-to-one",
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 897
+      },
+      "indexes": [
+        {
+          "columns": [
+            "integrationId",
+            "objectKeyHash"
+          ],
+          "type": "unique",
+          "name": "integration_key_hash_idx"
+        },
+        {
+          "columns": [
+            "integrationId",
+            "uploadStatus"
+          ],
+          "type": "index",
+          "name": "integration_status_idx"
+        },
+        {
+          "columns": [
+            "integrationId",
+            "objectKey(191)"
+          ],
+          "type": "index",
+          "name": "integration_object_key_prefix_idx"
+        },
+        {
+          "columns": [
+            "videoId"
+          ],
+          "type": "index",
+          "name": "video_id_idx"
+        },
+        {
+          "columns": [
+            "ownerId"
+          ],
+          "type": "index",
+          "name": "owner_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "auth_api_keys",
+      "columns": [
+        {
+          "name": "id",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 952
+          },
+          "length": 36
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 953
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "source",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 954
+          },
+          "length": 32,
+          "default": "unknown"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 958
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 949
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "user_id_created_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "agent_api_keys",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 971
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 972
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "tokenHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 973
+          },
+          "length": 64,
+          "unique": true
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 974
+          },
+          "length": 100,
+          "default": "Cap CLI"
+        },
+        {
+          "name": "scopes",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 975
+          }
+        },
+        {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 976
+          }
+        },
+        {
+          "name": "revokedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 977
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 978
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "lastUsedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 979
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 968
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "user_created_at_idx"
+        },
+        {
+          "columns": [
+            "expiresAt"
+          ],
+          "type": "index",
+          "name": "expires_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "agent_api_idempotency",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 991
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 992
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "operation",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 993
+          },
+          "length": 64
+        },
+        {
+          "name": "keyHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 994
+          },
+          "length": 64
+        },
+        {
+          "name": "requestHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 995
+          },
+          "length": 64
+        },
+        {
+          "name": "state",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 996
+          },
+          "length": 16,
+          "default": "pending"
+        },
+        {
+          "name": "statusCode",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1002
+          }
+        },
+        {
+          "name": "response",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1003
+          }
+        },
+        {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1004
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1005
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1006
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 988
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId",
+            "operation",
+            "keyHash"
+          ],
+          "type": "unique",
+          "name": "user_operation_key_idx"
+        },
+        {
+          "columns": [
+            "expiresAt"
+          ],
+          "type": "index",
+          "name": "expires_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "agent_api_authorization_codes",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1021
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1022
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "codeHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1023
+          },
+          "length": 64,
+          "unique": true
+        },
+        {
+          "name": "codeChallenge",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1024
+          },
+          "length": 64
+        },
+        {
+          "name": "redirectUri",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1025
+          },
+          "length": 512
+        },
+        {
+          "name": "scopes",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 1026
+          }
+        },
+        {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1027
+          }
+        },
+        {
+          "name": "consumedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1028
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1029
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1018
+      },
+      "indexes": [
+        {
+          "columns": [
+            "expiresAt"
+          ],
+          "type": "index",
+          "name": "expires_at_idx"
+        },
+        {
+          "columns": [
+            "userId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "user_created_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "mcp_oauth_clients",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1041
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "clientId",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1042
+          },
+          "length": 128,
+          "unique": true
+        },
+        {
+          "name": "clientName",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1043
+          },
+          "length": 100
+        },
+        {
+          "name": "redirectUris",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 1044
+          }
+        },
+        {
+          "name": "activatedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1045
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1046
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1038
+      },
+      "indexes": [
+        {
+          "columns": [
+            "activatedAt",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "inactive_created_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "mcp_oauth_registration_quotas",
+      "columns": [
+        {
+          "name": "windowId",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1057
+          },
+          "length": 10
+        },
+        {
+          "name": "registrations",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 1058
+          },
+          "default": 0
+        },
+        {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1059
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1054
+      },
+      "indexes": [
+        {
+          "columns": [
+            "expiresAt"
+          ],
+          "type": "index",
+          "name": "expires_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "mcp_oauth_codes",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1067
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1068
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "clientId",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1069
+          },
+          "length": 128
+        },
+        {
+          "name": "codeHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1070
+          },
+          "length": 64,
+          "unique": true
+        },
+        {
+          "name": "codeChallenge",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1071
+          },
+          "length": 64
+        },
+        {
+          "name": "redirectUri",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1072
+          },
+          "length": 512
+        },
+        {
+          "name": "resource",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1073
+          },
+          "length": 512
+        },
+        {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1074
+          }
+        },
+        {
+          "name": "consumedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1075
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1076
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1064
+      },
+      "indexes": [
+        {
+          "columns": [
+            "expiresAt"
+          ],
+          "type": "index",
+          "name": "expires_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "mcp_oauth_tokens",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1087
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1088
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "clientId",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1089
+          },
+          "length": 128
+        },
+        {
+          "name": "familyId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1090
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "resource",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1091
+          },
+          "length": 512
+        },
+        {
+          "name": "accessHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1092
+          },
+          "length": 64,
+          "unique": true
+        },
+        {
+          "name": "refreshHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1093
+          },
+          "length": 64,
+          "unique": true
+        },
+        {
+          "name": "accessExpiresAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1094
+          }
+        },
+        {
+          "name": "refreshExpiresAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1095
+          }
+        },
+        {
+          "name": "revokedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1096
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1097
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1084
+      },
+      "indexes": [
+        {
+          "columns": [
+            "familyId"
+          ],
+          "type": "index",
+          "name": "family_id_idx"
+        },
+        {
+          "columns": [
+            "clientId",
+            "revokedAt",
+            "refreshExpiresAt"
+          ],
+          "type": "index",
+          "name": "client_active_idx"
+        },
+        {
+          "columns": [
+            "refreshExpiresAt"
+          ],
+          "type": "index",
+          "name": "refresh_expires_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "agent_api_operations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1115
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1116
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "kind",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1117
+          },
+          "length": 32
+        },
+        {
+          "name": "resourceId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1130
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "resultResourceId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1131
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "state",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1132
+          },
+          "length": 16,
+          "default": "queued"
+        },
+        {
+          "name": "payload",
+          "type": "json",
+          "source": {
+            "file": "schema.ts",
+            "line": 1138
+          }
+        },
+        {
+          "name": "result",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1139
+          }
+        },
+        {
+          "name": "errorCode",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1140
+          },
+          "length": 64
+        },
+        {
+          "name": "errorMessage",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1141
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1142
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1143
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "completedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1144
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1112
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "user_created_at_idx"
+        },
+        {
+          "columns": [
+            "state",
+            "updatedAt"
+          ],
+          "type": "index",
+          "name": "state_updated_at_idx"
+        },
+        {
+          "columns": [
+            "resourceId"
+          ],
+          "type": "index",
+          "name": "resource_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "spaces",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1388
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "primary",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 1392
+          },
+          "default": false
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1393
+          },
+          "length": 255
+        },
+        {
+          "name": "organizationId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1394
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "createdById",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1397
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "iconUrl",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1398
+          },
+          "length": 255
+        },
+        {
+          "name": "description",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1401
+          },
+          "length": 1000
+        },
+        {
+          "name": "settings",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1402
+          }
+        },
+        {
+          "name": "password",
+          "type": "encryptedTextNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1411
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1412
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1413
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        },
+        {
+          "name": "privacy",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1416
+          },
+          "length": 255,
+          "default": "Private"
+        },
+        {
+          "name": "public",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 1420
+          },
+          "default": false
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1385
+      },
+      "indexes": [
+        {
+          "columns": [
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "organization_id_idx"
+        },
+        {
+          "columns": [
+            "createdById"
+          ],
+          "type": "index",
+          "name": "created_by_id_idx"
+        },
+        {
+          "columns": [
+            "public",
+            "organizationId"
+          ],
+          "type": "index",
+          "name": "public_organization_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "space_members",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1435
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "spaceId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1436
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "userId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1437
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1438
+          },
+          "length": 255,
+          "default": "member"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1442
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1443
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1432
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId"
+          ],
+          "type": "index",
+          "name": "user_id_idx"
+        },
+        {
+          "columns": [
+            "spaceId",
+            "userId"
+          ],
+          "type": "unique",
+          "name": "space_id_user_id_unique"
+        }
+      ]
+    },
+    {
+      "table": "space_videos",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1457
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "spaceId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1458
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "folderId",
+          "type": "nanoIdNullable",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1459
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "videoId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1460
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "addedById",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1461
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "addedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1462
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1454
+      },
+      "indexes": [
+        {
+          "columns": [
+            "folderId"
+          ],
+          "type": "index",
+          "name": "folder_id_idx"
+        },
+        {
+          "columns": [
+            "videoId"
+          ],
+          "type": "index",
+          "name": "video_id_idx"
+        },
+        {
+          "columns": [
+            "addedById"
+          ],
+          "type": "index",
+          "name": "added_by_id_idx"
+        },
+        {
+          "columns": [
+            "spaceId",
+            "videoId"
+          ],
+          "type": "index",
+          "name": "space_id_video_id_idx"
+        },
+        {
+          "columns": [
+            "spaceId",
+            "folderId"
+          ],
+          "type": "index",
+          "name": "space_id_folder_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "video_uploads",
+      "columns": [
+        {
+          "name": "video_id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1539
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "uploaded",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1540
+          },
+          "unsigned": true
+        },
+        {
+          "name": "total",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1543
+          },
+          "unsigned": true
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1546
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1547
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "mode",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1548
+          },
+          "length": 255
+        },
+        {
+          "name": "phase",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1549
+          },
+          "length": 32,
+          "default": "uploading"
+        },
+        {
+          "name": "processing_progress",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 1559
+          },
+          "default": 0
+        },
+        {
+          "name": "processing_message",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1560
+          },
+          "length": 255
+        },
+        {
+          "name": "processing_error",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1561
+          }
+        },
+        {
+          "name": "raw_file_key",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1562
+          },
+          "length": 512
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1536
+      },
+      "indexes": [
+        {
+          "columns": [
+            "phase",
+            "updated_at",
+            "video_id"
+          ],
+          "type": "index",
+          "name": "phase_updated_at_video_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "video_processing_jobs",
+      "columns": [
+        {
+          "name": "video_id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1576
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "owner_id",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1577
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "generation",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1578
+          },
+          "length": 64
+        },
+        {
+          "name": "manifest_sha256",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1579
+          },
+          "length": 64
+        },
+        {
+          "name": "state",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1580
+          },
+          "length": 32,
+          "default": "committing"
+        },
+        {
+          "name": "attempt_id",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1591
+          },
+          "length": 64
+        },
+        {
+          "name": "attempt_count",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 1592
+          },
+          "default": 0
+        },
+        {
+          "name": "lease_expires_at",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1593
+          }
+        },
+        {
+          "name": "next_retry_at",
+          "type": "datetime",
+          "source": {
+            "file": "schema.ts",
+            "line": 1594
+          }
+        },
+        {
+          "name": "workflow_run_id",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1595
+          },
+          "length": 255
+        },
+        {
+          "name": "remote_job_id",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1596
+          },
+          "length": 255
+        },
+        {
+          "name": "source",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1597
+          }
+        },
+        {
+          "name": "verification",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1598
+          }
+        },
+        {
+          "name": "output",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1599
+          }
+        },
+        {
+          "name": "error_code",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1600
+          },
+          "length": 64
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1601
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "datetime",
+          "source": {
+            "file": "schema.ts",
+            "line": 1602
+          }
+        },
+        {
+          "name": "updated_at",
+          "type": "datetime",
+          "source": {
+            "file": "schema.ts",
+            "line": 1605
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1573
+      },
+      "indexes": [
+        {
+          "columns": [
+            "state",
+            "next_retry_at",
+            "video_id"
+          ],
+          "type": "index",
+          "name": "processing_state_retry_video_idx"
+        },
+        {
+          "columns": [
+            "state",
+            "lease_expires_at",
+            "video_id"
+          ],
+          "type": "index",
+          "name": "processing_state_lease_video_idx"
+        }
+      ]
+    },
+    {
+      "table": "media_processing_budgets",
+      "columns": [
+        {
+          "name": "id",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1626
+          },
+          "length": 64
+        },
+        {
+          "name": "reserved_bytes",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1627
+          },
+          "unsigned": true,
+          "default": 0
+        },
+        {
+          "name": "limit_bytes",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1630
+          },
+          "unsigned": true
+        },
+        {
+          "name": "expires_at",
+          "type": "datetime",
+          "source": {
+            "file": "schema.ts",
+            "line": 1634
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1623
+      },
+      "indexes": [
+        {
+          "columns": [
+            "expires_at"
+          ],
+          "type": "index",
+          "name": "media_budget_expiry_idx"
+        }
+      ]
+    },
+    {
+      "table": "imported_videos",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1642
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "orgId",
+          "type": "nanoIdNullable",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1643
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "source",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1646
+          },
+          "length": 255
+        },
+        {
+          "name": "source_id",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1647
+          },
+          "length": 255
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1639
+      },
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "type": "index",
+          "name": "id_idx"
+        }
+      ]
+    },
+    {
+      "table": "developer_apps",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1658
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "ownerId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1659
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1660
+          },
+          "length": 255
+        },
+        {
+          "name": "environment",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1661
+          },
+          "length": 16
+        },
+        {
+          "name": "logoUrl",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1665
+          },
+          "length": 1024
+        },
+        {
+          "name": "deletedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1666
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1667
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1668
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 1655
+      },
+      "indexes": [
+        {
+          "columns": [
+            "ownerId",
+            "deletedAt"
+          ],
+          "type": "index",
+          "name": "owner_deleted_idx"
+        }
+      ]
+    },
+    {
+      "table": "developer_app_domains",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1676
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "appId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1677
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "domain",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1680
+          },
+          "length": 253
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1681
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "appId",
+          "references": "id",
+          "on": "developer_apps",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 1673
+      },
+      "indexes": [
+        {
+          "columns": [
+            "appId",
+            "domain"
+          ],
+          "type": "unique",
+          "name": "app_domain_unique"
+        }
+      ]
+    },
+    {
+      "table": "developer_api_keys",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1689
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "appId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1690
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "keyType",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1693
+          },
+          "length": 8
+        },
+        {
+          "name": "keyPrefix",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1697
+          },
+          "length": 12
+        },
+        {
+          "name": "keyHash",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1698
+          },
+          "length": 64,
+          "unique": true
+        },
+        {
+          "name": "encryptedKey",
+          "type": "encryptedText",
+          "source": {
+            "file": "schema.ts",
+            "line": 1699
+          },
+          "nativeType": "text"
+        },
+        {
+          "name": "lastUsedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1700
+          }
+        },
+        {
+          "name": "revokedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1701
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1702
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "appId",
+          "references": "id",
+          "on": "developer_apps",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 1686
+      },
+      "indexes": [
+        {
+          "columns": [
+            "appId",
+            "keyType"
+          ],
+          "type": "index",
+          "name": "app_key_type_idx"
+        }
+      ]
+    },
+    {
+      "table": "developer_videos",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1713
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "appId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1714
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "externalUserId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1717
+          },
+          "length": 255
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1718
+          },
+          "length": 255,
+          "default": "Untitled"
+        },
+        {
+          "name": "duration",
+          "type": "float",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1719
+          }
+        },
+        {
+          "name": "width",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1720
+          }
+        },
+        {
+          "name": "height",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1721
+          }
+        },
+        {
+          "name": "fps",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1722
+          }
+        },
+        {
+          "name": "s3Key",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1723
+          },
+          "length": 512
+        },
+        {
+          "name": "transcriptionStatus",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1724
+          },
+          "length": 16
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1728
+          }
+        },
+        {
+          "name": "deletedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1729
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1730
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1731
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "appId",
+          "references": "id",
+          "on": "developer_apps",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 1710
+      },
+      "indexes": [
+        {
+          "columns": [
+            "appId",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "app_created_idx"
+        },
+        {
+          "columns": [
+            "appId",
+            "externalUserId"
+          ],
+          "type": "index",
+          "name": "app_user_idx"
+        },
+        {
+          "columns": [
+            "appId",
+            "deletedAt"
+          ],
+          "type": "index",
+          "name": "app_deleted_idx"
+        }
+      ]
+    },
+    {
+      "table": "developer_credit_accounts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1743
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "appId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1744
+          },
+          "length": 15,
+          "unique": true,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "ownerId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1747
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "balanceMicroCredits",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1748
+          },
+          "unsigned": true,
+          "default": 0
+        },
+        {
+          "name": "stripeCustomerId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1754
+          },
+          "length": 255
+        },
+        {
+          "name": "stripePaymentMethodId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1755
+          },
+          "length": 255
+        },
+        {
+          "name": "autoTopUpEnabled",
+          "type": "boolean",
+          "source": {
+            "file": "schema.ts",
+            "line": 1756
+          },
+          "default": false
+        },
+        {
+          "name": "autoTopUpThresholdMicroCredits",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1757
+          },
+          "unsigned": true,
+          "default": 0
+        },
+        {
+          "name": "autoTopUpAmountCents",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 1763
+          },
+          "default": 0
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1764
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1765
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "appId",
+          "references": "id",
+          "on": "developer_apps",
+          "type": "one-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 1740
+      }
+    },
+    {
+      "table": "developer_credit_transactions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1785
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "accountId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1786
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "type",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1787
+          },
+          "length": 16
+        },
+        {
+          "name": "amountMicroCredits",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1793
+          }
+        },
+        {
+          "name": "balanceAfterMicroCredits",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1796
+          },
+          "unsigned": true
+        },
+        {
+          "name": "referenceId",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1800
+          },
+          "length": 255
+        },
+        {
+          "name": "referenceType",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1801
+          },
+          "length": 32
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1805
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1806
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "accountId",
+          "references": "id",
+          "on": "developer_credit_accounts",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 1782
+      },
+      "indexes": [
+        {
+          "columns": [
+            "accountId",
+            "type",
+            "createdAt"
+          ],
+          "type": "index",
+          "name": "account_type_created_idx"
+        },
+        {
+          "columns": [
+            "accountId",
+            "referenceId",
+            "referenceType"
+          ],
+          "type": "index",
+          "name": "account_ref_dedup_idx"
+        }
+      ]
+    },
+    {
+      "table": "developer_daily_storage_snapshots",
+      "columns": [
+        {
+          "name": "id",
+          "type": "nanoId",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1830
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "appId",
+          "type": "nanoId",
+          "source": {
+            "file": "schema.ts",
+            "line": 1831
+          },
+          "length": 15,
+          "nativeType": "varchar(15)"
+        },
+        {
+          "name": "snapshotDate",
+          "type": "varchar",
+          "source": {
+            "file": "schema.ts",
+            "line": 1834
+          },
+          "length": 10
+        },
+        {
+          "name": "totalDurationMinutes",
+          "type": "float",
+          "source": {
+            "file": "schema.ts",
+            "line": 1835
+          },
+          "default": 0
+        },
+        {
+          "name": "videoCount",
+          "type": "int",
+          "source": {
+            "file": "schema.ts",
+            "line": 1836
+          },
+          "default": 0
+        },
+        {
+          "name": "microCreditsCharged",
+          "type": "bigint",
+          "source": {
+            "file": "schema.ts",
+            "line": 1837
+          },
+          "unsigned": true,
+          "default": 0
+        },
+        {
+          "name": "processedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 1843
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 1844
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "appId",
+          "references": "id",
+          "on": "developer_apps",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 1827
+      },
+      "indexes": [
+        {
+          "columns": [
+            "appId",
+            "snapshotDate"
+          ],
+          "type": "unique",
+          "name": "app_date_unique"
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

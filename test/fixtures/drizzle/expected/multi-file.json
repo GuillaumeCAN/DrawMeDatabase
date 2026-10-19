@@ -1,0 +1,202 @@
+{
+  "tables": [
+    {
+      "table": "comments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/comments.ts",
+            "line": 6
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "post_id",
+          "type": "integer",
+          "source": {
+            "file": "src/db/schema/comments.ts",
+            "line": 7
+          }
+        },
+        {
+          "name": "author_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/comments.ts",
+            "line": 8
+          }
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "source": {
+            "file": "src/db/schema/comments.ts",
+            "line": 9
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "post_id",
+          "references": "id",
+          "on": "posts",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "author_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/comments.ts",
+        "line": 5
+      }
+    },
+    {
+      "table": "posts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/tables/posts.ts",
+            "line": 8
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "author_id",
+          "type": "integer",
+          "source": {
+            "file": "src/db/schema/tables/posts.ts",
+            "line": 9
+          }
+        },
+        {
+          "name": "status",
+          "type": "post_status",
+          "source": {
+            "file": "src/db/schema/tables/posts.ts",
+            "line": 10
+          },
+          "default": "draft",
+          "values": [
+            "draft",
+            "published"
+          ]
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/tables/posts.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "src/db/columns.ts",
+            "line": 6
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/db/columns.ts",
+            "line": 7
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "author_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/tables/posts.ts",
+        "line": 7
+      }
+    },
+    {
+      "table": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/tables/users.ts",
+            "line": 5
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "src/db/schema/tables/users.ts",
+            "line": 6
+          },
+          "length": 120
+        },
+        {
+          "name": "bio",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/tables/users.ts",
+            "line": 7
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "src/db/columns.ts",
+            "line": 6
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/db/columns.ts",
+            "line": 7
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/db/schema/tables/users.ts",
+        "line": 4
+      }
+    }
+  ],
+  "warnings": [
+    "src/db/schema/views.ts:4: view published skipped: views are not drawn."
+  ]
+}

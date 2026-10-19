@@ -21,6 +21,7 @@ const MODULES = [
     () => require('./laravel'),
     () => require('./symfony'),
     () => require('./prisma'),
+    () => require('./drizzle'),
 ];
 
 const list = (value) => (Array.isArray(value) ? value : []);

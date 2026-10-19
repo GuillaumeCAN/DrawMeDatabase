@@ -1,0 +1,9 @@
+{
+  "name": "@cap/database",
+  "dependencies": {
+    "drizzle-orm": "0.44.6"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.0"
+  }
+}

@@ -7,6 +7,7 @@
   "setting.framework.laravel": "Laravel: the migrations of database/migrations",
   "setting.framework.symfony": "Symfony: the Doctrine entities of src/Entity",
   "setting.framework.prisma": "Prisma: the models of the Prisma schema (prisma/schema.prisma, a schema folder, or the schema of prisma.config.ts)",
+  "setting.framework.drizzle": "Drizzle: the tables of the Drizzle schema files (the schema of drizzle.config.ts, else src/db/schema.ts...), read without running them",
   "setting.autoRefresh": "Refresh the open diagram while you edit the code of the schema (a migration, an entity, a Prisma schema...), before saving, and when a file is created, deleted or committed.",
   "setting.showGitStatus": "Show the git status in the diagram: tables new (not in the last commit), modified, or changed in an editor and not saved yet. Also available in the toolbar of the diagram. The status of each column comes with DrawMeDatabase Pro.",
   "setting.layout.elk": "ELK: compact layout with straight, right-angled links (best for large schemas)",

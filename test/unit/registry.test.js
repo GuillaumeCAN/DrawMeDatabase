@@ -182,6 +182,33 @@ test('Laravel and Symfony win a tie with Prisma, a stronger Prisma wins over a w
     assert.equal(detectFramework(project('prisma-bad-composer', { artisan: '', 'composer.json': '{,}', ...prisma })), 'prisma');
 });
 
+const DRIZZLE_SCHEMA = "import { pgTable, integer } from 'drizzle-orm/pg-core';\nexport const users = pgTable('users', { id: integer().primaryKey() });\n";
+const DRIZZLE_PACKAGE = JSON.stringify({ dependencies: { 'drizzle-orm': '^0.45.4' }, devDependencies: { 'drizzle-kit': '^0.31.11' } });
+
+test('detects Drizzle: a drizzle.config.ts and its schema files, or a schema at a usual location and drizzle-orm in package.json', () => {
+    const app = project('drizzle-app', { 'drizzle.config.ts': "export default { dialect: 'postgresql', schema: './src/db/schema.ts' };\n", 'src/db/schema.ts': DRIZZLE_SCHEMA });
+    assert.deepEqual(registry.detect(app), { framework: 'drizzle', forced: false, matches: [{ id: 'drizzle', label: 'Drizzle', score: 100 }], errors: [] });
+    assert.equal(detectFramework(project('drizzle-no-config', { 'package.json': DRIZZLE_PACKAGE, 'src/db/schema.ts': DRIZZLE_SCHEMA })), 'drizzle');
+    assert.equal(detectFramework(project('drizzle-schema-only', { 'db/schema.ts': DRIZZLE_SCHEMA })), 'drizzle', 'a schema file that imports drizzle-orm (50)');
+    // The package alone is no Drizzle project (a monorepo root), nor is another TypeScript project
+    assert.equal(detectFramework(project('drizzle-package-only', { 'package.json': DRIZZLE_PACKAGE })), 'Unknown');
+    assert.equal(detectFramework(project('kysely-app', { 'package.json': JSON.stringify({ dependencies: { kysely: '^0.28.0' } }), 'src/db/schema.ts': 'export interface Database {}\n' })), 'Unknown');
+});
+
+test('Prisma wins a tie with Drizzle (a project moving from one to the other); the setting chooses Drizzle; both are listed', () => {
+    const both = project('prisma-drizzle', {
+        'package.json': JSON.stringify({ dependencies: { '@prisma/client': '6.19.1', 'drizzle-orm': '0.45.4' } }),
+        'prisma/schema.prisma': PRISMA_SCHEMA,
+        'src/db/schema.ts': DRIZZLE_SCHEMA,
+    });
+    assert.deepEqual(registry.detect(both).matches.map(match => [match.id, match.score]), [['prisma', 100], ['drizzle', 100]]);
+    assert.equal(detectFramework(both), 'prisma');
+    assert.equal(detectFramework(both, { framework: 'drizzle' }), 'drizzle');
+    // A Drizzle config file whose schema is missing (50) loses to a Prisma schema with its package
+    const half = project('prisma-drizzle-config', { 'package.json': JSON.stringify({ devDependencies: { prisma: '^7.10.1' } }), 'prisma/schema.prisma': PRISMA_SCHEMA, 'drizzle.config.ts': "export default { schema: './missing.ts' };\n" });
+    assert.deepEqual(registry.detect(half).matches.map(match => [match.id, match.score]), [['prisma', 100], ['drizzle', 50]]);
+});
+
 test('artisan must be a file', () => {
     const dir = project('artisan-dir', {
         'artisan/readme.txt': '',
@@ -212,8 +239,8 @@ const BOTH = {
 
 test('every parser follows the contract: id, label, detect(), sources(), parse()', () => {
     const parsers = registry.getParsers();
-    assert.deepEqual(parsers.map(parser => parser.id), ['laravel', 'symfony', 'prisma'], 'Laravel first: it wins the ties');
-    assert.deepEqual(registry.labels(), ['Laravel', 'Symfony', 'Prisma']);
+    assert.deepEqual(parsers.map(parser => parser.id), ['laravel', 'symfony', 'prisma', 'drizzle'], 'Laravel first: it wins the ties');
+    assert.deepEqual(registry.labels(), ['Laravel', 'Symfony', 'Prisma', 'Drizzle']);
     const missing = path.join(tmpRoot, 'does-not-exist');
     for (const parser of parsers) {
         assert.match(parser.id, /^[a-z][a-z0-9-]*$/, parser.id);
@@ -392,6 +419,20 @@ test('the sources of Prisma: the schema file (or folder), package.json and the c
         { base: app, pattern: 'package.json' },
         { base: app, pattern: 'prisma.config.ts' },
     ]);
+});
+
+test('the sources of Drizzle: the schema files and what they import, the folders of drizzle.config.ts, package.json and the config file', () => {
+    const app = project('drizzle-sources', {
+        'drizzle.config.ts': "export default { schema: './src/db/schema/*.ts' };\n",
+        'src/db/schema/users.ts': `import { timestamps } from '../columns';\n${DRIZZLE_SCHEMA}`,
+        'src/db/columns.ts': 'export const timestamps = {};\n',
+    });
+    const sources = registry.getSources('drizzle', app);
+    assert.deepEqual(sources.folders, [{ path: path.join(app, 'src', 'db', 'schema'), recursive: false }]);
+    assert.deepEqual(sources.files, [path.join(app, 'src', 'db', 'schema', 'users.ts'), path.join(app, 'src', 'db', 'columns.ts'), path.join(app, 'package.json'), path.join(app, 'drizzle.config.ts')]);
+    assert.equal(covers(sources, path.join(app, 'src', 'db', 'schema', 'posts.ts')), true);
+    assert.equal(covers(sources, path.join(app, 'src', 'db', 'schema', 'notes.md')), false);
+    assert.equal(covers(sources, path.join(app, 'src', 'db', 'seed.ts')), false);
 });
 
 test('getSources() cleans the sources of a parser: absolute paths, recursive or not, extensions with a dot', () => {

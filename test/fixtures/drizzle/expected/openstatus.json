@@ -1,0 +1,7069 @@
+{
+  "tables": [
+    {
+      "table": "api_key",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 11
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "prefix",
+          "type": "text",
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 14
+          },
+          "unique": true
+        },
+        {
+          "name": "hashed_token",
+          "type": "text",
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 15
+          },
+          "unique": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "created_by_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "scopes",
+          "type": "text",
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 26
+          },
+          "default": "[\"write\"]"
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 30
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 33
+          }
+        },
+        {
+          "name": "last_used_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/api-keys/api_key.ts",
+            "line": 34
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "created_by_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/api-keys/api_key.ts",
+        "line": 8
+      },
+      "indexes": [
+        {
+          "columns": [
+            "prefix"
+          ],
+          "type": "index",
+          "name": "api_key_prefix_idx"
+        },
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "api_key_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "application",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/applications/application.ts",
+            "line": 9
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/applications/application.ts",
+            "line": 10
+          }
+        },
+        {
+          "name": "dsn",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/applications/application.ts",
+            "line": 11
+          },
+          "unique": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/applications/application.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/applications/application.ts",
+            "line": 15
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/applications/application.ts",
+            "line": 18
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/applications/application.ts",
+        "line": 6
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "application_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "audit_log",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 18
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "actor_type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "actor_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "actor_user_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "entity_type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "before",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "after",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 27
+          }
+        },
+        {
+          "name": "metadata",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 28
+          }
+        },
+        {
+          "name": "changed_fields",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 31
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/audit_logs/audit_log.ts",
+            "line": 32
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/audit_logs/audit_log.ts",
+        "line": 15
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id",
+            "created_at"
+          ],
+          "type": "index",
+          "name": "audit_log_workspace_created_idx"
+        },
+        {
+          "columns": [
+            "workspace_id",
+            "entity_type",
+            "entity_id",
+            "created_at"
+          ],
+          "type": "index",
+          "name": "audit_log_entity_idx"
+        }
+      ]
+    },
+    {
+      "table": "chat_session",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/chat_sessions/chat_session.ts",
+            "line": 17
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/chat_sessions/chat_session.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/chat_sessions/chat_session.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "src/schema/chat_sessions/chat_session.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "messages",
+          "type": "text",
+          "source": {
+            "file": "src/schema/chat_sessions/chat_session.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/chat_sessions/chat_session.ts",
+            "line": 28
+          }
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/chat_sessions/chat_session.ts",
+            "line": 31
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/chat_sessions/chat_session.ts",
+        "line": 14
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id",
+            "user_id",
+            "updated_at"
+          ],
+          "type": "index",
+          "name": "chat_session_workspace_user_updated_idx"
+        }
+      ]
+    },
+    {
+      "table": "check",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 10
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "regions",
+          "type": "text",
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 11
+          },
+          "default": ""
+        },
+        {
+          "name": "url",
+          "type": "text",
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 12
+          },
+          "length": 4096
+        },
+        {
+          "name": "headers",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 13
+          },
+          "default": ""
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 14
+          },
+          "default": ""
+        },
+        {
+          "name": "method",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 15
+          },
+          "default": "GET"
+        },
+        {
+          "name": "count_requests",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 17
+          },
+          "default": 1
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/check/check.ts",
+            "line": 21
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/check/check.ts",
+        "line": 7
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "check_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "external_service",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 14
+          },
+          "length": 64,
+          "unique": true
+        },
+        {
+          "name": "aliases",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 15
+          },
+          "defaultRaw": "(json_array())"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 19
+          },
+          "length": 256
+        },
+        {
+          "name": "url",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "status_page_url",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "industry",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "api_config",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "deleted_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 27
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service.ts",
+            "line": 30
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/external_services/external_service.ts",
+        "line": 10
+      },
+      "indexes": [
+        {
+          "columns": [
+            "deleted_at"
+          ],
+          "type": "index",
+          "name": "external_service_deleted_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "external_service_component",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "external_service_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "upstream_component_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "aliases",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 20
+          },
+          "defaultRaw": "(json_array())"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "group_name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 27
+          },
+          "default": 0
+        },
+        {
+          "name": "indicator",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 28
+          }
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 29
+          }
+        },
+        {
+          "name": "first_seen_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 30
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_component.ts",
+            "line": 33
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "external_service_id",
+          "references": "id",
+          "on": "external_service",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/external_services/external_service_component.ts",
+        "line": 11
+      },
+      "indexes": [
+        {
+          "columns": [
+            "external_service_id",
+            "upstream_component_id"
+          ],
+          "type": "unique",
+          "name": "external_service_component_unique_idx"
+        },
+        {
+          "columns": [
+            "external_service_id",
+            "slug"
+          ],
+          "type": "unique",
+          "name": "external_service_component_slug_unique_idx"
+        }
+      ]
+    },
+    {
+      "table": "external_service_incident",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "external_service_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "provider_incident_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "impact",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "shortlink",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "started_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "resolved_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "affected_component_ids",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 27
+          },
+          "defaultRaw": "'[]'"
+        },
+        {
+          "name": "raw_payload",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 31
+          }
+        },
+        {
+          "name": "raw_payload_purged_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 32
+          }
+        },
+        {
+          "name": "first_seen_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 33
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_incident.ts",
+            "line": 36
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "external_service_id",
+          "references": "id",
+          "on": "external_service",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/external_services/external_service_incident.ts",
+        "line": 12
+      },
+      "indexes": [
+        {
+          "columns": [
+            "external_service_id",
+            "provider_incident_id"
+          ],
+          "type": "unique",
+          "name": "external_service_incident_unique_idx"
+        },
+        {
+          "columns": [
+            "external_service_id",
+            "started_at"
+          ],
+          "type": "index",
+          "name": "external_service_incident_started_at_idx"
+        },
+        {
+          "columns": [
+            "resolved_at"
+          ],
+          "type": "index",
+          "name": "external_service_incident_resolved_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "external_service_report",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_report.ts",
+            "line": 10
+          }
+        },
+        {
+          "name": "external_service_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_report.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "external_service_component_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/external_services/external_service_report.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "reporter_hash",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_report.ts",
+            "line": 17
+          },
+          "length": 64
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "source": {
+            "file": "src/schema/external_services/external_service_report.ts",
+            "line": 18
+          },
+          "length": 2,
+          "default": ""
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/external_services/external_service_report.ts",
+            "line": 19
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "external_service_id",
+          "references": "id",
+          "on": "external_service",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "external_service_component_id",
+          "references": "id",
+          "on": "external_service_component",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/external_services/external_service_report.ts",
+        "line": 7
+      },
+      "indexes": [
+        {
+          "columns": [
+            "external_service_id",
+            "created_at"
+          ],
+          "type": "index",
+          "name": "external_service_report_service_idx"
+        },
+        {
+          "columns": [
+            "external_service_component_id",
+            "created_at"
+          ],
+          "type": "index",
+          "name": "external_service_report_component_idx"
+        }
+      ]
+    },
+    {
+      "table": "feedback",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "blocker",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "path",
+          "type": "text",
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "metadata",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/feedbacks/feedback.ts",
+            "line": 27
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/feedbacks/feedback.ts",
+        "line": 8
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "feedback_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "frozen_monitor_uptime",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/frozen_uptime/frozen_monitor_uptime.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/frozen_uptime/frozen_monitor_uptime.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/frozen_uptime/frozen_monitor_uptime.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "month",
+          "type": "text",
+          "source": {
+            "file": "src/schema/frozen_uptime/frozen_monitor_uptime.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "days",
+          "type": "text",
+          "source": {
+            "file": "src/schema/frozen_uptime/frozen_monitor_uptime.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/frozen_uptime/frozen_monitor_uptime.ts",
+            "line": 30
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/frozen_uptime/frozen_monitor_uptime.ts",
+        "line": 14
+      },
+      "indexes": [
+        {
+          "columns": [
+            "monitor_id",
+            "month"
+          ],
+          "type": "unique",
+          "name": "frozen_monitor_uptime_monitor_id_month_unique"
+        },
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "frozen_monitor_uptime_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "incident",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 24
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 28
+          },
+          "length": 256
+        },
+        {
+          "name": "severity",
+          "type": "text",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 29
+          }
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 30
+          },
+          "default": "open"
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 31
+          }
+        },
+        {
+          "name": "commander_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 32
+          }
+        },
+        {
+          "name": "declared_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 33
+          }
+        },
+        {
+          "name": "declared_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 34
+          }
+        },
+        {
+          "name": "started_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 35
+          }
+        },
+        {
+          "name": "mitigated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 36
+          }
+        },
+        {
+          "name": "resolved_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 37
+          }
+        },
+        {
+          "name": "resolved_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 38
+          }
+        },
+        {
+          "name": "closed_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 39
+          }
+        },
+        {
+          "name": "status_report_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 40
+          },
+          "unique": true
+        },
+        {
+          "name": "slack_team_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 44
+          }
+        },
+        {
+          "name": "slack_channel_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 45
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 46
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 49
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "commander_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "declared_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "resolved_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "status_report_id",
+          "references": "id",
+          "on": "status_report",
+          "type": "one-to-one",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/incidents/incident.ts",
+        "line": 21
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id",
+            "status"
+          ],
+          "type": "index",
+          "name": "incident_workspace_id_status_idx"
+        },
+        {
+          "columns": [
+            "workspace_id",
+            "declared_at"
+          ],
+          "type": "index",
+          "name": "incident_workspace_id_declared_at_idx"
+        },
+        {
+          "columns": [
+            "slack_team_id",
+            "slack_channel_id"
+          ],
+          "type": "unique",
+          "name": "incident_slack_channel_idx"
+        }
+      ]
+    },
+    {
+      "table": "incident_event",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 71
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "incident_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 72
+          }
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 75
+          }
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 76
+          }
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 77
+          }
+        },
+        {
+          "name": "source_ref",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 78
+          }
+        },
+        {
+          "name": "created_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 79
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/incident.ts",
+            "line": 80
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "incident_id",
+          "references": "id",
+          "on": "incident",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "created_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/incidents/incident.ts",
+        "line": 68
+      },
+      "indexes": [
+        {
+          "columns": [
+            "incident_id",
+            "created_at"
+          ],
+          "type": "index",
+          "name": "incident_event_incident_id_created_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "incident_postmortem",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 9
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "incident_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 10
+          },
+          "unique": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 14
+          },
+          "default": "draft"
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "source_transcript",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "drafted_by",
+          "type": "text",
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "created_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "updated_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "approved_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "approved_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "published_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 23
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/incidents/postmortem.ts",
+            "line": 26
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "incident_id",
+          "references": "id",
+          "on": "incident",
+          "type": "one-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "created_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "updated_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "approved_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/incidents/postmortem.ts",
+        "line": 8
+      }
+    },
+    {
+      "table": "integration",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 12
+          },
+          "length": 256
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "credential",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "external_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 21
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 24
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "data",
+          "type": "text",
+          "source": {
+            "file": "src/schema/integration.ts",
+            "line": 28
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/integration.ts",
+        "line": 8
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "integration_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "invitation",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 9
+          }
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 10
+          }
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 11
+          },
+          "default": "member"
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 15
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "accepted_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/invitations/invitation.ts",
+            "line": 18
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/invitations/invitation.ts",
+        "line": 6
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "invitation_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "maintenance",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 13
+          },
+          "length": 256
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "from",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "to",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "page_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "created_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "updated_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 27
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 29
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 32
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_id",
+          "references": "id",
+          "on": "page",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "created_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "updated_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/maintenances/maintenance.ts",
+        "line": 9
+      },
+      "indexes": [
+        {
+          "columns": [
+            "page_id"
+          ],
+          "type": "index",
+          "name": "maintenance_page_id_idx"
+        },
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "maintenance_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "maintenance_update",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 45
+          }
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 46
+          }
+        },
+        {
+          "name": "date",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 47
+          }
+        },
+        {
+          "name": "maintenance_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 48
+          }
+        },
+        {
+          "name": "created_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "updated_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 53
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 55
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/maintenances/maintenance.ts",
+            "line": 58
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "maintenance_id",
+          "references": "id",
+          "on": "maintenance",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "created_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "updated_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/maintenances/maintenance.ts",
+        "line": 42
+      },
+      "indexes": [
+        {
+          "columns": [
+            "maintenance_id"
+          ],
+          "type": "index",
+          "name": "maintenance_update_maintenance_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor_group",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_groups/monitor_group.ts",
+            "line": 10
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_groups/monitor_group.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "page_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_groups/monitor_group.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_groups/monitor_group.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_groups/monitor_group.ts",
+            "line": 19
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_groups/monitor_group.ts",
+            "line": 22
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_id",
+          "references": "id",
+          "on": "page",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitor_groups/monitor_group.ts",
+        "line": 7
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "monitor_group_workspace_id_idx"
+        },
+        {
+          "columns": [
+            "page_id"
+          ],
+          "type": "index",
+          "name": "monitor_group_page_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor_incident",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 27
+          }
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 28
+          },
+          "default": ""
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 29
+          },
+          "default": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 30
+          },
+          "default": "triage"
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 35
+          },
+          "unique": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 40
+          }
+        },
+        {
+          "name": "started_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 42
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "acknowledged_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 46
+          }
+        },
+        {
+          "name": "acknowledged_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 47
+          }
+        },
+        {
+          "name": "resolved_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 50
+          }
+        },
+        {
+          "name": "resolved_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 51
+          }
+        },
+        {
+          "name": "incident_screenshot_url",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 53
+          }
+        },
+        {
+          "name": "recovery_screenshot_url",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 54
+          }
+        },
+        {
+          "name": "auto_resolved",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 56
+          },
+          "default": false
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 58
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_incidents/monitor_incident.ts",
+            "line": 61
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "one-to-one",
+          "onDelete": "set default",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "acknowledged_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "resolved_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitor_incidents/monitor_incident.ts",
+        "line": 24
+      },
+      "indexes": [
+        {
+          "columns": [
+            "monitor_id",
+            "started_at"
+          ],
+          "type": "unique"
+        },
+        {
+          "columns": [
+            "workspace_id",
+            "started_at"
+          ],
+          "type": "index",
+          "name": "monitor_incident_workspace_id_started_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor_run",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_run/monitor_run.ts",
+            "line": 10
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_run/monitor_run.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_run/monitor_run.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "runned_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_run/monitor_run.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_run/monitor_run.ts",
+            "line": 17
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitor_run/monitor_run.ts",
+        "line": 7
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id",
+            "created_at"
+          ],
+          "type": "index",
+          "name": "monitor_run_workspace_id_created_at_idx"
+        },
+        {
+          "columns": [
+            "monitor_id"
+          ],
+          "type": "index",
+          "name": "monitor_run_monitor_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor_status",
+      "columns": [
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_status/monitor_status.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "region",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_status/monitor_status.ts",
+            "line": 18
+          },
+          "default": ""
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_status/monitor_status.ts",
+            "line": 19
+          },
+          "default": "active"
+        },
+        {
+          "name": "cron_timestamp",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_status/monitor_status.ts",
+            "line": 22
+          },
+          "default": 0
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_status/monitor_status.ts",
+            "line": 24
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_status/monitor_status.ts",
+            "line": 27
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitor_status/monitor_status.ts",
+        "line": 12
+      },
+      "indexes": [
+        {
+          "columns": [
+            "monitor_id",
+            "region"
+          ],
+          "type": "index",
+          "name": "monitor_status_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor_tag",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "color",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 24
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 27
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitor_tags/monitor_tag.ts",
+        "line": 13
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "monitor_tag_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor_tag_to_monitor",
+      "columns": [
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 37
+          }
+        },
+        {
+          "name": "monitor_tag_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 40
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitor_tags/monitor_tag.ts",
+            "line": 43
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "monitor_tag_id",
+          "references": "id",
+          "on": "monitor_tag",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitor_tags/monitor_tag.ts",
+        "line": 34
+      },
+      "indexes": [
+        {
+          "columns": [
+            "monitor_tag_id"
+          ],
+          "type": "index",
+          "name": "monitor_tag_to_monitor_monitor_tag_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor_transition",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 10
+          }
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "region",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "cron_timestamp",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "from_status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "to_status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "quorum_count",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "region_count",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "transitioned",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "outbox_rows",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 21
+          },
+          "default": 0
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitor_transition/monitor_transition.ts",
+            "line": 22
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitor_transition/monitor_transition.ts",
+        "line": 7
+      },
+      "indexes": [
+        {
+          "columns": [
+            "monitor_id",
+            "cron_timestamp"
+          ],
+          "type": "index",
+          "name": "monitor_transition_monitor_id_cron_timestamp_idx"
+        },
+        {
+          "columns": [
+            "created_at"
+          ],
+          "type": "index",
+          "name": "monitor_transition_created_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "monitor",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "job_type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 22
+          },
+          "default": "http"
+        },
+        {
+          "name": "periodicity",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 25
+          },
+          "default": "other"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 28
+          },
+          "default": "active"
+        },
+        {
+          "name": "active",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 29
+          },
+          "default": false
+        },
+        {
+          "name": "regions",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 31
+          },
+          "default": ""
+        },
+        {
+          "name": "url",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 33
+          },
+          "length": 2048
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 35
+          },
+          "length": 256,
+          "default": ""
+        },
+        {
+          "name": "external_name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 36
+          }
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 37
+          },
+          "default": ""
+        },
+        {
+          "name": "headers",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 39
+          },
+          "default": ""
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 40
+          },
+          "default": ""
+        },
+        {
+          "name": "method",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 41
+          },
+          "default": "GET"
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 42
+          }
+        },
+        {
+          "name": "timeout",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 45
+          },
+          "default": 45000
+        },
+        {
+          "name": "degraded_after",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 48
+          }
+        },
+        {
+          "name": "assertions",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 50
+          }
+        },
+        {
+          "name": "otel_endpoint",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "otel_headers",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 54
+          }
+        },
+        {
+          "name": "public",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 56
+          },
+          "default": false
+        },
+        {
+          "name": "retry",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 58
+          },
+          "default": 3
+        },
+        {
+          "name": "follow_redirects",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 60
+          },
+          "default": true
+        },
+        {
+          "name": "grpc_service",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 64
+          }
+        },
+        {
+          "name": "grpc_tls",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 66
+          },
+          "default": "tls"
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 68
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 71
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "deleted_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/monitors/monitor.ts",
+            "line": 75
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/monitors/monitor.ts",
+        "line": 18
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "monitor_workspace_id_active_idx"
+        }
+      ]
+    },
+    {
+      "table": "notification",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "data",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 21
+          },
+          "default": "{}"
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 23
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 26
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/notifications/notification.ts",
+        "line": 15
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "notification_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "notification_trigger",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 36
+          }
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 37
+          }
+        },
+        {
+          "name": "notification_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 40
+          }
+        },
+        {
+          "name": "cron_timestamp",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 44
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "notification_id",
+          "references": "id",
+          "on": "notification",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/notifications/notification.ts",
+        "line": 33
+      },
+      "indexes": [
+        {
+          "columns": [
+            "notification_id",
+            "monitor_id",
+            "cron_timestamp"
+          ],
+          "type": "unique",
+          "name": "notification_id_monitor_id_crontimestampe"
+        }
+      ]
+    },
+    {
+      "table": "notifications_to_monitors",
+      "columns": [
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 58
+          }
+        },
+        {
+          "name": "notification_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 61
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/notification.ts",
+            "line": 64
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "notification_id",
+          "references": "id",
+          "on": "notification",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/notifications/notification.ts",
+        "line": 55
+      },
+      "indexes": [
+        {
+          "columns": [
+            "notification_id"
+          ],
+          "type": "index",
+          "name": "notifications_to_monitors_notification_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "notification_outbox",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 39
+          }
+        },
+        {
+          "name": "dedup_key",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 40
+          },
+          "unique": true
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 41
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 44
+          }
+        },
+        {
+          "name": "notification_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 45
+          }
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 48
+          }
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 49
+          }
+        },
+        {
+          "name": "from_status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "to_status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 53
+          }
+        },
+        {
+          "name": "cron_timestamp",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 54
+          }
+        },
+        {
+          "name": "incident_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 55
+          }
+        },
+        {
+          "name": "payload",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 61
+          }
+        },
+        {
+          "name": "delivery_status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 64
+          },
+          "default": "pending"
+        },
+        {
+          "name": "outcome",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 69
+          }
+        },
+        {
+          "name": "attempts",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 70
+          },
+          "default": 0
+        },
+        {
+          "name": "next_attempt_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 71
+          }
+        },
+        {
+          "name": "deadline_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 72
+          }
+        },
+        {
+          "name": "locked_by",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 73
+          }
+        },
+        {
+          "name": "locked_until",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 74
+          }
+        },
+        {
+          "name": "delivered_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 75
+          }
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 76
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 77
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "notification_id",
+          "references": "id",
+          "on": "notification",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "incident_id",
+          "references": "id",
+          "on": "monitor_incident",
+          "type": "many-to-one",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/notifications/outbox.ts",
+        "line": 36
+      },
+      "indexes": [
+        {
+          "columns": [
+            "next_attempt_at"
+          ],
+          "type": "index",
+          "name": "notification_outbox_claim_idx"
+        },
+        {
+          "columns": [
+            "notification_id",
+            "cron_timestamp"
+          ],
+          "type": "index",
+          "name": "notification_outbox_notification_id_cron_timestamp_idx"
+        },
+        {
+          "columns": [
+            "monitor_id",
+            "notification_id"
+          ],
+          "type": "index",
+          "name": "notification_outbox_channel_idx"
+        }
+      ]
+    },
+    {
+      "table": "notification_dead_letter",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 97
+          }
+        },
+        {
+          "name": "outbox_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 98
+          }
+        },
+        {
+          "name": "dedup_key",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 99
+          },
+          "unique": true
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 100
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 103
+          }
+        },
+        {
+          "name": "notification_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 104
+          }
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 105
+          }
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 106
+          }
+        },
+        {
+          "name": "from_status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 109
+          }
+        },
+        {
+          "name": "to_status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 110
+          }
+        },
+        {
+          "name": "cron_timestamp",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 111
+          }
+        },
+        {
+          "name": "incident_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 112
+          }
+        },
+        {
+          "name": "payload",
+          "type": "text",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 113
+          }
+        },
+        {
+          "name": "attempts",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 116
+          }
+        },
+        {
+          "name": "final_error",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 117
+          }
+        },
+        {
+          "name": "died_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/notifications/outbox.ts",
+            "line": 118
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/notifications/outbox.ts",
+        "line": 94
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id",
+            "died_at"
+          ],
+          "type": "index",
+          "name": "notification_dead_letter_workspace_id_died_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "oauth_authorization_code",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 13
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "hash",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 14
+          },
+          "unique": true
+        },
+        {
+          "name": "client_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "redirect_uri",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "code_challenge",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 27
+          }
+        },
+        {
+          "name": "consumed_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 28
+          }
+        },
+        {
+          "name": "grant_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_authorization_code.ts",
+            "line": 30
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "client_id",
+          "references": "client_id",
+          "on": "oauth_client",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "grant_id",
+          "references": "id",
+          "on": "oauth_grant",
+          "type": "many-to-one",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/oauth/oauth_authorization_code.ts",
+        "line": 10
+      },
+      "indexes": [
+        {
+          "columns": [
+            "expires_at"
+          ],
+          "type": "index",
+          "name": "oauth_authorization_code_expires_at_idx"
+        },
+        {
+          "columns": [
+            "client_id"
+          ],
+          "type": "index",
+          "name": "oauth_authorization_code_client_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "oauth_client",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_client.ts",
+            "line": 11
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "client_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_client.ts",
+            "line": 12
+          },
+          "unique": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_client.ts",
+            "line": 13
+          },
+          "default": "MCP Client"
+        },
+        {
+          "name": "redirect_uris",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_client.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "revoked_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_client.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_client.ts",
+            "line": 18
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/oauth/oauth_client.ts",
+        "line": 10
+      }
+    },
+    {
+      "table": "oauth_grant",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 14
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "client_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "access_token_hash",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 25
+          },
+          "unique": true
+        },
+        {
+          "name": "access_token_expires_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "refresh_token_hash",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 29
+          },
+          "unique": true
+        },
+        {
+          "name": "refresh_token_expires_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 30
+          }
+        },
+        {
+          "name": "previous_refresh_token_hash",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 35
+          }
+        },
+        {
+          "name": "rotated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 36
+          }
+        },
+        {
+          "name": "last_used_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 37
+          }
+        },
+        {
+          "name": "revoked_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 38
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_grant.ts",
+            "line": 39
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "client_id",
+          "references": "client_id",
+          "on": "oauth_client",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/oauth/oauth_grant.ts",
+        "line": 11
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "oauth_grant_workspace_id_idx"
+        },
+        {
+          "columns": [
+            "client_id",
+            "user_id"
+          ],
+          "type": "index",
+          "name": "oauth_grant_client_id_user_id_idx"
+        },
+        {
+          "columns": [
+            "user_id"
+          ],
+          "type": "index",
+          "name": "oauth_grant_user_id_idx"
+        },
+        {
+          "columns": [
+            "previous_refresh_token_hash"
+          ],
+          "type": "index",
+          "name": "oauth_grant_previous_refresh_token_hash_idx"
+        },
+        {
+          "columns": [
+            "refresh_token_expires_at"
+          ],
+          "type": "index",
+          "name": "oauth_grant_refresh_token_expires_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "oauth_session",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "client_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "redirect_uri",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "resource",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "code_challenge",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "code_challenge_method",
+          "type": "text",
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 21
+          },
+          "default": "S256"
+        },
+        {
+          "name": "decided_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/oauth/oauth_session.ts",
+            "line": 25
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "client_id",
+          "references": "client_id",
+          "on": "oauth_client",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/oauth/oauth_session.ts",
+        "line": 9
+      },
+      "indexes": [
+        {
+          "columns": [
+            "client_id"
+          ],
+          "type": "index",
+          "name": "oauth_session_client_id_idx"
+        },
+        {
+          "columns": [
+            "expires_at"
+          ],
+          "type": "index",
+          "name": "oauth_session_expires_at_idx"
+        }
+      ]
+    },
+    {
+      "table": "page_component_groups",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_component_groups/page_component_groups.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/page_component_groups/page_component_groups.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "page_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/page_component_groups/page_component_groups.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/page_component_groups/page_component_groups.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "default_open",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/page_component_groups/page_component_groups.ts",
+            "line": 20
+          },
+          "default": false
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_component_groups/page_component_groups.ts",
+            "line": 24
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_component_groups/page_component_groups.ts",
+            "line": 27
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_id",
+          "references": "id",
+          "on": "page",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/page_component_groups/page_component_groups.ts",
+        "line": 8
+      },
+      "indexes": [
+        {
+          "columns": [
+            "page_id"
+          ],
+          "type": "index",
+          "name": "page_component_groups_page_id_idx"
+        },
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "page_component_groups_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "page_component",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "page_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 27
+          }
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 30
+          },
+          "default": "monitor"
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 33
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 36
+          }
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 37
+          }
+        },
+        {
+          "name": "order",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 38
+          },
+          "default": 0
+        },
+        {
+          "name": "group_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 39
+          }
+        },
+        {
+          "name": "group_order",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 42
+          },
+          "default": 0
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 44
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 47
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_id",
+          "references": "id",
+          "on": "page",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "group_id",
+          "references": "id",
+          "on": "page_component_groups",
+          "type": "many-to-one",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/page_components/page_components.ts",
+        "line": 20
+      },
+      "indexes": [
+        {
+          "columns": [
+            "page_id",
+            "monitor_id"
+          ],
+          "type": "unique",
+          "name": "page_component_page_id_monitor_id_unique"
+        },
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "page_component_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "maintenance_to_page_component",
+      "columns": [
+        {
+          "name": "maintenance_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 95
+          }
+        },
+        {
+          "name": "page_component_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 98
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 101
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "maintenance_id",
+          "references": "id",
+          "on": "maintenance",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_component_id",
+          "references": "id",
+          "on": "page_component",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/page_components/page_components.ts",
+        "line": 92
+      },
+      "indexes": [
+        {
+          "columns": [
+            "page_component_id"
+          ],
+          "type": "index",
+          "name": "maintenance_to_page_component_page_component_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "status_report_to_page_component",
+      "columns": [
+        {
+          "name": "status_report_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 130
+          }
+        },
+        {
+          "name": "page_component_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 133
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 136
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "status_report_id",
+          "references": "id",
+          "on": "status_report",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_component_id",
+          "references": "id",
+          "on": "page_component",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/page_components/page_components.ts",
+        "line": 127
+      },
+      "indexes": [
+        {
+          "columns": [
+            "page_component_id"
+          ],
+          "type": "index",
+          "name": "status_report_to_page_component_page_component_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "status_report_update_to_page_component",
+      "columns": [
+        {
+          "name": "status_report_update_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 167
+          }
+        },
+        {
+          "name": "page_component_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 170
+          }
+        },
+        {
+          "name": "impact",
+          "type": "text",
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 173
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_components/page_components.ts",
+            "line": 174
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "status_report_update_id",
+          "references": "id",
+          "on": "status_report_update",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_component_id",
+          "references": "id",
+          "on": "page_component",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/page_components/page_components.ts",
+        "line": 164
+      },
+      "indexes": [
+        {
+          "columns": [
+            "page_component_id"
+          ],
+          "type": "index",
+          "name": "status_report_update_to_page_component_page_component_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "page_subscriber_to_page_component",
+      "columns": [
+        {
+          "name": "page_subscriber_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscriber_to_page_component.ts",
+            "line": 10
+          }
+        },
+        {
+          "name": "page_component_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscriber_to_page_component.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscriber_to_page_component.ts",
+            "line": 16
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "page_subscriber_id",
+          "references": "id",
+          "on": "page_subscriber",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_component_id",
+          "references": "id",
+          "on": "page_component",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/page_subscribers/page_subscriber_to_page_component.ts",
+        "line": 7
+      }
+    },
+    {
+      "table": "page_subscriber",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "page_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "channel_type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 25
+          },
+          "default": "email"
+        },
+        {
+          "name": "webhook_url",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 32
+          }
+        },
+        {
+          "name": "channel_config",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 33
+          }
+        },
+        {
+          "name": "slack_channel_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 38
+          }
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 42
+          },
+          "default": "self_signup"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 50
+          }
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "accepted_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 53
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 54
+          }
+        },
+        {
+          "name": "unsubscribed_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 55
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 56
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/page_subscribers/page_subscribers.ts",
+            "line": 59
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "page_id",
+          "references": "id",
+          "on": "page",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/page_subscribers/page_subscribers.ts",
+        "line": 14
+      },
+      "indexes": [
+        {
+          "columns": [
+            "page_id"
+          ],
+          "type": "index",
+          "name": "page_subscriber_page_id_idx"
+        },
+        {
+          "columns": [
+            "LOWER(email)",
+            "page_id"
+          ],
+          "type": "unique",
+          "name": "idx_page_subscriber_email_page_active"
+        },
+        {
+          "columns": [
+            "LOWER(webhook_url)",
+            "page_id"
+          ],
+          "type": "unique",
+          "name": "idx_page_subscriber_webhook_page_active"
+        },
+        {
+          "columns": [
+            "slack_channel_id",
+            "page_id"
+          ],
+          "type": "unique",
+          "name": "idx_page_subscriber_slack_channel_page_active"
+        }
+      ]
+    },
+    {
+      "table": "page",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "icon",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 25
+          },
+          "length": 256,
+          "default": ""
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 26
+          },
+          "length": 256,
+          "unique": true
+        },
+        {
+          "name": "custom_domain",
+          "type": "text",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 27
+          },
+          "length": 256
+        },
+        {
+          "name": "published",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 28
+          },
+          "default": false
+        },
+        {
+          "name": "force_theme",
+          "type": "text",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 30
+          },
+          "default": "system"
+        },
+        {
+          "name": "custom_theme",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 36
+          }
+        },
+        {
+          "name": "password",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 39
+          },
+          "length": 256
+        },
+        {
+          "name": "password_protected",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 41
+          },
+          "default": false
+        },
+        {
+          "name": "access_type",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 44
+          },
+          "default": "public"
+        },
+        {
+          "name": "auth_email_domains",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 47
+          }
+        },
+        {
+          "name": "allowed_ip_ranges",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 48
+          }
+        },
+        {
+          "name": "homepage_url",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 51
+          },
+          "length": 256
+        },
+        {
+          "name": "contact_url",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 52
+          },
+          "length": 256
+        },
+        {
+          "name": "default_locale",
+          "type": "text",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 54
+          },
+          "default": "en"
+        },
+        {
+          "name": "locales",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 58
+          }
+        },
+        {
+          "name": "legacy_page",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 60
+          },
+          "default": true
+        },
+        {
+          "name": "configuration",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 63
+          }
+        },
+        {
+          "name": "allow_index",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 65
+          },
+          "default": true
+        },
+        {
+          "name": "show_monitor_values",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 73
+          },
+          "default": true
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 77
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/pages/page.ts",
+            "line": 80
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/pages/page.ts",
+        "line": 14
+      },
+      "indexes": [
+        {
+          "columns": [
+            "LOWER(slug)"
+          ],
+          "type": "index",
+          "name": "page_lower_slug_idx"
+        },
+        {
+          "columns": [
+            "LOWER(custom_domain)"
+          ],
+          "type": "index",
+          "name": "page_lower_custom_domain_idx"
+        },
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "page_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "private_location_monitor_status",
+      "columns": [
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/private_locations/private_location_monitor_status.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "private_location_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/private_locations/private_location_monitor_status.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/private_locations/private_location_monitor_status.ts",
+            "line": 23
+          },
+          "default": "active"
+        },
+        {
+          "name": "cron_timestamp",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/private_locations/private_location_monitor_status.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_location_monitor_status.ts",
+            "line": 25
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_location_monitor_status.ts",
+            "line": 28
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "private_location_id",
+          "references": "id",
+          "on": "private_location",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/private_locations/private_location_monitor_status.ts",
+        "line": 14
+      },
+      "indexes": [
+        {
+          "columns": [
+            "private_location_id"
+          ],
+          "type": "index",
+          "name": "private_location_monitor_status_pl_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "private_location",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 16
+          },
+          "default": "error"
+        },
+        {
+          "name": "metadata",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "last_seen_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 24
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 27
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/private_locations/private_locations.ts",
+        "line": 10
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "private_location_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "private_location_to_monitor",
+      "columns": [
+        {
+          "name": "private_location_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 37
+          }
+        },
+        {
+          "name": "monitor_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 41
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 44
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "deleted_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/private_locations/private_locations.ts",
+            "line": 47
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "private_location_id",
+          "references": "id",
+          "on": "private_location",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "monitor_id",
+          "references": "id",
+          "on": "monitor",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/private_locations/private_locations.ts",
+        "line": 34
+      },
+      "indexes": [
+        {
+          "columns": [
+            "private_location_id"
+          ],
+          "type": "index",
+          "name": "private_location_to_monitor_private_location_id_idx"
+        },
+        {
+          "columns": [
+            "monitor_id"
+          ],
+          "type": "index",
+          "name": "private_location_to_monitor_monitor_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "slack_user",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/slack_users/slack_user.ts",
+            "line": 16
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/slack_users/slack_user.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "slack_team_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/slack_users/slack_user.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "slack_user_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/slack_users/slack_user.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/slack_users/slack_user.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/slack_users/slack_user.ts",
+            "line": 25
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/slack_users/slack_user.ts",
+        "line": 13
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id",
+            "slack_team_id",
+            "slack_user_id"
+          ],
+          "type": "unique"
+        },
+        {
+          "columns": [
+            "user_id"
+          ],
+          "type": "index",
+          "name": "slack_user_user_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "status_report",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 18
+          }
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 20
+          },
+          "length": 256
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "page_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "created_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 28
+          }
+        },
+        {
+          "name": "updated_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 29
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 31
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 34
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "page_id",
+          "references": "id",
+          "on": "page",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "created_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "updated_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/status_reports/status_reports.ts",
+        "line": 15
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id",
+            "created_at"
+          ],
+          "type": "index",
+          "name": "status_report_workspace_created_idx"
+        },
+        {
+          "columns": [
+            "page_id"
+          ],
+          "type": "index",
+          "name": "status_report_page_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "status_report_update",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 47
+          }
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 49
+          }
+        },
+        {
+          "name": "date",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 50
+          }
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 51
+          }
+        },
+        {
+          "name": "status_report_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 53
+          }
+        },
+        {
+          "name": "created_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 57
+          }
+        },
+        {
+          "name": "updated_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 58
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 60
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/status_reports/status_reports.ts",
+            "line": 63
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "status_report_id",
+          "references": "id",
+          "on": "status_report",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "created_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "updated_by",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/status_reports/status_reports.ts",
+        "line": 44
+      },
+      "indexes": [
+        {
+          "columns": [
+            "status_report_id"
+          ],
+          "type": "index",
+          "name": "status_report_update_status_report_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "user",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 16
+          }
+        },
+        {
+          "name": "tenant_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 19
+          },
+          "length": 256,
+          "unique": true
+        },
+        {
+          "name": "first_name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 20
+          },
+          "default": ""
+        },
+        {
+          "name": "last_name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 21
+          },
+          "default": ""
+        },
+        {
+          "name": "photo_url",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 22
+          },
+          "default": ""
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 26
+          },
+          "default": ""
+        },
+        {
+          "name": "emailVerified",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 27
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 29
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 32
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "deleted_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 35
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/users/user.ts",
+        "line": 13
+      },
+      "indexes": [
+        {
+          "columns": [
+            "email"
+          ],
+          "type": "index",
+          "name": "user_email_idx"
+        }
+      ]
+    },
+    {
+      "table": "users_to_workspaces",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 49
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 55
+          },
+          "default": "member"
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 56
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/users/user.ts",
+        "line": 46
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "users_to_workspaces_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "account",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 85
+          }
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 88
+          }
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 89
+          }
+        },
+        {
+          "name": "provider_account_id",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 90
+          }
+        },
+        {
+          "name": "refresh_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 91
+          }
+        },
+        {
+          "name": "access_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 92
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 93
+          }
+        },
+        {
+          "name": "token_type",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 94
+          }
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 95
+          }
+        },
+        {
+          "name": "id_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 96
+          }
+        },
+        {
+          "name": "session_state",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 97
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/users/user.ts",
+        "line": 82
+      },
+      "indexes": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "type": "index",
+          "name": "account_user_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "session",
+      "columns": [
+        {
+          "name": "session_token",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 110
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 111
+          }
+        },
+        {
+          "name": "expires",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 114
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "user",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/users/user.ts",
+        "line": 107
+      },
+      "indexes": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "type": "index",
+          "name": "session_user_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "verification_token",
+      "columns": [
+        {
+          "name": "identifier",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 122
+          }
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 123
+          }
+        },
+        {
+          "name": "expires",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/users/user.ts",
+            "line": 124
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/users/user.ts",
+        "line": 119
+      }
+    },
+    {
+      "table": "viewer",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 13
+          },
+          "unique": true
+        },
+        {
+          "name": "emailVerified",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 14
+          }
+        },
+        {
+          "name": "image",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 16
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 19
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/viewers/viewer.ts",
+        "line": 10
+      }
+    },
+    {
+      "table": "viewer_session",
+      "columns": [
+        {
+          "name": "session_token",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 26
+          }
+        },
+        {
+          "name": "expires",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 29
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "viewer",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/viewers/viewer.ts",
+        "line": 24
+      }
+    },
+    {
+      "table": "viewer_accounts",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "text",
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 35
+          }
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 38
+          }
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 39
+          }
+        },
+        {
+          "name": "providerAccountId",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 40
+          }
+        },
+        {
+          "name": "refresh_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 41
+          }
+        },
+        {
+          "name": "access_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 42
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 43
+          }
+        },
+        {
+          "name": "token_type",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 44
+          }
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 45
+          }
+        },
+        {
+          "name": "id_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 46
+          }
+        },
+        {
+          "name": "session_state",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/viewers/viewer.ts",
+            "line": 47
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "viewer",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/viewers/viewer.ts",
+        "line": 32
+      }
+    },
+    {
+      "table": "workspace_sso_domain",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/workspaces/sso_domain.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "workspace_id",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/workspaces/sso_domain.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "domain",
+          "type": "text",
+          "source": {
+            "file": "src/schema/workspaces/sso_domain.ts",
+            "line": 17
+          },
+          "unique": true
+        },
+        {
+          "name": "verified_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/sso_domain.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/sso_domain.ts",
+            "line": 20
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "workspace_id",
+          "references": "id",
+          "on": "workspace",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema/workspaces/sso_domain.ts",
+        "line": 8
+      },
+      "indexes": [
+        {
+          "columns": [
+            "workspace_id"
+          ],
+          "type": "index",
+          "name": "workspace_sso_domain_workspace_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "workspace",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 15
+          }
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 16
+          },
+          "unique": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 17
+          }
+        },
+        {
+          "name": "stripe_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 19
+          },
+          "length": 256,
+          "unique": true
+        },
+        {
+          "name": "subscription_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "plan",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "ends_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "paid_until",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 23
+          }
+        },
+        {
+          "name": "trial_ends_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 24
+          }
+        },
+        {
+          "name": "trialed_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 25
+          }
+        },
+        {
+          "name": "limits",
+          "type": "text",
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 26
+          },
+          "default": "{}"
+        },
+        {
+          "name": "workos_organization_id",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 28
+          },
+          "unique": true
+        },
+        {
+          "name": "sso_enabled",
+          "type": "integer",
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 31
+          },
+          "default": false
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 35
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 38
+          },
+          "defaultRaw": "(strftime('%s', 'now'))"
+        },
+        {
+          "name": "dsn",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema/workspaces/workspace.ts",
+            "line": 42
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema/workspaces/workspace.ts",
+        "line": 12
+      },
+      "indexes": [
+        {
+          "columns": [
+            "id",
+            "dsn"
+          ],
+          "type": "unique"
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

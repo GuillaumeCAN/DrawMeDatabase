@@ -106,7 +106,7 @@ suite('DrawMeDatabase extension: a Prisma project', () => {
         const schema = api.getSchema();
         assert.equal(schema.framework, 'prisma');
         assert.equal(schema.basePath, workspace());
-        assert.deepEqual(api.getFrameworks().map(framework => framework.id), ['laravel', 'symfony', 'prisma']);
+        assert.deepEqual(api.getFrameworks().map(framework => framework.id), ['laravel', 'symfony', 'prisma', 'drizzle']);
         assert.equal(api.detectFramework(workspace()), 'prisma');
         assert.deepEqual(api.getSources(workspace(), 'prisma'), {
             folders: [{ path: path.join(workspace(), 'prisma', 'schema'), recursive: true }],

@@ -170,7 +170,7 @@ suite('DrawMeDatabase extension', () => {
     test('the parsers: the stacks of the API, their sources, and the DrawMeDatabase.framework setting', () => {
         const api = vscode.extensions.getExtension(EXTENSION_ID).exports;
         assert.equal(api.apiVersion, 3);
-        assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }]);
+        assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }, { id: 'drizzle', label: 'Drizzle' }]);
         const schema = api.getSchema();
         assert.equal(schema.framework, 'laravel');
         assert.deepEqual(api.getSources(schema.basePath, schema.framework),

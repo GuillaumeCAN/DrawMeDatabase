@@ -1,0 +1,6 @@
+{
+  "dialect": "mysql",
+  "schema": ["./src/schema.ts", "./src/audit.ts"],
+  "out": "./drizzle",
+  "casing": "camelCase"
+}

@@ -2,7 +2,7 @@
   "name": "draw-me-database",
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
-  "description": "Visualize the schema of your database from your code: Laravel migrations, Symfony Doctrine entities and Prisma schemas, as a live diagram with its git status",
+  "description": "Visualize the schema of your database from your code: Laravel migrations, Symfony Doctrine entities, Prisma schemas and Drizzle ORM schemas, as a live diagram with its git status",
   "version": "1.8.0",
   "icon": "images/logo_128.png",
   "engines": {
@@ -29,6 +29,8 @@
     "doctrine",
     "prisma",
     "prisma schema",
+    "drizzle",
+    "drizzle orm",
     "orm",
     "postgresql",
     "mysql",
@@ -162,13 +164,15 @@
             "auto",
             "laravel",
             "symfony",
-            "prisma"
+            "prisma",
+            "drizzle"
           ],
           "enumDescriptions": [
             "%setting.framework.auto%",
             "%setting.framework.laravel%",
             "%setting.framework.symfony%",
-            "%setting.framework.prisma%"
+            "%setting.framework.prisma%",
+            "%setting.framework.drizzle%"
           ],
           "default": "auto",
           "scope": "resource",
