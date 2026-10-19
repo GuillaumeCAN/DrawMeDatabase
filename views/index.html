@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="{{CSP}}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrawMeDatabase</title>
+    <link rel="stylesheet" href="{{THEME_CSS}}">
+</head>
+
+<body>
+    <div id="progress" class="progress" hidden></div>
+
+    <header class="toolbar">
+        <div class="tabs" role="tablist" aria-label="Viewer">
+            <button type="button" role="tab" id="tab-diagram" data-viewer="diagram" aria-controls="diagram-view" aria-selected="true">Diagram</button>
+            <button type="button" role="tab" id="tab-json" data-viewer="json" aria-controls="json-view" aria-selected="false" tabindex="-1">JSON</button>
+        </div>
+
+        <div id="summary" class="summary"></div>
+
+        <div class="actions">
+            <div class="group" data-viewer-only="diagram">
+                <select id="layout-select" class="select" title="Layout engine" aria-label="Layout engine">
+                    <option value="dagre">Dagre</option>
+                    <option value="elk">ELK</option>
+                </select>
+                <button type="button" class="icon" id="direction-button" title="Direction: top to bottom" aria-label="Direction: top to bottom">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M4 10l4 4 4-4"/></svg>
+                </button>
+                <span class="separator" aria-hidden="true"></span>
+                <button type="button" class="icon" id="zoom-out" title="Zoom out (-)" aria-label="Zoom out">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg>
+                </button>
+                <button type="button" class="text-button zoom-level" id="zoom-level" title="Actual size (0)" aria-label="Actual size">100%</button>
+                <button type="button" class="icon" id="zoom-in" title="Zoom in (+)" aria-label="Zoom in">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M8 3v10"/></svg>
+                </button>
+                <button type="button" class="icon" id="zoom-fit" title="Fit to window (F)" aria-label="Fit to window">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+                </button>
+                <span class="separator" aria-hidden="true"></span>
+            </div>
+
+            <div class="menu-anchor">
+                <button type="button" class="text-button" id="export-button" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu" title="Export">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11"/></svg>
+                    <span>Export</span>
+                </button>
+                <div id="export-menu" class="menu" role="menu" aria-labelledby="export-button" hidden></div>
+            </div>
+            <button type="button" class="icon" id="refresh-button" title="Refresh from the code" aria-label="Refresh from the code">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1M13.5 2v3.5H10"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <section id="diagram-view" class="view" role="tabpanel" aria-labelledby="tab-diagram">
+            <div id="viewport" class="viewport" tabindex="0" aria-label="Database diagram. Drag to move it, Ctrl and the mouse wheel to zoom, F to fit.">
+                <div id="stage" class="stage"></div>
+            </div>
+            <div id="message" class="message" role="alert" hidden></div>
+            <p class="credit">DrawMeDatabase - by Guillaume Cancalon ©</p>
+        </section>
+
+        <section id="json-view" class="view" role="tabpanel" aria-labelledby="tab-json" hidden>
+            <pre id="json-output" class="json" tabindex="0"></pre>
+        </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+{{SCRIPTS}}
+</body>
+</html>

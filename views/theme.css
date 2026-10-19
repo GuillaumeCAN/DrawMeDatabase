@@ -1,139 +1,450 @@
 /* Colors come from the VS Code theme (light, dark and high contrast) */
+:root {
+    --dmdb-border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+    --dmdb-hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+    --dmdb-active: var(--vscode-toolbar-activeBackground, rgba(128, 128, 128, 0.3));
+    --dmdb-dot: var(--vscode-editorIndentGuide-background1, var(--vscode-editorIndentGuide-background, rgba(128, 128, 128, 0.25)));
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
 body {
-    font-family: var(--vscode-font-family, Arial, sans-serif);
-    font-size: var(--vscode-font-size, 13px);
-    color: var(--vscode-editor-foreground);
-    background-color: var(--vscode-editor-background);
-    margin: 20px;
+    height: 100%;
 }
 
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.header h1 {
-    font-size: 18px;
+body {
     margin: 0;
-}
-
-.credit {
+    padding: 0;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-left: 20px;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: var(--vscode-font-family, system-ui, sans-serif);
+    font-size: var(--vscode-font-size, 13px);
+    color: var(--vscode-foreground, var(--vscode-editor-foreground));
+    background-color: var(--vscode-editor-background);
 }
 
-.credit p {
-    font-size: 12px;
+button,
+select {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+
+:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+/* Progress bar (parsing, drawing) */
+.progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 30;
+    overflow: hidden;
+}
+
+.progress::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30%;
+    background-color: var(--vscode-progressBar-background);
+    animation: dmdb-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes dmdb-progress {
+    from { left: -30%; }
+    to { left: 100%; }
+}
+
+/* Toolbar */
+.toolbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 35px;
+    padding: 0 8px 0 12px;
+    border-bottom: 1px solid var(--dmdb-border);
+    background-color: var(--vscode-editor-background);
+}
+
+.tabs {
+    display: flex;
+    align-self: stretch;
+    gap: 4px;
+}
+
+.tabs [role="tab"] {
+    padding: 0 8px;
+    border: none;
+    border-bottom: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--vscode-panelTitle-inactiveForeground, var(--vscode-descriptionForeground));
+}
+
+.tabs [role="tab"]:hover {
+    color: var(--vscode-panelTitle-activeForeground, var(--vscode-foreground));
+}
+
+.tabs [role="tab"][aria-selected="true"] {
+    color: var(--vscode-panelTitle-activeForeground, var(--vscode-foreground));
+    border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--vscode-focusBorder));
+}
+
+.summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     color: var(--vscode-descriptionForeground);
 }
 
-pre {
-    background-color: var(--vscode-textCodeBlock-background);
-    color: var(--vscode-editor-foreground);
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: var(--vscode-editor-font-size, 13px);
-    padding: 10px;
-    border: 1px solid var(--vscode-panel-border, transparent);
+.summary > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.link {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--vscode-editorWarning-foreground, var(--vscode-textLink-foreground));
+}
+
+.link:hover {
+    text-decoration: underline;
+}
+
+.actions,
+.group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.separator {
+    width: 1px;
+    height: 16px;
+    margin: 0 6px;
+    background-color: var(--dmdb-border);
+}
+
+.icon,
+.text-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 24px;
+    min-width: 24px;
+    padding: 0 4px;
+    border: none;
     border-radius: 5px;
-    overflow-x: auto;
+    background: none;
+    cursor: pointer;
+    color: var(--vscode-icon-foreground, var(--vscode-foreground));
 }
 
-.error {
-    color: var(--vscode-errorForeground);
+.icon:hover,
+.text-button:hover {
+    background-color: var(--dmdb-hover);
 }
 
-select#viewer-select {
+.icon:active,
+.text-button:active,
+.text-button[aria-expanded="true"] {
+    background-color: var(--dmdb-active);
+}
+
+.icon svg,
+.text-button svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#direction-button svg {
+    transition: transform 0.15s ease;
+}
+
+#direction-button.left-to-right svg {
+    transform: rotate(-90deg);
+}
+
+.zoom-level {
+    min-width: 46px;
+    font-variant-numeric: tabular-nums;
+}
+
+.select {
+    height: 24px;
+    padding: 0 4px;
+    border: 1px solid var(--vscode-dropdown-border, transparent);
+    border-radius: 4px;
     background-color: var(--vscode-dropdown-background);
     color: var(--vscode-dropdown-foreground);
-    border: 1px solid var(--vscode-dropdown-border, transparent);
-    padding: 5px;
-    border-radius: 3px;
-    font-family: inherit;
-    font-size: 14px;
+    cursor: pointer;
 }
 
-select#viewer-select:focus,
-#copy-btn:focus-visible {
-    outline: 1px solid var(--vscode-focusBorder);
-    outline-offset: 1px;
+/* Narrow panels: the summary goes under the tabs, the Export button keeps its icon only */
+@media (max-width: 640px) {
+    .toolbar {
+        flex-wrap: wrap;
+        row-gap: 0;
+    }
+
+    .summary {
+        order: 3;
+        flex-basis: 100%;
+        min-height: 22px;
+    }
+
+    .actions {
+        margin-left: auto;
+    }
 }
 
-/* Mermaid viewer: the page fits the panel and only the diagram area scrolls, so both of its
-   scrollbars stay on screen for a wide or tall diagram */
-body.mermaid-page {
-    height: calc(100vh - 40px);
-    display: flex;
-    flex-direction: column;
+@media (max-width: 520px) {
+    #export-button span {
+        display: none;
+    }
+
+    .tabs {
+        gap: 0;
+    }
 }
 
-.mermaid-container {
-    flex: 1 1 auto;
-    min-height: 0;
-    border: 1px solid var(--vscode-panel-border, transparent);
-    background-color: var(--vscode-editor-background);
-    border-radius: 7px;
-    margin-right: 10px;
-    padding: 0 10px 10px;
-    overflow: auto;
-}
-
-/* Bigger attribute text (also applied while Mermaid measures the diagram) */
-.mermaid-diagram svg text {
-    font-size: 12px !important;
-}
-
-/* JSON viewer */
-.json-viewer {
+/* Export menu */
+.menu-anchor {
     position: relative;
 }
 
-#copy-btn {
+.menu {
     position: absolute;
-    top: 0;
+    top: calc(100% + 4px);
     right: 0;
-    margin: 10px;
-    background-color: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
-    color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
-    border: 1px solid var(--vscode-button-border, transparent);
-    padding: 5px 10px;
-    border-radius: 3px;
+    z-index: 20;
+    min-width: 210px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--vscode-menu-border, var(--dmdb-border));
+    border-radius: 6px;
+    background-color: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+    color: var(--vscode-menu-foreground, var(--vscode-foreground));
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.35));
+}
+
+.menu [role="menuitem"] {
+    height: 26px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    text-align: left;
+    white-space: nowrap;
     cursor: pointer;
-    font-family: inherit;
-    font-size: 14px;
 }
 
-#copy-btn:hover:not(:disabled) {
-    background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+.menu [role="menuitem"]:hover:not(:disabled),
+.menu [role="menuitem"]:focus-visible {
+    outline: none;
+    background-color: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
+    color: var(--vscode-menu-selectionForeground, var(--vscode-list-activeSelectionForeground));
 }
 
-#copy-btn:disabled {
+.menu [role="menuitem"]:disabled {
     opacity: 0.5;
     cursor: default;
 }
 
-/* Toast styles */
+/* Viewers */
+main {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+}
+
+.view {
+    position: absolute;
+    inset: 0;
+}
+
+/* Diagram: the viewport shows the zoomed stage on a dotted canvas */
+.viewport {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    background-color: var(--vscode-editor-background);
+    background-image: radial-gradient(circle, var(--dmdb-dot) 1px, transparent 1.2px);
+    background-size: 20px 20px;
+}
+
+.viewport.dragging {
+    cursor: grabbing;
+}
+
+.viewport:focus-visible {
+    outline-offset: -2px;
+}
+
+.stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+}
+
+.stage svg {
+    display: block;
+    overflow: visible;
+}
+
+/* Search results (1.3.0): the matches stand out, the other tables fade */
+.stage .node.dimmed {
+    opacity: 0.25;
+}
+
+.stage .node.match rect {
+    stroke: var(--vscode-focusBorder) !important;
+    stroke-width: 2px !important;
+}
+
+/* Off-screen element where Mermaid measures the text */
+.render-sandbox {
+    position: absolute;
+    top: 0;
+    left: -100000px;
+    visibility: hidden;
+}
+
+.message {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    max-height: calc(100% - 32px);
+    overflow: auto;
+    padding: 12px 16px;
+    border: 1px solid var(--vscode-inputValidation-errorBorder, var(--dmdb-border));
+    border-radius: 6px;
+    background-color: var(--vscode-editorWidget-background);
+    color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, transparent);
+}
+
+.message-title {
+    margin-top: 0;
+    font-weight: 600;
+}
+
+.credit {
+    position: absolute;
+    right: 12px;
+    bottom: 6px;
+    margin: 0;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+pre {
+    margin: 0;
+    padding: 10px;
+    overflow: auto;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: var(--vscode-editor-font-size, 13px);
+    background-color: var(--vscode-textCodeBlock-background);
+    border-radius: 4px;
+}
+
+/* JSON viewer, colored like the editor's JSON */
+.json {
+    position: absolute;
+    inset: 0;
+    padding: 12px 16px;
+    border-radius: 0;
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+    line-height: 1.45;
+}
+
+.json-key {
+    color: var(--vscode-debugTokenExpression-name, var(--vscode-symbolIcon-propertyForeground, #9cdcfe));
+}
+
+.json-string {
+    color: var(--vscode-debugTokenExpression-string, #ce9178);
+}
+
+.json-number {
+    color: var(--vscode-debugTokenExpression-number, #b5cea8);
+}
+
+.json-literal {
+    color: var(--vscode-debugTokenExpression-boolean, #569cd6);
+}
+
+.json-punctuation {
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Toast */
 .toast {
     position: fixed;
     bottom: 20px;
     right: 20px;
+    z-index: 40;
+    padding: 8px 14px;
+    border: 1px solid var(--vscode-notifications-border, var(--vscode-contrastBorder, transparent));
+    border-radius: 6px;
     background-color: var(--vscode-notifications-background, var(--vscode-editorWidget-background));
     color: var(--vscode-notifications-foreground, var(--vscode-editor-foreground));
-    border: 1px solid var(--vscode-notifications-border, var(--vscode-contrastBorder, transparent));
-    padding: 10px 20px;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px var(--vscode-widget-shadow, transparent);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, transparent);
     opacity: 0;
     pointer-events: none;
-    transform: translateY(20px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .toast.show {
     opacity: 1;
     transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
 }

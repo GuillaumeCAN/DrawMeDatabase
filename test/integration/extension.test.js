@@ -21,6 +21,18 @@ const drawMeDatabaseTabs = () => vscode.window.tabGroups.all
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// The drawing reported by the webview (exported by the extension): waits for one that matches
+async function rendered(extension, matches) {
+    for (let i = 0; i < 300; i++) {
+        const render = extension.exports && extension.exports.lastRender;
+        if (render && matches(render)) {
+            return render;
+        }
+        await sleep(100);
+    }
+    return extension.exports && extension.exports.lastRender;
+}
+
 // The tab model is updated asynchronously: wait for the panel tab, then a little longer so a
 // second (unwanted) panel would have time to show up too
 async function settledTabCount() {
@@ -33,6 +45,7 @@ async function settledTabCount() {
 
 suite('DrawMeDatabase extension', () => {
     suiteTeardown(async () => {
+        await vscode.workspace.getConfiguration('DrawMeDatabase').update('layout', undefined, vscode.ConfigurationTarget.Global);
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     });
 
@@ -65,6 +78,19 @@ suite('DrawMeDatabase extension', () => {
             [{ foreignKey: 'user_id', references: 'id', on: 'users', type: 'many-to-one' }]);
 
         assert.equal(await settledTabCount(), 1, 'one DrawMeDatabase panel is open');
+    });
+
+    test('the webview draws the diagram with Mermaid, in both layouts', async function () {
+        this.timeout(60000);
+        const extension = vscode.extensions.getExtension(EXTENSION_ID);
+        const elk = await rendered(extension, render => render.layout === 'elk');
+        assert.ok(elk && elk.ok, `ELK drawing: ${JSON.stringify(elk)}`);
+        assert.ok(elk.entities >= 2, JSON.stringify(elk));
+
+        // The toolbar and the setting change the layout: the page draws again
+        await vscode.workspace.getConfiguration('DrawMeDatabase').update('layout', 'dagre', vscode.ConfigurationTarget.Global);
+        const dagre = await rendered(extension, render => render.layout === 'dagre');
+        assert.ok(dagre && dagre.ok, `Dagre drawing: ${JSON.stringify(dagre)}`);
     });
 
     test('running the command again reuses the same panel', async () => {

@@ -16,6 +16,7 @@ const path = require('path');
 const Module = require('module');
 
 const { ParserError } = require('../../parsers/errors');
+const html = require('../../views/html');
 
 const ROOT = path.join(__dirname, '..', '..');
 const EXTENSION = path.join(ROOT, 'extension.js');
@@ -51,17 +52,59 @@ const emitter = () => {
 };
 
 // The parts of the VS Code API used by extension.js. Messages resolve to state.answer
-// (the button the user clicks, undefined = dismissed).
+// (the button the user clicks, undefined = dismissed), the Save dialog to state.saveUri.
 function createVscode(state) {
     const message = (list) => (text, ...items) => {
         list.push({ text, items });
         return Promise.resolve(state.answer);
     };
+    const onConfiguration = emitter();
+
+    function createPanel(viewType, title, column, options) {
+        const onMessage = emitter();
+        const onDispose = emitter();
+        const panel = {
+            viewType, title, options,
+            pages: [],
+            posted: [],
+            reveals: 0,
+            disposed: false,
+            iconPath: undefined,
+            webview: {
+                options: undefined,
+                cspSource: 'https://webview.test',
+                asWebviewUri: (uri) => ({ toString: () => WEBVIEW_ROOT + path.relative(ROOT, uri.fsPath).split(path.sep).join('/') }),
+                onDidReceiveMessage: onMessage,
+                postMessage: (value) => {
+                    panel.posted.push(value);
+                    return Promise.resolve(true);
+                },
+                set html(value) {
+                    panel.pages.push(value);
+                },
+                get html() {
+                    return panel.pages[panel.pages.length - 1];
+                },
+            },
+            reveal: () => panel.reveals++,
+            onDidDispose: onDispose,
+            dispose() {
+                panel.disposed = true;
+                onDispose.fire();
+            },
+            postFromPage: (value) => onMessage.fire(value),
+            listeners: () => onMessage.count(),
+            // The messages of a type posted to the page
+            sent: (type) => panel.posted.filter(posted => posted.type === type),
+        };
+        return panel;
+    }
 
     return {
         Uri,
         StatusBarAlignment: { Left: 1, Right: 2 },
         ViewColumn: { One: 1 },
+        ConfigurationTarget: { Global: 1, Workspace: 2 },
         window: {
             get activeTextEditor() {
                 return state.activeTextEditor;
@@ -75,36 +118,18 @@ function createVscode(state) {
             showErrorMessage: message(state.errors),
             showWarningMessage: message(state.warnings),
             showInformationMessage: message(state.infos),
-            createWebviewPanel(viewType, title, column, options) {
-                const onMessage = emitter();
-                const onDispose = emitter();
-                const panel = {
-                    viewType, title, options,
-                    pages: [],
-                    reveals: 0,
-                    disposed: false,
-                    webview: {
-                        cspSource: 'https://webview.test',
-                        asWebviewUri: (uri) => ({ toString: () => WEBVIEW_ROOT + path.relative(ROOT, uri.fsPath).split(path.sep).join('/') }),
-                        onDidReceiveMessage: onMessage,
-                        set html(value) {
-                            panel.pages.push(value);
-                        },
-                        get html() {
-                            return panel.pages[panel.pages.length - 1];
-                        },
-                    },
-                    reveal: () => panel.reveals++,
-                    onDidDispose: onDispose,
-                    dispose() {
-                        panel.disposed = true;
-                        onDispose.fire();
-                    },
-                    postFromPage: (value) => onMessage.fire(value),
-                    listeners: () => onMessage.count(),
-                };
+            showSaveDialog: (options) => {
+                state.saveDialogs.push(options);
+                return Promise.resolve(state.saveUri);
+            },
+            createWebviewPanel(...args) {
+                const panel = createPanel(...args);
                 state.panels.push(panel);
                 return panel;
+            },
+            registerWebviewPanelSerializer(viewType, serializer) {
+                state.serializers.set(viewType, serializer);
+                return { dispose: () => state.serializers.delete(viewType) };
             },
         },
         workspace: {
@@ -118,14 +143,40 @@ function createVscode(state) {
                     const name = `${section}.${key}`;
                     return Object.prototype.hasOwnProperty.call(settings, name) ? settings[name] : defaultValue;
                 },
+                update: (key, value, target) => {
+                    state.updates.push({ key: `${section}.${key}`, value, target });
+                    return Promise.resolve();
+                },
             }),
+            onDidChangeConfiguration: onConfiguration,
+            fs: {
+                writeFile: (uri, data) => {
+                    state.written.push({ path: uri.fsPath, data: Buffer.from(data) });
+                    return Promise.resolve();
+                },
+            },
+        },
+        env: {
+            clipboard: {
+                writeText: (text) => {
+                    state.clipboard.push(text);
+                    return Promise.resolve();
+                },
+            },
         },
         commands: {
             registerCommand(id, callback) {
                 state.commands.set(id, callback);
                 return { dispose: () => state.commands.delete(id) };
             },
+            executeCommand(id, ...args) {
+                state.executed.push({ id, args });
+                return Promise.resolve();
+            },
         },
+        // Fires a configuration change of the given settings
+        changeConfiguration: (...names) => onConfiguration.fire({ affectsConfiguration: (name) => names.includes(name) }),
+        createPanel,
     };
 }
 
@@ -164,6 +215,13 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] })) {
         output: [],
         outputShown: 0,
         parsed: [],
+        serializers: new Map(),
+        updates: [],
+        saveDialogs: [],
+        saveUri: undefined,
+        written: [],
+        clipboard: [],
+        executed: [],
     };
     const parser = {
         parse: (basePath) => {
@@ -176,11 +234,12 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] })) {
     delete require.cache[EXTENSION];
     const extension = require(EXTENSION);
     const context = { subscriptions: [], extensionUri: Uri.file(ROOT), extensionPath: ROOT };
-    extension.activate(context);
+    context.api = extension.activate(context);
 
     return {
         state,
         context,
+        vscode: mocks.vscode,
         run: () => state.commands.get('DMDB.parseSchema')(),
         openFolders: (...folderPaths) => {
             state.folders = folderPaths.map((folderPath, index) => ({ uri: Uri.file(folderPath), name: path.basename(folderPath), index }));
@@ -227,84 +286,249 @@ test.after(() => {
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
-// The script and stylesheet URLs of a page, and its embedded data
+// The script and stylesheet URLs of a page
 const pageUrls = (page) => [...page.matchAll(/(?:src|href)="([^"]*)"/g)].map(match => match[1]);
-const pageData = (page) => JSON.parse(/<script id="dmdb-data" type="application\/json">([\s\S]*?)<\/script>/.exec(page)[1]);
 
-test('draws the schema in one panel, every placeholder of both pages filled', async () => {
-    const ext = activate();
-    ext.openFolders(folder('draw', LARAVEL));
+test('draws the schema in one panel: the page once, then the settings and the schema', async () => {
+    const ext = activate(() => ({ tables: TABLES, warnings: ['x.php:1: skipped'] }));
+    const dir = folder('draw', LARAVEL);
+    ext.openFolders(dir);
 
     assert.deepEqual(ext.run(), TABLES);
     assert.equal(ext.state.panels.length, 1);
     const panel = ext.state.panels[0];
+    assert.equal(panel.viewType, 'drawMeDatabase');
     assert.equal(panel.options.enableScripts, true);
+    assert.equal(panel.options.retainContextWhenHidden, true);
     assert.deepEqual(panel.options.localResourceRoots.map(uri => uri.fsPath), [path.join(ROOT, 'views')]);
+    assert.deepEqual(panel.webview.options.localResourceRoots.map(uri => uri.fsPath), [path.join(ROOT, 'views')]);
+    assert.equal(panel.iconPath.fsPath, path.join(ROOT, 'images', 'logo_128.png'));
     assert.deepEqual(ext.state.errors, []);
 
-    const checkPage = (page, viewer, scripts) => {
-        assert.ok(!page.includes('{{'), 'every placeholder is filled');
-        assert.ok(page.includes(`<title>DrawMeDatabase - ${viewer === 'json' ? 'JSON' : 'Mermaid'} Viewer</title>`));
-        assert.deepEqual(pageData(page), TABLES);
-        assert.match(page, /content="default-src &#39;none&#39;; script-src &#39;nonce-[^&]+&#39;; style-src https:\/\/webview.test /);
-        assert.deepEqual(pageUrls(page), ['views/theme.css', ...scripts].map(file => WEBVIEW_ROOT + file));
-        for (const file of pageUrls(page).map(url => url.slice(WEBVIEW_ROOT.length)).filter(file => !file.startsWith('views/vendor/'))) {
-            assert.ok(fs.existsSync(path.join(ROOT, file)), file);
-        }
-    };
-    checkPage(panel.webview.html, 'mermaid',
-        ['views/vendor/mermaid.min.js', 'views/mermaid/generator.js', 'views/common.js', 'views/mermaid/mermaid.js']);
+    const page = panel.webview.html;
+    assert.ok(!page.includes('{{'), 'every placeholder is filled');
+    assert.ok(page.includes('<title>DrawMeDatabase</title>'));
+    assert.match(page, /content="default-src &#39;none&#39;; script-src &#39;nonce-[^&]+&#39;; style-src https:\/\/webview.test /);
+    assert.deepEqual(pageUrls(page), ['views/theme.css', ...html.SCRIPTS.map(segments => `views/${segments.join('/')}`)].map(file => WEBVIEW_ROOT + file));
+    for (const file of pageUrls(page).map(url => url.slice(WEBVIEW_ROOT.length)).filter(file => !file.startsWith('views/vendor/'))) {
+        assert.ok(fs.existsSync(path.join(ROOT, file)), file);
+    }
 
-    panel.postFromPage({ command: 'changeViewer', viewer: 'json' });
-    checkPage(panel.webview.html, 'json', ['views/common.js', 'views/json/json.js']);
+    // Nothing is posted before the page is ready
+    assert.deepEqual(panel.posted, []);
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(panel.posted, [
+        { type: 'settings', layout: 'elk', direction: 'TB' },
+        {
+            type: 'schema',
+            tables: TABLES,
+            warnings: 1,
+            project: { name: 'draw', folder: Uri.file(dir).toString(), framework: 'laravel', frameworkLabel: 'Laravel' },
+        },
+    ]);
 
-    panel.postFromPage({ command: 'changeViewer', viewer: 'mermaid' });
-    assert.ok(panel.webview.html.includes('Mermaid Viewer'));
-    assert.equal(panel.pages.length, 3);
+    // A reload of the page (restored panel) gets everything again
+    panel.postFromPage({ type: 'ready' });
+    assert.equal(panel.sent('schema').length, 2);
+    assert.equal(panel.pages.length, 1);
 });
 
-test('invalid viewer messages are ignored', () => {
+test('invalid messages from the page are ignored', async () => {
     const ext = activate();
     ext.openFolders(folder('messages', LARAVEL));
     ext.run();
     const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    const posted = panel.posted.length;
 
     for (const message of [
-        { command: 'changeViewer', viewer: '../../../etc/passwd' },
-        { command: 'changeViewer', viewer: 'constructor' },
-        { command: 'changeViewer', viewer: 'toString' },
-        { command: 'changeViewer' },
-        { command: 'other', viewer: 'json' },
+        { type: 'setting', key: 'layout', value: 'circle' },
+        { type: 'setting', key: 'frameworkPath', value: '/etc' },
+        { type: 'setting', key: 'constructor', value: 'elk' },
+        { type: 'save', format: 'exe', content: 'MZ' },
+        { type: 'save', format: 'toString', content: 'x' },
+        { type: 'save', format: 'svg', content: 42 },
+        { type: 'copy', content: { text: 'x' } },
+        { type: 'changeViewer', viewer: 'json' },
+        { type: 'other' },
+        { command: 'changeViewer', viewer: 'json' },
         null,
         'json',
     ]) {
         panel.postFromPage(message);
     }
+    await flush();
+    assert.equal(panel.posted.length, posted);
     assert.equal(panel.pages.length, 1);
+    assert.deepEqual(ext.state.updates, []);
+    assert.deepEqual(ext.state.saveDialogs, []);
+    assert.deepEqual(ext.state.clipboard, []);
     assert.deepEqual(ext.state.errors, []);
 });
 
-test('a new run reuses the panel; once closed, the next run opens a new one on the Mermaid viewer', () => {
+test('a new run reuses the panel and posts the new schema; once closed, the next run opens a new one', () => {
     const ext = activate();
     ext.openFolders(folder('reuse', LARAVEL));
     ext.run();
     const panel = ext.state.panels[0];
-    panel.postFromPage({ command: 'changeViewer', viewer: 'json' });
+    panel.postFromPage({ type: 'ready' });
 
     ext.run();
     assert.equal(ext.state.panels.length, 1);
     assert.equal(panel.reveals, 1);
-    assert.ok(panel.webview.html.includes('JSON Viewer'), 'the current viewer is kept');
+    assert.equal(panel.pages.length, 1, 'the page is not reloaded');
+    assert.equal(panel.sent('schema').length, 2);
 
     panel.dispose();
     assert.equal(panel.listeners(), 0, 'the message listener is disposed');
     ext.run();
     assert.equal(ext.state.panels.length, 2);
-    assert.ok(ext.state.panels[1].webview.html.includes('Mermaid Viewer'));
 
     // Deactivation disposes the panel
     ext.context.subscriptions.forEach(item => item.dispose());
     assert.equal(ext.state.panels[1].disposed, true);
+});
+
+test('the settings come from the configuration, the toolbar changes them globally', async () => {
+    const ext = activate();
+    ext.openFolders(folder('settings', LARAVEL));
+    ext.state.settings[''] = { 'DrawMeDatabase.layout': 'dagre', 'DrawMeDatabase.direction': 'sideways' };
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(panel.sent('settings'), [{ type: 'settings', layout: 'dagre', direction: 'TB' }]);
+
+    panel.postFromPage({ type: 'setting', key: 'direction', value: 'LR' });
+    panel.postFromPage({ type: 'setting', key: 'layout', value: 'elk' });
+    assert.deepEqual(ext.state.updates, [
+        { key: 'DrawMeDatabase.direction', value: 'LR', target: 1 },
+        { key: 'DrawMeDatabase.layout', value: 'elk', target: 1 },
+    ]);
+
+    ext.state.settings[''] = { 'DrawMeDatabase.layout': 'elk', 'DrawMeDatabase.direction': 'LR' };
+    ext.vscode.changeConfiguration('DrawMeDatabase.direction');
+    ext.vscode.changeConfiguration('DrawMeDatabase.frameworkPath');
+    assert.deepEqual(panel.sent('settings'), [
+        { type: 'settings', layout: 'dagre', direction: 'TB' },
+        { type: 'settings', layout: 'elk', direction: 'LR' },
+    ]);
+});
+
+test('an export is written where the user chooses, then can be opened', async () => {
+    const ext = activate();
+    const dir = folder('export', LARAVEL);
+    ext.openFolders(dir);
+    ext.run();
+    const panel = ext.state.panels[0];
+
+    // Cancelled: nothing is written
+    panel.postFromPage({ type: 'save', format: 'svg', content: '<svg/>', fileName: 'export-schema.svg' });
+    await flush();
+    assert.equal(ext.state.saveDialogs.length, 1);
+    assert.equal(ext.state.saveDialogs[0].defaultUri.fsPath, path.join(dir, 'export-schema.svg'));
+    assert.deepEqual(ext.state.saveDialogs[0].filters, { 'SVG image': ['svg'] });
+    assert.deepEqual(ext.state.written, []);
+
+    ext.state.saveUri = Uri.file(path.join(dir, 'out.svg'));
+    ext.state.answer = 'Open';
+    panel.postFromPage({ type: 'save', format: 'svg', content: '<svg>é</svg>', fileName: 'export-schema.svg' });
+    await flush();
+    await flush();
+    assert.equal(ext.state.written.length, 1);
+    assert.equal(ext.state.written[0].data.toString('utf8'), '<svg>é</svg>');
+    assert.deepEqual(ext.state.infos.map(info => info.text), ['Exported to out.svg.']);
+    assert.deepEqual(ext.state.executed, [{ id: 'vscode.open', args: [ext.state.saveUri] }]);
+
+    // PNG content is base64; a file name of another type or with a path is not trusted
+    ext.state.answer = undefined;
+    ext.state.saveUri = Uri.file(path.join(dir, 'out.png'));
+    panel.postFromPage({ type: 'save', format: 'png', content: Buffer.from([137, 80, 78, 71]).toString('base64'), fileName: '../../evil.sh' });
+    await flush();
+    await flush();
+    assert.equal(ext.state.saveDialogs[2].defaultUri.fsPath, path.join(dir, 'schema.png'));
+    assert.deepEqual([...ext.state.written[1].data], [137, 80, 78, 71]);
+    assert.equal(ext.state.executed.length, 1);
+});
+
+test('copy puts the text on the clipboard and tells the page', async () => {
+    const ext = activate();
+    ext.openFolders(folder('copy', LARAVEL));
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+
+    panel.postFromPage({ type: 'copy', format: 'mmd', content: 'erDiagram\n' });
+    panel.postFromPage({ type: 'copy', format: 'json', content: '[]' });
+    await flush();
+    assert.deepEqual(ext.state.clipboard, ['erDiagram\n', '[]']);
+    assert.deepEqual(panel.sent('toast').map(toast => toast.text), ['Mermaid source copied to the clipboard.', 'JSON copied to the clipboard.']);
+});
+
+test('refresh from the page parses again and shows the progress', async () => {
+    const ext = activate();
+    ext.openFolders(folder('refresh', LARAVEL));
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    ext.state.parsed = [];
+
+    panel.postFromPage({ type: 'refresh' });
+    assert.deepEqual(panel.sent('busy'), [{ type: 'busy', busy: true }]);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(ext.state.parsed.length, 1);
+    assert.deepEqual(panel.sent('busy'), [{ type: 'busy', busy: true }, { type: 'busy', busy: false }]);
+    assert.equal(panel.sent('schema').length, 2);
+
+    panel.postFromPage({ type: 'showOutput' });
+    assert.equal(ext.state.outputShown, 1);
+});
+
+test('the drawing reported by the page is exported, its errors are written to the output', () => {
+    const ext = activate();
+    ext.openFolders(folder('rendered', LARAVEL));
+    ext.run();
+    const panel = ext.state.panels[0];
+    const api = ext.context.api;
+
+    panel.postFromPage({ type: 'rendered', ok: true, layout: 'elk', entities: 2, ms: 120 });
+    assert.deepEqual(api.lastRender, { ok: true, layout: 'elk', entities: 2, error: '' });
+    panel.postFromPage({ type: 'rendered', ok: false, error: 'Mermaid could not draw the diagram: boom' });
+    assert.equal(api.lastRender.ok, false);
+    assert.ok(ext.state.output.includes('Diagram error: Mermaid could not draw the diagram: boom'));
+});
+
+test('DMDB.refresh draws the schema like DMDB.parseSchema', () => {
+    const ext = activate();
+    ext.openFolders(folder('refresh-command', LARAVEL));
+    assert.deepEqual(ext.state.commands.get('DMDB.refresh')(), TABLES);
+    assert.equal(ext.state.panels.length, 1);
+});
+
+test('a panel restored after a reload draws the schema of its folder again', async () => {
+    const ext = activate();
+    const dir = folder('restore', LARAVEL);
+    ext.openFolders(dir);
+    const serializer = ext.state.serializers.get('drawMeDatabase');
+    assert.ok(serializer, 'a serializer is registered for the panel');
+
+    const restored = ext.vscode.createPanel('drawMeDatabase', 'DrawMeDatabase', 1, {});
+    await serializer.deserializeWebviewPanel(restored, { viewer: 'json', folder: Uri.file(dir).toString() });
+    assert.equal(restored.pages.length, 1);
+    assert.equal(restored.webview.options.enableScripts, true);
+    assert.deepEqual(ext.state.parsed, [dir]);
+    restored.postFromPage({ type: 'ready' });
+    assert.equal(restored.sent('schema').length, 1);
+    assert.equal(ext.state.panels.length, 0, 'the restored panel is reused');
+
+    // Unknown folder: the page asks the user to draw the schema
+    const other = ext.vscode.createPanel('drawMeDatabase', 'DrawMeDatabase', 1, {});
+    await serializer.deserializeWebviewPanel(other, { folder: 'file:///elsewhere' });
+    assert.equal(restored.disposed, true, 'one panel at a time');
+    other.postFromPage({ type: 'ready' });
+    assert.equal(other.sent('schema').length, 0);
+    assert.deepEqual(other.sent('empty'), [{ type: 'empty', text: 'Run DrawMeDatabase (or click Refresh) to draw the schema of the project.' }]);
+    await serializer.deserializeWebviewPanel(ext.vscode.createPanel('drawMeDatabase', 'DrawMeDatabase', 1, {}), undefined);
+    assert.equal(ext.state.parsed.length, 1);
 });
 
 test('a ParserError is shown as is', () => {

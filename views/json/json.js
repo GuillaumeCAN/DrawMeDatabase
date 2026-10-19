@@ -5,42 +5,56 @@
 // Please see the LICENSE file that should have been included as part of this package.
 //
 
-// JSON viewer: shows the parsed tables and copies them to the clipboard
+// JSON viewer: the parsed tables, colored like code (DOM text nodes only, never parsed as HTML)
 (function () {
     'use strict';
 
-    const app = window.DrawMeDatabase;
-    const output = document.getElementById('json-output');
-    const copyButton = document.getElementById('copy-btn');
+    // Strings (keys when followed by ':'), numbers, true / false / null, punctuation
+    const TOKEN = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}[\],])/g;
 
-    // Show toast notification
-    function showToast(message) {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 4000);
+    function create(output) {
+        let text = '';
+
+        function append(content, className) {
+            if (!className) {
+                output.appendChild(document.createTextNode(content));
+                return;
+            }
+            const span = document.createElement('span');
+            span.className = className;
+            span.textContent = content;
+            output.appendChild(span);
+        }
+
+        return {
+            render(tables) {
+                text = window.DrawMeDatabaseExport.jsonFile(tables);
+                output.textContent = '';
+                let index = 0;
+                for (const match of text.matchAll(TOKEN)) {
+                    append(text.slice(index, match.index));
+                    const [, string, colon, number, literal, punctuation] = match;
+                    if (string) {
+                        append(string, colon ? 'json-key' : 'json-string');
+                        if (colon) {
+                            append(colon, 'json-punctuation');
+                        }
+                    } else if (number) {
+                        append(number, 'json-number');
+                    } else if (literal) {
+                        append(literal, 'json-literal');
+                    } else {
+                        append(punctuation, 'json-punctuation');
+                    }
+                    index = match.index + match[0].length;
+                }
+                append(text.slice(index));
+            },
+            get text() {
+                return text;
+            },
+        };
     }
 
-    if (!app || app.error) {
-        output.classList.add('error');
-        output.textContent = 'Unable to read the schema data: '
-            + (app && app.error && app.error.message ? app.error.message : 'unknown error');
-        copyButton.disabled = true;
-        return;
-    }
-
-    const jsonText = JSON.stringify(app.data, null, 2);
-    output.textContent = jsonText;
-
-    // Copy JSON data to clipboard
-    copyButton.addEventListener('click', () => {
-        navigator.clipboard.writeText(jsonText).then(() => {
-            showToast('JSON code successfully copied!');
-        }).catch(err => {
-            console.error('Error while copying: ', err);
-            showToast('Unable to copy the JSON code.');
-        });
-    });
+    window.DrawMeDatabaseJson = { create };
 })();

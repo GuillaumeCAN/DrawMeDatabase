@@ -93,3 +93,24 @@ Bug fixes and stabilization release.
 
 ### Known issues
 - See the "Known limitations" section of the [README](README.md)
+
+## [v1.2.0] - 2026-10-18
+
+A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your VS Code theme.
+
+### Added
+- **Zoom and pan**: drag the diagram to move it, Ctrl (Cmd on macOS) + mouse wheel or pinch to zoom, toolbar buttons to zoom in, zoom out, fit to window and show at 100 %, and keyboard shortcuts (`+`, `-`, `0`, `F`, arrows) when the diagram has the focus
+- **Export**: save the diagram as SVG, PNG, Mermaid source (`.mmd`) or Markdown, copy the Mermaid source, and save or copy the JSON
+- **Layout engines**: ELK (new default, compact with right-angled links, best for large schemas) or Dagre (the previous layout), and the direction of the diagram (top to bottom or left to right), from the toolbar or the new `DrawMeDatabase.layout` and `DrawMeDatabase.direction` settings
+- A **Refresh** button in the toolbar and in the title bar of the panel, and the `DrawMeDatabase: Refresh Diagram` command
+- The toolbar shows the framework, the project and the number of tables, and a link to the warnings
+- The panel comes back after a reload of the window, with the same viewer and zoom
+
+### Changed
+- Mermaid 12.2.0 is bundled (instead of 10.9.8)
+- The diagram uses the colors of the current VS Code theme (any theme, light, dark or high contrast)
+- Attribute names keep their accents and non-Latin letters (`prénom`, `名前`), and nullable columns are shown as `type?`
+- The diagram and JSON viewers are tabs of the same page: switching between them no longer reloads the panel, and refreshing keeps the zoom
+- The JSON viewer is colored like code
+- The commands are now `DrawMeDatabase: Draw Database Schema` and `DrawMeDatabase: Refresh Diagram`
+- Errors of the diagram are written in the **DrawMeDatabase** output panel

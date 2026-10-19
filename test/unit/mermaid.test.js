@@ -11,15 +11,18 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-const { generateMermaidER } = require('../../views/mermaid/generator');
+const { generateMermaidER, buildDiagram } = require('../../views/mermaid/generator');
 
 // The Mermaid build bundled in the extension (devDependency, pinned): checks the generated text
 // against its real erDiagram parser. Skipped when node_modules is not installed.
-const MERMAID_ESM = path.join(__dirname, '..', '..', 'node_modules', 'mermaid', 'dist', 'mermaid.esm.mjs');
+const MERMAID_PACKAGE = path.join(__dirname, '..', '..', 'node_modules', 'mermaid');
+const MERMAID_ESM = path.join(MERMAID_PACKAGE, 'dist', 'mermaid.esm.mjs');
 const mermaidInstalled = fs.existsSync(MERMAID_ESM);
+const mermaidVersion = mermaidInstalled ? require(path.join(MERMAID_PACKAGE, 'package.json')).version : 'not installed';
+const skip = !mermaidInstalled && 'node_modules/mermaid is not installed';
 let mermaidPromise;
 
-// Entities are returned by label (the table name) instead of by generated id
+// Entities are returned by label (the table name) instead of by id
 async function parseWithMermaid(source) {
     if (!mermaidPromise) {
         mermaidPromise = import(pathToFileURL(MERMAID_ESM).href).then(module => {
@@ -32,15 +35,17 @@ async function parseWithMermaid(source) {
     await mermaid.parse(source);
     const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
     const byId = diagram.db.getEntities();
-    const label = (id) => (Object.prototype.hasOwnProperty.call(byId, id) ? shown(byId[id].alias) : undefined);
-    const entities = new Map(Object.keys(byId).map(id => [label(id), byId[id]]));
+    // Relationships name entities by their internal id ('entity-users-0')
+    const byInternalId = new Map([...byId.values()].map(entity => [entity.id, entity]));
+    const label = (entity) => (entity ? shown(entity.alias || entity.label) : undefined);
+    const entities = new Map([...byId.values()].map(entity => [label(entity), entity]));
     const relationships = diagram.db.getRelationships().map(relation => ({
         ...relation,
-        entityA: label(relation.entityA),
-        entityB: label(relation.entityB),
+        entityA: label(byInternalId.get(relation.entityA)),
+        entityB: label(byInternalId.get(relation.entityB)),
         roleA: shown(relation.roleA),
     }));
-    return { ids: Object.keys(byId), entities, relationships };
+    return { ids: [...byId.keys()], entities, relationships };
 }
 
 // The text Mermaid draws: it encodes '#123;' as 'ﬂ°°123¶ß' while parsing, then writes it back
@@ -70,26 +75,26 @@ const POSTS = {
 
 // Every diagram built by the tests, parsed by Mermaid at the end
 const generated = [];
-const generate = (tables) => {
-    const source = generateMermaidER(tables);
+const generate = (tables, options) => {
+    const source = generateMermaidER(tables, options);
     generated.push(source);
     return source;
 };
 
-test('entities get an id and their name as label, attributes are "type name" with PK / FK keys', () => {
+test('tables are entities named after them, attributes are "type name" with PK / FK keys', () => {
     assert.equal(generate([USERS, POSTS]), [
         'erDiagram',
-        '  e1["users"] {',
+        '  users {',
         '    bigIncrements id PK',
         '    string email',
-        '    timestamp created_at',
+        '    timestamp? created_at',
         '  }',
-        '  e2["posts"] {',
+        '  posts {',
         '    bigIncrements id PK',
         '    unsignedBigInteger user_id FK',
         '    string title',
         '  }',
-        '  e1 ||--o{ e2 : "user_id"',
+        '  users ||--o{ posts : "user_id"',
         '',
     ].join('\n'));
 });
@@ -120,9 +125,9 @@ test('cardinalities follow the relation type', () => {
         { table: 'tag', columns: [{ name: 'id', type: 'integer', primary: true }], relations: [] },
     ]);
     const output = lines(source);
-    assert.ok(output.includes('  e1 ||--o{ e2 : "user_id"'), 'many-to-one (users -> posts)');
-    assert.ok(output.includes('  e1 ||--o| e3 : "user_id"'), 'one-to-one (users -> profiles)');
-    assert.ok(output.includes('  e4 }o--o{ e5 : "post_tag"'), 'many-to-many (post -> tag) uses via');
+    assert.ok(output.includes('  users ||--o{ posts : "user_id"'), 'many-to-one (users -> posts)');
+    assert.ok(output.includes('  users ||--o| profiles : "user_id"'), 'one-to-one (users -> profiles)');
+    assert.ok(output.includes('  post }o--o{ tag : "post_tag"'), 'many-to-many (post -> tag) uses via');
     // The join column of a many-to-many relation is not a column of the owning table
     assert.ok(output.includes('    integer id PK'));
     assert.ok(!source.includes('post_id'));
@@ -130,29 +135,39 @@ test('cardinalities follow the relation type', () => {
 
 test('a relation without type is many-to-one (backward compatible)', () => {
     const source = generate([USERS, { table: 'posts', columns: [], relations: [{ foreignKey: 'user_id', references: 'id', on: 'users' }] }]);
-    assert.ok(lines(source).includes('  e1 ||--o{ e2 : "user_id"'));
+    assert.ok(lines(source).includes('  users ||--o{ posts : "user_id"'));
     const unknownType = generate([{ table: 'a', columns: [], relations: [{ foreignKey: 'b_id', references: 'id', on: 'b', type: 'whatever' }] }]);
-    assert.ok(lines(unknownType).includes('  e2 ||--o{ e1 : "b_id"'));
+    assert.ok(lines(unknownType).includes('  b ||--o{ a : "b_id"'));
 });
 
 test('many-to-many without via falls back to the foreign key label', () => {
     const source = generate([{ table: 'a', columns: [], relations: [{ foreignKey: 'a_id', references: 'id', on: 'b', type: 'many-to-many' }] }]);
-    assert.ok(lines(source).includes('  e1 }o--o{ e2 : "a_id"'));
+    assert.ok(lines(source).includes('  a }o--o{ b : "a_id"'));
 });
 
 test('labels have their quotes stripped', () => {
     const source = generate([{ table: 'a', columns: [], relations: [{ foreignKey: '"b_id"', references: 'id', on: 'b' }] }]);
-    assert.ok(lines(source).includes('  e2 ||--o{ e1 : "b_id"'));
+    assert.ok(lines(source).includes('  b ||--o{ a : "b_id"'));
     const percent = generate([{ table: 'a', columns: [], relations: [{ foreignKey: 'x%%{init}%%"\\', references: 'id', on: 'b' }] }]);
-    assert.ok(lines(percent).includes('  e2 ||--o{ e1 : "x__{init}___"'));
+    assert.ok(lines(percent).includes('  b ||--o{ a : "x__{init}___"'));
 });
 
 test("'#' and ':' are written as Mermaid entity codes", () => {
     const source = generate([{ table: 'table#x;', columns: [], relations: [{ foreignKey: 'style:#f00;', references: 'id', on: 'b' }] }]);
     assert.deepEqual(lines(source).slice(1), [
-        '  e1["table#35;x;"]',
-        '  e2["b"]',
-        '  e2 ||--o{ e1 : "style#58;#35;f00;"',
+        '  t1["table#35;x;"]',
+        '  b',
+        '  b ||--o{ t1 : "style#58;#35;f00;"',
+        '',
+    ]);
+});
+
+test('"direction LR" in a name is not read as a direction statement', () => {
+    const source = generate([{ table: 'direction LR', columns: [], relations: [{ foreignKey: 'x direction tb', references: 'id', on: 'b' }] }]);
+    assert.deepEqual(lines(source).slice(1), [
+        '  t1["direction_LR"]',
+        '  b',
+        '  b ||--o{ t1 : "x direction_tb"',
         '',
     ]);
 });
@@ -164,9 +179,9 @@ test('identical edges are emitted once', () => {
 });
 
 test('tables without columns and relation targets that are not tables are declared', () => {
-    assert.equal(generate([{ table: 'cache', columns: [], relations: [] }]), 'erDiagram\n  e1["cache"]\n');
+    assert.equal(generate([{ table: 'cache', columns: [], relations: [] }]), 'erDiagram\n  cache\n');
     assert.equal(generate([{ table: 'posts', columns: [], relations: [{ foreignKey: 'team_id', references: 'id', on: 'teams' }] }]),
-        'erDiagram\n  e1["posts"]\n  e2["teams"]\n  e2 ||--o{ e1 : "team_id"\n');
+        'erDiagram\n  posts\n  teams\n  teams ||--o{ posts : "team_id"\n');
 });
 
 test('duplicate table entries are merged', () => {
@@ -174,82 +189,108 @@ test('duplicate table entries are merged', () => {
         { table: 'users', columns: [{ name: 'id', type: 'integer', primary: true }], relations: [] },
         { table: 'users', columns: [{ name: 'id', type: 'string' }, { name: 'phone', type: 'string' }], relations: [] },
     ]);
-    assert.equal(source, 'erDiagram\n  e1["users"] {\n    integer id PK\n    string phone\n  }\n');
+    assert.equal(source, 'erDiagram\n  users {\n    integer id PK\n    string phone\n  }\n');
 });
 
-test('types are reduced to one Mermaid word', () => {
+test('types are reduced to one Mermaid word, nullable ones end with "?"', () => {
     const source = generate([{
         table: 'post',
         columns: [
             { name: 'tags', type: '\\Doctrine\\Common\\Collections\\Collection' },
             { name: 'items', type: 'Collection<int, Post>' },
             { name: 'subtitle', type: '?string' },
-            { name: 'publishedAt', type: '\\DateTimeImmutable' },
+            { name: 'publishedAt', type: '\\DateTimeImmutable', nullable: true },
             { name: 'price', type: 'decimal(8,2)' },
             { name: 'flag', type: 'uk' },
+            { name: 'status', type: 'enum(draft, published)' },
+            { name: 'cost', type: '$money' },
             { name: 'unknown_type', type: '' },
             { name: 'missing_type' },
+            { name: 'not_nullable', type: 'string', nullable: false },
         ],
         relations: [],
     }]);
-    assert.deepEqual(lines(source).slice(2, 10), [
+    assert.deepEqual(lines(source).slice(2, 13), [
         '    Collection tags',
         '    Collection items',
-        '    string subtitle',
-        '    DateTimeImmutable publishedAt',
-        '    decimal_8_2_ price',
-        '    uk_ flag',
+        '    string? subtitle',
+        '    DateTimeImmutable? publishedAt',
+        '    decimal(8,2) price',
+        '    _uk flag',
+        '    enum(draft,_published) status',
+        '    _money cost',
         '    unknown unknown_type',
         '    unknown missing_type',
+        '    string not_nullable',
     ]);
 });
 
-test('column names are sanitized', () => {
+test('column names keep their letters, accents included, and are made valid', () => {
     const source = generate([{
         table: 'users',
         columns: [
             { name: '2fa_secret', type: 'string' },
             { name: 'pk', type: 'string' },
             { name: 'FK', type: 'string' },
+            { name: 'uk-code', type: 'string' },
+            { name: 'pk_id', type: 'string' },
             { name: 'first name', type: 'string' },
             { name: 'prénom', type: 'string' },
+            { name: '名前', type: 'string' },
             { name: 'user-id', type: 'integer' },
+            { name: 'a$b#c', type: 'string' },
             { name: '?', type: 'string' },
             { name: '_token', type: 'string' },
         ],
         relations: [],
     }]);
-    assert.deepEqual(lines(source).slice(2, 10), [
+    assert.deepEqual(lines(source).slice(2, 14), [
         '    string _2fa_secret',
-        '    string pk_',
-        '    string FK_',
+        '    string _pk',
+        '    string _FK',
+        '    string _uk-code',
+        '    string pk_id',
         '    string first_name',
-        '    string prenom',
-        '    integer user_id',
+        '    string prénom',
+        '    string 名前',
+        '    integer user-id',
+        '    string a_b_c',
         '    string unnamed',
         '    string _token',
     ]);
 });
 
-// Words of the erDiagram grammar, and Object.prototype keys: Mermaid 10.9.8 keeps its entities in
-// a plain object, so 'constructor' or '__proto__' used as an entity name breaks the whole diagram
+// Words of the erDiagram grammar, and Object.prototype keys (Mermaid 10 kept its entities in a
+// plain object, where 'constructor' or '__proto__' broke the whole diagram)
 const ODD_NAMES = ['end', 'one', 'u', 'to', '2fa', 'password reset tokens', 'erDiagram', 'MANY', 'user-roles',
     'style', 'classDef', 'accTitle', ...Object.getOwnPropertyNames(Object.prototype)];
 
-test('any table name is only a quoted label', () => {
+test('odd table names get a generated id and keep their name as label', () => {
     const source = generate([
         ...ODD_NAMES.map(table => ({ table, columns: [{ name: 'id', type: 'integer' }], relations: [] })),
         { table: 'a"b%c\\d', columns: [], relations: [{ foreignKey: 'to_id', references: 'id', on: 'to' }] },
         { table: '', columns: [], relations: [] },
     ]);
     const output = lines(source);
-    assert.ok(output.includes('  e1["end"] {'));
-    assert.ok(output.includes('  e10["style"] {'));
-    assert.ok(output.includes(`  e${ODD_NAMES.indexOf('constructor') + 1}["constructor"] {`));
-    assert.ok(output.includes(`  e${ODD_NAMES.indexOf('__proto__') + 1}["__proto__"] {`));
-    assert.ok(output.includes(`  e${ODD_NAMES.length + 1}["ab_c_d"]`));
-    assert.ok(output.includes(`  e${ODD_NAMES.length + 2}["unnamed"]`));
-    assert.ok(output.includes(`  e4 ||--o{ e${ODD_NAMES.length + 1} : "to_id"`));
+    assert.ok(output.includes('  t1["end"] {'));
+    assert.ok(output.includes('  t4["to"] {'));
+    assert.ok(output.includes('  t7["erDiagram"] {'));
+    assert.ok(output.includes('  t8["MANY"] {'));
+    assert.ok(output.includes('  t10["style"] {'));
+    assert.ok(output.includes('  constructor {'), 'plain words are used as ids');
+    assert.ok(output.some(line => /^ {2}t\d+\["__proto__"\] \{$/.test(line)));
+    assert.ok(output.some(line => /^ {2}t\d+\["ab_c_d"\]$/.test(line)));
+    assert.ok(output.some(line => /^ {2}t\d+\["unnamed"\]$/.test(line)));
+    assert.ok(output.some(line => /^ {2}t4 \|\|--o\{ t\d+ : "to_id"$/.test(line)));
+});
+
+test('ids stay unique: case-insensitive duplicates and tables named like generated ids', () => {
+    assert.equal(generate([
+        { table: 'Users', columns: [], relations: [] },
+        { table: 'users', columns: [], relations: [] },
+        { table: 't1', columns: [], relations: [] },
+        { table: 'my table', columns: [], relations: [] },
+    ]), 'erDiagram\n  Users\n  t2["users"]\n  t1\n  t3["my table"]\n');
 });
 
 test('names that are equal after cleaning stay distinct entities', () => {
@@ -257,27 +298,51 @@ test('names that are equal after cleaning stay distinct entities', () => {
         { table: 'a"b', columns: [], relations: [] },
         { table: 'ab', columns: [], relations: [] },
     ]);
-    assert.equal(source, 'erDiagram\n  e1["ab"]\n  e2["ab"]\n');
+    assert.equal(source, 'erDiagram\n  t1["ab"]\n  ab\n');
+});
+
+test('the direction option adds a direction statement', () => {
+    assert.ok(lines(generate([USERS, POSTS], { direction: 'LR' })).includes('  direction LR'));
+    assert.equal(lines(generate([USERS], { direction: 'TB' }))[1], '  direction TB');
+    assert.ok(!generate([USERS], { direction: 'sideways' }).includes('direction'));
+});
+
+test('the highlight option marks the matching tables and dims the others', () => {
+    const source = generate([USERS, POSTS, { table: 'tags', columns: [], relations: [] }], { highlight: ['posts', 'tags'] });
+    assert.ok(lines(source).includes('  class posts,tags match'));
+    assert.ok(lines(source).includes('  class users dimmed'));
+    assert.ok(!generate([USERS], { highlight: [] }).includes('class '));
+    assert.ok(!generate([USERS], { highlight: ['users'] }).includes('dimmed'));
+});
+
+test('buildDiagram lists the entities with their id and table', () => {
+    const { source, entities } = buildDiagram([POSTS, { table: 'my table', columns: [], relations: [] }]);
+    assert.equal(source, generateMermaidER([POSTS, { table: 'my table', columns: [], relations: [] }]));
+    assert.deepEqual(entities, [
+        { id: 'posts', table: 'posts', declared: true },
+        { id: 't1', table: 'my table', declared: true },
+        { id: 'users', table: 'users', declared: false },
+    ]);
 });
 
 test('invalid input does not throw', () => {
     assert.equal(generate(undefined), 'erDiagram\n');
     assert.equal(generate(null), 'erDiagram\n');
     assert.equal(generate({}), 'erDiagram\n');
-    assert.equal(generate([null, 42, { table: 'x' }]), 'erDiagram\n  e1["x"]\n');
-    assert.equal(generate([{ table: 'x', columns: [null], relations: [null, { foreignKey: 'a' }] }]), 'erDiagram\n  e1["x"]\n');
+    assert.equal(generate([null, 42, { table: 'x' }]), 'erDiagram\n  x\n');
+    assert.equal(generate([{ table: 'x', columns: [null], relations: [null, { foreignKey: 'a' }] }]), 'erDiagram\n  x\n');
     // A relation without foreign key still gets the (mandatory) label, empty
-    assert.equal(generate([{ table: 'x', columns: [], relations: [{ on: 'y' }] }]), 'erDiagram\n  e1["x"]\n  e2["y"]\n  e2 ||--o{ e1 : ""\n');
+    assert.equal(generate([{ table: 'x', columns: [], relations: [{ on: 'y' }] }]), 'erDiagram\n  x\n  y\n  y ||--o{ x : ""\n');
 });
 
-test('every generated diagram is accepted by Mermaid 10.9.8', { skip: !mermaidInstalled && 'node_modules/mermaid is not installed' }, async () => {
+test(`every generated diagram is accepted by Mermaid ${mermaidVersion}`, { skip }, async () => {
     assert.ok(generated.length > 10);
     for (const source of generated) {
         await assert.doesNotReject(parseWithMermaid(source), source);
     }
 });
 
-test('Mermaid reads the attributes and cardinalities as intended', { skip: !mermaidInstalled && 'node_modules/mermaid is not installed' }, async () => {
+test('Mermaid reads the attributes and cardinalities as intended', { skip }, async () => {
     const { entities, relationships } = await parseWithMermaid(generateMermaidER([
         USERS,
         POSTS,
@@ -285,10 +350,10 @@ test('Mermaid reads the attributes and cardinalities as intended', { skip: !merm
         { table: 'post', columns: [], relations: [{ foreignKey: 'post_id', references: 'id', on: 'tag', type: 'many-to-many', via: 'post_tag' }] },
     ]));
 
-    assert.deepEqual(entities.get('posts').attributes[1],
-        { attributeType: 'unsignedBigInteger', attributeName: 'user_id', attributeKeyTypeList: ['FK'] });
-    assert.deepEqual(entities.get('users').attributes[0],
-        { attributeType: 'bigIncrements', attributeName: 'id', attributeKeyTypeList: ['PK'] });
+    const attribute = ({ type, name, keys }) => ({ type, name, keys });
+    assert.deepEqual(attribute(entities.get('posts').attributes[1]), { type: 'unsignedBigInteger', name: 'user_id', keys: ['FK'] });
+    assert.deepEqual(attribute(entities.get('users').attributes[0]), { type: 'bigIncrements', name: 'id', keys: ['PK'] });
+    assert.deepEqual(attribute(entities.get('users').attributes[2]), { type: 'timestamp?', name: 'created_at', keys: [] });
 
     // relSpec.cardB is the marker next to entityA, cardA the one next to entityB
     const relation = (a, b) => relationships.find(r => r.entityA === a && r.entityB === b);
@@ -298,8 +363,23 @@ test('Mermaid reads the attributes and cardinalities as intended', { skip: !merm
     assert.equal(relation('post', 'tag').roleA, 'post_tag');
 });
 
-test('Mermaid keeps every odd table name, and shows labels as written', { skip: !mermaidInstalled && 'node_modules/mermaid is not installed' }, async () => {
-    const names = [...ODD_NAMES, 'table#x;', 'x&#60;y', 'R&D', 'fk#1;'];
+test('Mermaid reads accented and non-Latin names as written', { skip }, async () => {
+    const { entities } = await parseWithMermaid(generateMermaidER([{
+        table: 'clients',
+        columns: [
+            { name: 'prénom', type: 'string' },
+            { name: '名前', type: 'string', nullable: true },
+            { name: 'créé_le', type: 'datetime_immutable' },
+        ],
+        relations: [],
+    }, { table: 'utilisateurs créés', columns: [{ name: 'id', type: 'integer', primary: true }], relations: [] }]));
+    assert.deepEqual(entities.get('clients').attributes.map(({ type, name }) => `${type} ${name}`),
+        ['string prénom', 'string? 名前', 'datetime_immutable créé_le']);
+    assert.ok(entities.has('utilisateurs créés'));
+});
+
+test('Mermaid keeps every odd table name, and shows labels as written', { skip }, async () => {
+    const names = [...ODD_NAMES, 'table#x;', 'x&#60;y', 'R&D', 'fk#1;', 'Users', 'users'];
     const { ids, entities, relationships } = await parseWithMermaid(generateMermaidER([
         ...names.map(table => ({ table, columns: [{ name: 'id', type: 'integer', primary: true }], relations: [] })),
         { table: 'links', columns: [], relations: names.map(on => ({ foreignKey: `${on}_id`, references: 'id', on })) },
@@ -308,8 +388,15 @@ test('Mermaid keeps every odd table name, and shows labels as written', { skip: 
 
     assert.equal(ids.length, names.length + 2);
     for (const name of names) {
-        assert.deepEqual(entities.get(name).attributes, [{ attributeType: 'integer', attributeName: 'id', attributeKeyTypeList: ['PK'] }], name);
+        assert.deepEqual(entities.get(name).attributes.map(({ type, name: column, keys }) => ({ type, column, keys })),
+            [{ type: 'integer', column: 'id', keys: ['PK'] }], name);
         assert.ok(relationships.some(r => r.entityA === name && r.entityB === 'links' && r.roleA === `${name}_id`), name);
     }
     assert.ok(relationships.some(r => r.entityA === 'end' && r.entityB === 'styles' && r.roleA === 'style:#f00;'));
+});
+
+test('Mermaid applies the highlight classes', { skip }, async () => {
+    const { entities } = await parseWithMermaid(generateMermaidER([USERS, POSTS], { highlight: ['users'] }));
+    assert.match(entities.get('users').cssClasses, /\bmatch\b/);
+    assert.match(entities.get('posts').cssClasses, /\bdimmed\b/);
 });
