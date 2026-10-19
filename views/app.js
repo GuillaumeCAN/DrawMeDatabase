@@ -25,7 +25,9 @@
         // The workspace folder of the schema, drawn again when VS Code restores the panel
         folder: typeof saved.folder === 'string' ? saved.folder : null,
         query: typeof saved.query === 'string' ? saved.query : '',
-        panel: saved.panel === true,
+        // The side panel is open at first when it fits beside the diagram (under 720 px it covers
+        // it, see theme.css), then as the user left it
+        panel: typeof saved.panel === 'boolean' ? saved.panel : window.innerWidth > 720,
     };
 
     let schema = null;

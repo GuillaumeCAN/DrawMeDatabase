@@ -315,6 +315,9 @@ function createVscode(state) {
                 } else {
                     state.executed.push({ id, args });
                 }
+                if (state.failingCommands.has(id)) {
+                    return Promise.reject(new Error(`Extension '${args[0]}' not found.`));
+                }
                 return Promise.resolve();
             },
         },
@@ -371,6 +374,8 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] }), initial = {}
         written: [],
         clipboard: [],
         executed: [],
+        // Commands that reject, like extension.open for an extension the Marketplace does not know
+        failingCommands: new Set(),
         opened: [],
         watchers: [],
         documents: [],
@@ -1717,4 +1722,21 @@ test('views: what was asked for the diagram is dropped when there is nothing to 
     const panel = ext.state.panels[0];
     panel.postFromPage({ type: 'ready' });
     assert.deepEqual(panel.sent('runExport'), []);
+});
+
+test('a Pro button tells when DrawMeDatabase Pro cannot be found, instead of an error', async () => {
+    const ext = activate();
+    ext.openFolders(folder('pro-missing', LARAVEL));
+    ext.state.failingCommands.add('extension.open');
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    panel.postFromPage({ type: 'pro' });
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.deepEqual(ext.state.executed.filter(command => command.id === 'extension.open').map(command => command.args),
+        [['GuillaumeCancalon.draw-me-database-pro']]);
+    assert.deepEqual(ext.state.errors, []);
+    assert.deepEqual(ext.state.infos.map(info => info.text),
+        ['DrawMeDatabase Pro was not found on the Marketplace: it is not published yet, or VS Code is offline.']);
 });

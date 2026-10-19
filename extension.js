@@ -166,8 +166,13 @@ function activate(context) {
     };
     // DrawMeDatabase Pro: its trial or license is on
     const proUnlocked = () => Boolean(license && license.kind !== 'expired');
+    // Its page in the Extensions view; a message instead of an error while the Marketplace does not
+    // know it (not published yet, or offline)
     const openPro = () => Promise.resolve(vscode.commands.executeCommand('extension.open', PRO_EXTENSION_ID))
-        .catch(err => reportUnexpectedError(output, err));
+        .catch(err => {
+            output.appendLine(`DrawMeDatabase Pro: ${err && err.message ? err.message : err}`);
+            vscode.window.showInformationMessage(tr('message.proUnavailable'));
+        });
 
     // What the side panel lists: the tools and exports of the extensions (the ones of DrawMeDatabase
     // Pro greyed while it does not add them, locked when its trial has ended) and the license
@@ -411,6 +416,7 @@ function activate(context) {
 
     const viewer = createViewer(context, output, {
         refresh: () => draw(getWorkspaceFolder(lastFolder)),
+        openPro,
         exportFolder: () => lastFolder,
         openTable,
         // The Schema view keeps following the code
@@ -950,7 +956,7 @@ function cleanSection(section, actions) {
 
 // A single webview panel. The page is loaded once: the schema and the settings are posted to it
 // (again when it reloads, after being restored), and it asks for refreshes and exports.
-function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor, features, runTool, runLicenseAction, tableInfo, runTableAction, proUnlocked }) {
+function createViewer(context, output, { refresh, openPro, exportFolder, openTable, onClose, exporters, schemaFor, features, runTool, runLicenseAction, tableInfo, runTableAction, proUnlocked }) {
     let panel;
     let ready = false;
     // What the page shows: the last schema, or a message when there is none
@@ -1055,8 +1061,7 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 break;
             }
             case 'pro':
-                Promise.resolve(vscode.commands.executeCommand('extension.open', PRO_EXTENSION_ID))
-                    .catch(err => reportUnexpectedError(output, err));
+                openPro();
                 break;
             case 'svg': {
                 const resolve = svgRequests.get(message.id);

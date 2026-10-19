@@ -183,3 +183,7 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 ### Changed
 - The options panel of the diagram keeps the options of the diagram, the appearance and the settings: its tools, exports and license moved to the sidebar, which a button of the panel opens
 - `getSchema()` and `onDidChangeSchema` of the API also give the schema read by the Schema view
+- The side panel of the diagram is open by default when it fits beside the diagram (wider than 720 px), then stays as you leave it
+
+### Fixed
+- A button of DrawMeDatabase Pro (PRO badge, Discover, a Pro tool or export) no longer fails with "Extension not found" while Pro is not on the Marketplace: a message tells that it is not published yet, or that VS Code is offline
