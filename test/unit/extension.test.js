@@ -1262,6 +1262,15 @@ test('side panel: the tools and exports of DrawMeDatabase Pro are listed greyed 
 
     pro.set({ kind: 'licensed', commands: { manage: 'DMDBPro.licenseStatus' } });
     assert.deepEqual(panel.sent('features').at(-1).license.actions, ['manage']);
+    // A stored key: Pro gives its remove command, shown after the others
+    pro.set({ kind: 'licensed', commands: { manage: 'DMDBPro.licenseStatus', remove: 'DMDBPro.removeLicense' } });
+    assert.deepEqual(panel.sent('features').at(-1).license.actions, ['manage', 'remove']);
+    pro.set({ kind: 'expired', commands: { buy: 'DMDBPro.buyLicense', enter: 'DMDBPro.enterLicense', remove: 'DMDBPro.removeLicense' } });
+    assert.deepEqual(panel.sent('features').at(-1).license.actions, ['buy', 'enter', 'remove']);
+    ext.state.executed = [];
+    panel.postFromPage({ type: 'license', action: 'remove' });
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.removeLicense', args: [] }]);
     pro.set({ kind: 'stolen' });
     assert.equal(panel.sent('features').at(-1).license.kind, 'free');
 

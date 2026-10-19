@@ -70,7 +70,7 @@ DrawMeDatabase has a view container in the Activity Bar, with the views *Schema*
 Every extension can call the API, so the API cannot unlock what DrawMeDatabase keeps for DrawMeDatabase Pro (the git status of the columns, the palettes, the custom colors and the fonts). DrawMeDatabase reads the license from the exports of the extension **`GuillaumeCancalon.draw-me-database-pro`**, which VS Code keeps for that extension:
 
 1. Pro returns **frozen** exports from its `activate()` (`Object.freeze`), with:
-   - `licenseStatus()`: `{ kind, daysLeft, commands }`, or `null` once it is deactivated. `kind`: `'licensed'`, `'trial'` (with `daysLeft`), `'expired'` (its tools and exports are then shown locked) or `'development'`. `commands`: `{ buy, enter, manage }`, the commands of its buttons;
+   - `licenseStatus()`: `{ kind, daysLeft, commands }`, or `null` once it is deactivated. `kind`: `'licensed'`, `'trial'` (with `daysLeft`), `'expired'` (its tools and exports are then shown locked) or `'development'`. `commands`: `{ buy, enter, manage, remove }`, the commands of its buttons (`remove`: only while a key is stored);
    - `onDidChangeLicenseStatus(listener)`: an event fired when its license changes (and every hour during the trial). Returns a `Disposable`.
 2. Pro calls `connectPro()` while it activates, **without awaiting it** in `activate()`: DrawMeDatabase waits for the end of the activation of Pro (`extension.activate()`), then follows its license.
 

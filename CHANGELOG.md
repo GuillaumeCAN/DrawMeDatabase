@@ -179,6 +179,7 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
   - Without a folder, a Laravel or Symfony project or tables, or after an error, the Schema view tells why, with a button to set the framework folder, refresh or show the output
 - Other extensions can add their views to the container (id `drawMeDatabase`), with the context keys `drawMeDatabase.sidebar`, `drawMeDatabase.schemaState` and `drawMeDatabase.license` (`docs/api.md`)
 - Commands `DrawMeDatabase: Open Settings` and `DrawMeDatabase: Show Output`
+- A **Remove the license key** button in the License view, when DrawMeDatabase Pro gives the command (`commands.remove`)
 
 ### Changed
 - The options panel of the diagram keeps the options of the diagram, the appearance and the settings: its tools, exports and license moved to the sidebar, which a button of the panel opens

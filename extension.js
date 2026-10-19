@@ -191,7 +191,9 @@ function activate(context) {
         const commands = license && license.commands ? license.commands : {};
         let actions = ['discover'];
         if (license) {
-            actions = (license.kind === 'licensed' ? ['manage'] : license.kind === 'development' ? [] : ['buy', 'enter']).filter(action => commands[action]);
+            // remove: only when Pro gives the command, that is when a key is stored
+            actions = (license.kind === 'licensed' ? ['manage', 'remove'] : license.kind === 'development' ? [] : ['buy', 'enter', 'remove'])
+                .filter(action => commands[action]);
         }
         return {
             tools: [...PRO_TOOLS.map(id => describe(id, tools.get(id))), ...others(tools, PRO_TOOLS).map(tool => describe(tool.id, tool))],
@@ -574,11 +576,11 @@ function activate(context) {
 
     // The license of DrawMeDatabase Pro, shown at the bottom of the side panel and in the License
     // view: { kind: 'licensed' | 'trial' | 'expired' | 'development', daysLeft, commands: { buy,
-    // enter, manage } }, or null (not installed)
+    // enter, manage, remove } }, or null (not installed)
     const setLicense = (status) => {
         if (status && LICENSE_KINDS.includes(status.kind)) {
             const commands = {};
-            for (const action of ['buy', 'enter', 'manage']) {
+            for (const action of ['buy', 'enter', 'manage', 'remove']) {
                 if (status.commands && typeof status.commands[action] === 'string') {
                     commands[action] = status.commands[action];
                 }
