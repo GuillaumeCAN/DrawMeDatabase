@@ -55,6 +55,27 @@
     // Tables shown by another extension (a path, a saved view): { tables, highlight, label }
     let focus = null;
     let drawn = false;
+    // What the views asked while the diagram was not drawn yet (an export, a table to show): run
+    // once it is, unless the drawing failed
+    let rendering = false;
+    let renderedOk = false;
+    let afterRender = [];
+    const whenDrawn = (run) => {
+        if (drawn && !rendering) {
+            if (renderedOk) {
+                run();
+            }
+        } else {
+            afterRender.push(run);
+        }
+    };
+    const runAfterRender = () => {
+        const waiting = afterRender;
+        afterRender = [];
+        if (renderedOk) {
+            waiting.forEach(run => run());
+        }
+    };
 
     const $ = (id) => document.getElementById(id);
     const elements = {
@@ -97,6 +118,7 @@
         // Errors go to the DrawMeDatabase output; the integration test checks the drawing
         onRendered(result) {
             vscode.postMessage({ type: 'rendered', ...result });
+            renderedOk = Boolean(result && result.ok);
         },
         onOpenTable(table) {
             vscode.postMessage({ type: 'open', table });
@@ -192,7 +214,13 @@
             diagram.showMessage(focus ? t('diagram.focusMissing') : t('diagram.noMatch', { query: state.query.trim() }));
             return;
         }
-        diagram.render(shownTables(), diagramSettings(), view);
+        // The drawings are queued: this one is done when the queue is (a drawing that changes
+        // nothing reports nothing, the last result stands)
+        rendering = true;
+        Promise.resolve(diagram.render(shownTables(), diagramSettings(), view)).then(() => {
+            rendering = false;
+            runAfterRender();
+        });
         drawn = true;
         showLegend();
     }
@@ -443,58 +471,13 @@
         }
     });
 
-    // Side panel: options of the diagram, appearance, tools, exports, settings, license
-
-    const TOOL_ICONS = {
-        'pro.canvas': 'canvas',
-        'pro.timeline': 'history',
-        'pro.designer': 'designer',
-        'pro.addColumns': 'columns',
-        'pro.compare': 'compare',
-        'pro.compareRefs': 'compare',
-        'pro.migrationChanges': 'migration',
-        'pro.checks': 'checks',
-        'pro.findPath': 'path',
-        'pro.saveView': 'bookmark',
-        'pro.openView': 'view',
-        'pro.models': 'code',
-    };
-    const exportIcon = (id) => (/sql/.test(id) ? 'database' : /typescript|json/.test(id) ? 'code' : 'file');
-
-    const label = (prefix, item) => (t.has(`${prefix}.${item.id}`) ? t(`${prefix}.${item.id}`) : item.label || item.id);
-    const hint = (prefix, item) => (t.has(`${prefix}.${item.id}.hint`) ? t(`${prefix}.${item.id}.hint`) : item.hint || '');
-    const stateTitle = (state) => (state === 'missing' ? t('panel.pro.missing') : state === 'locked' ? t('panel.pro.locked') : undefined);
-
-    function licenseFooter() {
-        const license = features.license || { kind: 'free' };
-        const buttons = (license.actions || []).map((action, index) => ({
-            id: `license:${action}`,
-            label: t(action === 'discover' ? 'panel.license.discover' : `panel.license.${action}`),
-            primary: index === 0 && action !== 'manage',
-        }));
-        if (license.kind === 'free') {
-            return { kind: 'free', title: t('panel.license.free'), text: t('panel.license.free.hint'), buttons };
-        }
-        const title = license.kind === 'trial'
-            ? t('panel.license.trial', { count: Math.max(0, Number(license.daysLeft) || 0) })
-            : t(`panel.license.${license.kind}`);
-        return { kind: license.kind, title, buttons };
-    }
+    // Side panel: options of the diagram, appearance and settings. The tools, the exports and the
+    // license are in the DrawMeDatabase views of the Activity Bar (sidebar.js)
 
     function panelModel() {
         const appearance = settings.appearance;
         const appearanceItems = window.DrawMeDatabaseSidePanel.appearanceItems(appearance, t, { locked: !settings.pro });
         const proLock = settings.pro ? {} : { locked: true, badge: t('panel.pro'), lockedTitle: t('panel.pro.missing') };
-
-        const builtIn = [...EXPORTS.diagram, ...EXPORTS.json].map(item => ({ id: `export:${item.id}`, label: t(item.label), icon: item.icon, state: schema ? 'available' : 'locked' }));
-        const others = features.exports.map(item => ({
-            id: `export:${item.id}`,
-            label: label('export', item),
-            icon: exportIcon(item.id),
-            state: item.state,
-            badge: item.pro ? t('panel.pro') : undefined,
-            title: stateTitle(item.state),
-        }));
 
         return {
             title: t('panel.title'),
@@ -514,23 +497,6 @@
                     ],
                 },
                 { id: 'appearance', title: t('panel.appearance'), items: appearanceItems },
-                {
-                    id: 'tools',
-                    title: t('panel.tools'),
-                    items: [{
-                        type: 'actions',
-                        items: features.tools.map(tool => ({
-                            id: `tool:${tool.id}`,
-                            label: label('tool', tool),
-                            hint: hint('tool', tool),
-                            icon: TOOL_ICONS[tool.id] || tool.icon || 'settings',
-                            state: tool.state,
-                            badge: tool.pro ? t('panel.pro') : undefined,
-                            title: stateTitle(tool.state),
-                        })),
-                    }],
-                },
-                { id: 'exports', title: t('panel.exports'), items: [{ type: 'actions', items: [...builtIn, ...others] }] },
                 {
                     id: 'settings',
                     title: t('panel.settings'),
@@ -554,7 +520,11 @@
                     ],
                 },
             ],
-            footer: licenseFooter(),
+            footer: {
+                title: t('panel.sidebar'),
+                text: t('panel.sidebar.hint'),
+                buttons: [{ id: 'sidebar', label: t('panel.sidebar.open'), icon: 'database' }],
+            },
         };
     }
 
@@ -601,27 +571,28 @@
             askPro();
         } else if (id === 'resetAppearance') {
             vscode.postMessage({ type: 'resetAppearance' });
-        } else if (id.startsWith('tool:')) {
-            vscode.postMessage({ type: 'tool', id: id.slice(5) });
-        } else if (id.startsWith('export:')) {
-            const name = id.slice(7);
-            const builtIn = [...EXPORTS.diagram, ...EXPORTS.json].find(item => item.id === name);
-            if (builtIn) {
-                if (schema) {
-                    runExport(builtIn);
-                }
-                return;
-            }
-            const other = features.exports.find(item => item.id === name);
-            if (other && other.state === 'missing') {
-                vscode.postMessage({ type: 'pro' });
-            } else if (other) {
-                vscode.postMessage({ type: 'export', id: name, tables: shownTables().map(table => table.table) });
-            }
+        } else if (id === 'sidebar') {
+            vscode.postMessage({ type: 'openSidebar' });
         } else if (id.startsWith('settings:')) {
             vscode.postMessage({ type: 'openSettings', target: id.slice(9) });
-        } else if (id.startsWith('license:')) {
-            vscode.postMessage({ type: 'license', action: id.slice(8) });
+        }
+    }
+
+    // An export of the Exports view (DMDB.runExport): one of the page, or of another extension, on
+    // the tables on screen
+    function exportById(id) {
+        const builtIn = [...EXPORTS.diagram, ...EXPORTS.json].find(item => item.id === id);
+        if (builtIn) {
+            if (schema) {
+                runExport(builtIn);
+            }
+            return;
+        }
+        const other = features.exports.find(item => item.id === id);
+        if (other && other.state === 'missing') {
+            askPro();
+        } else if (other || extraExports.items.some(item => item.id === id)) {
+            vscode.postMessage({ type: 'export', id, tables: shownTables().map(table => table.table) });
         }
     }
 
@@ -845,6 +816,23 @@
                 }, Boolean(schema));
                 if (state.viewer !== 'diagram') {
                     showViewer('diagram');
+                }
+                break;
+            case 'runExport':
+                if (typeof message.id === 'string') {
+                    whenDrawn(() => exportById(message.id));
+                }
+                break;
+            case 'showTable':
+                if (typeof message.table === 'string') {
+                    if (state.viewer !== 'diagram') {
+                        showViewer('diagram');
+                    }
+                    whenDrawn(() => {
+                        if (schema && schema.tables.some(table => table.table === message.table)) {
+                            showTable(message.table, { center: true });
+                        }
+                    });
                 }
                 break;
             case 'svgRequest':

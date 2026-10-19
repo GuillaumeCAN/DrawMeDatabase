@@ -25,7 +25,7 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 | `detectFramework(basePath)` | `'laravel'`, `'symfony'` or another value for an unsupported folder |
 | `parseSchema(basePath, framework, options)` | Parses a framework folder: `{ tables, warnings }`. Options: `git`, `overrides`, `gitCache`, `columnSources`, `until` (Laravel), `details` (lengths, defaults, indexes, ON DELETE...), see [pivot-format.md](pivot-format.md). Throws a `ParserError` for a missing folder or an unknown framework |
 | `viewsUri`, `viewScripts` | The folder of the page files and the scripts that draw a diagram, in loading order (`vendor/mermaid.min.js`, `i18n.js`, `appearance.js`, `mermaid/generator.js`, `mermaid/zoom.js`, `exporters.js`, `search.js`, `mermaid/diagram.js`, `sidepanel.js`), with `theme.css`. Add `viewsUri` to the `localResourceRoots` of your panel to reuse them, see [Pages](#pages) |
-| `registerExporter({ id, label, extension, export, pro })` | Adds an item to the Export menu of the diagram and to the Export section of its side panel. `export(schema)` gets the tables on screen (the search result when there is one) and returns the text of the file (or a promise), saved with the Save dialog. `pro: true`: locked in the side panel once the trial of DrawMeDatabase Pro has ended. Returns a `Disposable` |
+| `registerExporter({ id, label, extension, export, pro })` | Adds an item to the Export menu of the diagram and to the Exports view of the sidebar (1.6.0: the Export section of the side panel). `export(schema)` gets the tables on screen (the search result when there is one) and returns the text of the file (or a promise), saved with the Save dialog. `pro: true`: locked in the Exports view once the trial of DrawMeDatabase Pro has ended. Returns a `Disposable` |
 | `focusTables({ tables, highlight, label })` | Shows only these tables (and the relations between them) in the diagram, `highlight` standing out, with `label` and a button to go back to the whole schema. Opens the diagram when needed |
 | `getDiagramSvg()` | The diagram on screen as an SVG file (text), or `null` when no diagram is drawn |
 | Generator `marks` | The page scripts draw a table's `mark` as a CSS class of its node and a column's `note` as its comment when the diagram is drawn with `{ marks: true }` (for example a schema comparison: added, removed, changed) |
@@ -35,11 +35,35 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 
 | Member | Description |
 |--------|-------------|
-| `registerTool({ id, label, command, args, hint, icon, pro })` | Adds a tool to the Tools section of the side panel of the diagram: a click runs `command` with `args` (strings, numbers, booleans). The ids of DrawMeDatabase Pro (`pro.canvas`, `pro.designer`...) replace the greyed items shown before it is installed, and their texts come from the translations of DrawMeDatabase. Returns `{ update({ label, hint, locked }), dispose() }` |
-| `setLicenseStatus({ kind, daysLeft, commands })` | The license of DrawMeDatabase Pro, at the bottom of the side panel. `kind`: `'licensed'`, `'trial'` (with `daysLeft`), `'expired'` (its tools and exports are then shown locked) or `'development'`. `commands`: `{ buy, enter, manage }`, the commands of its buttons. `null`: not installed |
+| `registerTool({ id, label, command, args, hint, icon, pro })` | Adds a tool to the Tools view of the sidebar (1.6.0: the Tools section of the side panel of the diagram): a click runs `command` with `args` (strings, numbers, booleans). The ids of DrawMeDatabase Pro (`pro.canvas`, `pro.designer`...) replace the greyed items shown before it is installed, and their texts come from the translations of DrawMeDatabase. `icon`: a codicon (`plug`), or an icon of `views/sidepanel.js` (`history`, `compare`...). Returns `{ update({ label, hint, locked }), dispose() }` |
+| `setLicenseStatus({ kind, daysLeft, commands })` | The license of DrawMeDatabase Pro, in the License view of the sidebar (1.6.0: at the bottom of the side panel), which is only shown while it is set. `kind`: `'licensed'`, `'trial'` (with `daysLeft`), `'expired'` (its tools and exports are then shown locked) or `'development'`. `commands`: `{ buy, enter, manage }`, the commands of its buttons. `null`: not installed |
 | `registerTableInfoProvider({ id, provide })` | Adds sections to the inspector of a table (a click on a table in the diagram). `provide(table, schema)` returns, or resolves to within 10 s, a list of sections: `{ title, items: [{ label, value, hint, badge, tone }], actions: [{ label, command, args }], note, locked }`. `tone`: `'added'`, `'modified'`, `'removed'`, `'muted'` or `'accent'`; an action runs `command` with `args` (strings, numbers, booleans); `locked: true` greys the section with a PRO badge. Without any provider, the inspector shows what DrawMeDatabase Pro would add. Returns a `Disposable` |
 | `getDisplaySettings()` | The appearance and the language chosen by the user: `{ theme, palette, colors, font, customFont, fontSize, grid, language }` (`language`: `'en'` or `'fr'`, already resolved) |
 | `onDidChangeDisplaySettings(listener)` | Event fired with the new display settings. Returns a `Disposable` |
+
+## Sidebar (DrawMeDatabase 1.7.0)
+
+DrawMeDatabase has a view container in the Activity Bar, with the views *Schema* (`DMDB.schema`), *Tools* (`DMDB.tools`), *Exports* (`DMDB.exports`) and *License* (`DMDB.license`); see [activity-bar.md](activity-bar.md). Its id is **`drawMeDatabase`**: other extensions add their own views to it in their `package.json`, after the ones of DrawMeDatabase.
+
+```json
+"contributes": {
+    "views": {
+        "drawMeDatabase": [
+            { "id": "DMDBPro.connections", "name": "%view.connections%", "when": "drawMeDatabase.sidebar" }
+        ]
+    }
+}
+```
+
+| Context key | Value |
+|-------------|-------|
+| `drawMeDatabase.sidebar` | `true` once the container exists. Put it in the `when` clause of your views: with a DrawMeDatabase older than 1.7.0, VS Code would move them to the Explorer |
+| `drawMeDatabase.schemaState` | What the Schema view shows: `loading`, `noFolder`, `noProject` (no Laravel or Symfony project found), `noTables`, `error` (see the output) or `ready` |
+| `drawMeDatabase.license` | The `kind` given to `setLicenseStatus()`, or `free` |
+
+- `workbench.view.extension.drawMeDatabase` opens the container, `<view id>.focus` one of its views.
+- The Schema view reads the schema itself when it is shown, without the diagram: `getSchema()` and `onDidChangeSchema` then give its schema too, and it follows the edits of the code while the Schema view or the diagram is visible.
+- The commands of the views can be used in the menus of your views: `DMDB.refreshSchema` (read the schema again), `DMDB.showInDiagram` (with a table name: open the diagram on it and inspect it), `DMDB.openTable` (a table name, and optionally a column name: open its file at its line), `DMDB.runExport` (an export id, see `registerExporter`), `DMDB.openSettings`, `DMDB.showOutput`.
 
 ## Pages
 

@@ -164,3 +164,18 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - An inspector of the tables, in its own panel on the left: a click on a table shows its columns (keys, types, nullable, git status, and the line of each column), the tables it references and the ones that reference it, with buttons to open its file and to show its neighbours; a double-click (or Ctrl+click) opens its file. DrawMeDatabase Pro adds its indexes, defaults, history and actions
 - French: the diagram, the messages, and the commands and settings in VS Code (`DrawMeDatabase.language`: `auto`, `en` or `fr`)
 - API version 2: `registerTool()`, `setLicenseStatus()`, `registerTableInfoProvider()`, `getDisplaySettings()` and `onDidChangeDisplaySettings`, and the page scripts `i18n.js`, `appearance.js` and `sidepanel.js` for the panels of other extensions (`docs/api.md`)
+
+## [v1.7.0] - 2026-10-18
+
+### Added
+- DrawMeDatabase in the Activity Bar (a database icon), like GitLens, with native views (`docs/activity-bar.md`):
+  - **Schema**: the tables of the project and their columns (keys, types, nullable, foreign keys, git status), read from the code without opening the diagram and kept up to date while you type. A click opens the migration or the entity, or the line of a column; *Show in Diagram* opens the diagram on the table and inspects it
+  - **Tools** and **Exports**: the exports of the diagram (they run on what the diagram shows, and open it when needed), and the tools and exports of DrawMeDatabase Pro, greyed with PRO until it is installed, with a lock once its trial has ended
+  - **License**: the state of DrawMeDatabase Pro and its buttons, shown once it is installed
+  - Without a folder, a Laravel or Symfony project or tables, or after an error, the Schema view tells why, with a button to set the framework folder, refresh or show the output
+- Other extensions can add their views to the container (id `drawMeDatabase`), with the context keys `drawMeDatabase.sidebar`, `drawMeDatabase.schemaState` and `drawMeDatabase.license` (`docs/api.md`)
+- Commands `DrawMeDatabase: Open Settings` and `DrawMeDatabase: Show Output`
+
+### Changed
+- The options panel of the diagram keeps the options of the diagram, the appearance and the settings: its tools, exports and license moved to the sidebar, which a button of the panel opens
+- `getSchema()` and `onDidChangeSchema` of the API also give the schema read by the Schema view

@@ -13,6 +13,7 @@ const { ParserError } = require('./parsers/errors');
 const html = require('./views/html');
 const i18n = require('./views/i18n');
 const appearance = require('./views/appearance');
+const sidebar = require('./sidebar');
 
 const VIEW_TYPE = 'drawMeDatabase';
 
@@ -64,11 +65,15 @@ function readSetting(config, key) {
     return value === undefined ? (setting.values ? setting.values[0] : setting.default) : value;
 }
 
-// Texts of the messages, in the language of the DrawMeDatabase.language setting (views/i18n.js)
-function tr(key, params) {
+// Texts of the messages and of the views, in the language of the DrawMeDatabase.language setting
+// (views/i18n.js)
+function translator() {
     const setting = vscode.workspace.getConfiguration('DrawMeDatabase').get('language', 'auto');
-    const language = i18n.resolveLanguage(setting, vscode.env && vscode.env.language);
-    return i18n.translator(language)(key, params);
+    return i18n.translator(i18n.resolveLanguage(setting, vscode.env && vscode.env.language));
+}
+
+function tr(key, params) {
+    return translator()(key, params);
 }
 
 // Files the panel can export
@@ -159,6 +164,8 @@ function activate(context) {
         settings.language = i18n.resolveLanguage(readSetting(config, 'language'), vscode.env && vscode.env.language);
         return settings;
     };
+    // DrawMeDatabase Pro: its trial or license is on
+    const proUnlocked = () => Boolean(license && license.kind !== 'expired');
     const openPro = () => Promise.resolve(vscode.commands.executeCommand('extension.open', PRO_EXTENSION_ID))
         .catch(err => reportUnexpectedError(output, err));
 
@@ -229,26 +236,53 @@ function activate(context) {
         }
     };
 
-    // Parses the schema of the folder and shows it: returns the parsed tables. auto: refresh
-    // after a change of the code, without messages and without closing the panel on an error
-    // (the code may be in the middle of an edit), nor bringing the panel to the front.
-    const draw = (folder, { auto = false } = {}) => {
-        let schema;
+    // Parses the schema of the folder (the text of the unsaved editors included) for the diagram
+    // and the views: returns the parsed schema, or undefined after an error. auto: a refresh after
+    // a change of the code, which keeps the previous schema on an error (the code may be in the
+    // middle of an edit) and writes its messages to the output only. Otherwise an error or a
+    // project without tables clears the schema; notify: false writes the messages to the output.
+    const read = (folder, { auto = false, notify = !auto } = {}) => {
         if (!auto) {
             gitCache.clear();
         }
+        let failure = 'noFolder';
+        let schema;
         if (folder) {
             lastFolder = folder;
             schema = readSchema(folder, output, {
-                notify: !auto,
+                notify,
                 // What the developer sees: the text of the editors not saved yet
                 overrides: unsavedEditors(),
                 gitCache,
                 git: vscode.workspace.getConfiguration('DrawMeDatabase').get('showGitStatus', true) !== false,
+                onFailure: (reason) => {
+                    failure = reason;
+                },
             });
+        }
+        if (schema && schema.tables.length > 0) {
+            current = { folder, basePath: schema.basePath, framework: schema.framework, tables: schema.tables, warnings: schema.warnings };
+            if (watching()) {
+                watcher.watch(current);
+            }
+            views.schemaChanged('ready');
+            schemaChanged.fire(publicSchema());
         } else if (!auto) {
+            current = null;
+            watcher.stop();
+            views.schemaChanged(schema ? 'noTables' : failure);
+        }
+        return schema;
+    };
+
+    // Parses the schema of the folder and shows it: returns the parsed tables. auto: refresh
+    // after a change of the code, without messages and without closing the panel on an error
+    // (the code may be in the middle of an edit), nor bringing the panel to the front.
+    const draw = (folder, { auto = false } = {}) => {
+        if (!folder && !auto) {
             vscode.window.showErrorMessage(tr('message.noProject'));
         }
+        const schema = read(folder, { auto });
 
         if (!schema || schema.tables.length === 0) {
             if (auto) {
@@ -261,7 +295,6 @@ function activate(context) {
         }
 
         try {
-            current = { folder, basePath: schema.basePath, framework: schema.framework, tables: schema.tables };
             viewer.show({
                 tables: schema.tables,
                 warnings: schema.warnings,
@@ -273,12 +306,31 @@ function activate(context) {
                 },
             }, { reveal: !auto });
             watcher.watch(current);
-            schemaChanged.fire(publicSchema());
         } catch (err) {
             reportUnexpectedError(output, err);
         }
         return schema.tables;
     };
+
+    // The views read the schema themselves, without the diagram (after a pause: the setting of
+    // the framework folder may be typed)
+    let readTimer;
+    const readForViews = (delay = 0) => {
+        clearTimeout(readTimer);
+        if (!current) {
+            views.schemaChanged('loading');
+        }
+        readTimer = setTimeout(() => {
+            try {
+                read(getWorkspaceFolder(lastFolder), { notify: false });
+            } catch (err) {
+                reportUnexpectedError(output, err);
+            }
+        }, delay);
+    };
+    context.subscriptions.push({ dispose: () => clearTimeout(readTimer) });
+    // The schema follows the code while the diagram or the Schema view is visible
+    const watching = () => viewer.isOpen() || views.schemaVisible();
 
     // Opens the file a table comes from (migration or entity), beside the diagram
     // Opens the file of a table, or the line of one of its columns (column: its name)
@@ -314,6 +366,8 @@ function activate(context) {
         }
         if (current && viewer.isOpen()) {
             draw(current.folder, { auto: true });
+        } else if (current && views.schemaVisible()) {
+            read(current.folder, { auto: true });
         }
     });
     context.subscriptions.push(watcher);
@@ -359,15 +413,19 @@ function activate(context) {
         refresh: () => draw(getWorkspaceFolder(lastFolder)),
         exportFolder: () => lastFolder,
         openTable,
-        onClose: () => watcher.stop(),
+        // The Schema view keeps following the code
+        onClose: () => {
+            if (!views.schemaVisible()) {
+                watcher.stop();
+            }
+        },
         exporters: () => [...exporters.values()],
         features,
         runTool,
         runLicenseAction,
         tableInfo,
         runTableAction,
-        // Its trial or license is on
-        proUnlocked: () => Boolean(license && license.kind !== 'expired'),
+        proUnlocked,
         schemaFor: (names) => {
             const schema = publicSchema();
             if (schema && Array.isArray(names)) {
@@ -379,9 +437,81 @@ function activate(context) {
     });
     context.subscriptions.push(viewer);
 
+    // The views of the DrawMeDatabase container in the Activity Bar (sidebar.js)
+    const views = sidebar.createSidebar(vscode, {
+        translator,
+        schema: () => current,
+        project: () => (current ? [FRAMEWORK_LABELS[current.framework], current.folder.name].filter(Boolean).join(' · ') : ''),
+        features,
+        showGit: () => vscode.workspace.getConfiguration('DrawMeDatabase').get('showGitStatus', true) !== false,
+        // As in the diagram: the git status of the columns comes with DrawMeDatabase Pro
+        showColumnGit: () => proUnlocked() && vscode.workspace.getConfiguration('DrawMeDatabase').get('showColumnGitStatus', true) !== false,
+        onSchemaVisibility(visible) {
+            if (visible && !viewer.isOpen()) {
+                // The code may have changed while nothing followed it
+                readForViews();
+            } else if (!visible && !viewer.isOpen()) {
+                watcher.stop();
+            }
+        },
+    });
+    context.subscriptions.push(views);
+    // The views and the options panel of the diagram list the same tools, exports and license
+    const featuresChanged = () => {
+        viewer.featuresChanged();
+        views.featuresChanged();
+    };
+    // An export of the Exports view: the diagram runs it on what it shows (opened when needed)
+    const runExport = (id) => {
+        if (PRO_EXPORTS.includes(id) && !exporters.has(id)) {
+            openPro();
+        } else {
+            viewer.request({ type: 'runExport', id });
+        }
+    };
+
     context.subscriptions.push(
         vscode.commands.registerCommand('DMDB.parseSchema', () => draw(getWorkspaceFolder(lastFolder))),
         vscode.commands.registerCommand('DMDB.refresh', () => draw(getWorkspaceFolder(lastFolder))),
+        // Title of the Schema view: read the schema again, without opening the diagram
+        vscode.commands.registerCommand('DMDB.refreshSchema', () => {
+            if (viewer.isOpen()) {
+                gitCache.clear();
+                draw(getWorkspaceFolder(lastFolder), { auto: true });
+            } else {
+                readForViews();
+            }
+        }),
+        // The items of the views (their arguments come from the views, or from other extensions)
+        vscode.commands.registerCommand('DMDB.openTable', (table, column) => openTable(table, column)),
+        vscode.commands.registerCommand('DMDB.showInDiagram', (node) => {
+            const table = typeof node === 'string' ? node : node && node.table;
+            if (typeof table === 'string') {
+                viewer.request({ type: 'showTable', table });
+            }
+        }),
+        vscode.commands.registerCommand('DMDB.runTool', (id) => {
+            if (typeof id === 'string') {
+                runTool(id);
+            }
+        }),
+        vscode.commands.registerCommand('DMDB.runExport', (id) => {
+            if (typeof id === 'string') {
+                runExport(id);
+            }
+        }),
+        vscode.commands.registerCommand('DMDB.licenseAction', (action) => {
+            if (typeof action === 'string') {
+                runLicenseAction(action);
+            }
+        }),
+        vscode.commands.registerCommand('DMDB.openSettings', (target) => openSettings(output, target)),
+        vscode.commands.registerCommand('DMDB.showOutput', () => output.show()),
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            if (views.schemaVisible() && !viewer.isOpen()) {
+                readForViews();
+            }
+        }),
         // The panel is restored after a reload of the window: draw the schema of its folder again
         vscode.window.registerWebviewPanelSerializer(VIEW_TYPE, {
             async deserializeWebviewPanel(panel, state) {
@@ -407,7 +537,14 @@ function activate(context) {
             if ([...APPEARANCE_SETTINGS, 'language'].some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
                 displayChanged.fire(displaySettings());
             }
-            if (!current || !viewer.isOpen()) {
+            if (['language', 'showGitStatus', 'showColumnGitStatus'].some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
+                views.refresh();
+            }
+            if (!current || !watching()) {
+                // The Schema view did not find the project: maybe in the new framework folder
+                if (event.affectsConfiguration('DrawMeDatabase.frameworkPath') && views.schemaVisible() && !viewer.isOpen()) {
+                    readForViews(500);
+                }
                 return;
             }
             if (event.affectsConfiguration('DrawMeDatabase.autoRefresh')) {
@@ -423,6 +560,11 @@ function activate(context) {
             }
         }),
     );
+
+    // The Schema view may be visible from the start (the layout of the window is restored)
+    if (views.schemaVisible() && !current) {
+        readForViews();
+    }
 
     // API of the extension: vscode.extensions.getExtension('GuillaumeCancalon.draw-me-database').exports.
     // Used by DrawMeDatabase Pro and the integration test; documented in docs/api.md.
@@ -462,10 +604,12 @@ function activate(context) {
                 pro: exporter.pro === true || PRO_EXPORTS.includes(exporter.id),
             });
             viewer.exportersChanged();
+            views.featuresChanged();
             return {
                 dispose() {
                     exporters.delete(exporter.id);
                     viewer.exportersChanged();
+                    views.featuresChanged();
                 },
             };
         },
@@ -487,7 +631,7 @@ function activate(context) {
                 locked: tool.locked === true,
             };
             tools.set(entry.id, entry);
-            viewer.featuresChanged();
+            featuresChanged();
             return {
                 update(changes) {
                     if (changes && typeof changes === 'object') {
@@ -500,13 +644,13 @@ function activate(context) {
                         if (typeof changes.locked === 'boolean') {
                             entry.locked = changes.locked;
                         }
-                        viewer.featuresChanged();
+                        featuresChanged();
                     }
                 },
                 dispose() {
                     if (tools.get(entry.id) === entry) {
                         tools.delete(entry.id);
-                        viewer.featuresChanged();
+                        featuresChanged();
                     }
                 },
             };
@@ -543,6 +687,8 @@ function activate(context) {
                 license = null;
             }
             viewer.licenseChanged();
+            // The License view, the greyed tools and the git status of the columns follow
+            views.refresh();
         },
         // Shows these tables only (with the relations between them), the highlighted ones standing
         // out, and a label to go back to the whole schema: { tables, highlight, label }
@@ -562,7 +708,8 @@ function activate(context) {
 // Detects the framework and parses the schema: returns { tables, warnings (count), framework,
 // basePath }, or undefined after an error (already shown to the user). notify: false writes the
 // messages to the output only (automatic refresh); overrides, gitCache and git go to the parser.
-function readSchema(folder, output, { notify = true, overrides = null, gitCache = null, git = true } = {}) {
+// onFailure(reason) tells the Schema view why there is no schema: 'noProject' or 'error'.
+function readSchema(folder, output, { notify = true, overrides = null, gitCache = null, git = true, onFailure = () => {} } = {}) {
     const tell = (show, text, ...items) => (notify ? show(text, ...items) : output.appendLine(text));
     const showError = (text) => tell(vscode.window.showErrorMessage, text);
 
@@ -574,6 +721,7 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         showError(frameworkPath
             ? tr('message.frameworkPathMissing', { path: frameworkPath, folder: folder.uri.fsPath, elsewhere })
             : tr('message.folderMissing', { path: basePath }));
+        onFailure('noProject');
         return undefined;
     }
 
@@ -586,6 +734,7 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         if (!Object.prototype.hasOwnProperty.call(PARSERS, framework)) {
             const hint = tr(frameworkPath ? 'message.noFramework.checkSetting' : 'message.noFramework.setSetting');
             showError(tr('message.noFramework', { path: basePath, hint }));
+            onFailure('noProject');
             return undefined;
         }
 
@@ -603,6 +752,7 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         } else {
             output.appendLine(`Unexpected error: ${err && err.stack ? err.stack : err}`);
         }
+        onFailure('error');
         return undefined;
     }
 
@@ -647,6 +797,13 @@ function resolveBasePath(folderPath, frameworkPath) {
         return path.resolve(frameworkPath);
     }
     return relative;
+}
+
+// The settings of DrawMeDatabase, or the one of the framework folder (target: 'frameworkPath')
+function openSettings(output, target) {
+    const query = target === 'frameworkPath' ? 'DrawMeDatabase.frameworkPath' : '@ext:GuillaumeCancalon.draw-me-database';
+    Promise.resolve(vscode.commands.executeCommand('workbench.action.openSettings', query))
+        .catch(err => reportUnexpectedError(output, err));
 }
 
 // One generic message for the user, the details in the output channel
@@ -802,8 +959,9 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
     let subscriptions = [];
     // The last drawing reported by the page (shown in the output when it failed)
     let lastRender = null;
-    // A focus asked before the page was ready; SVG requests waiting for the page
-    let pendingFocus = null;
+    // What the views and the API asked before the page was ready (by type: focus, runExport,
+    // showTable); SVG requests waiting for the page
+    const pending = new Map();
     const svgRequests = new Map();
     let svgRequestCount = 0;
 
@@ -885,10 +1043,8 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 } else if (emptyText) {
                     post({ type: 'empty', text: emptyText });
                 }
-                if (pendingFocus) {
-                    post(pendingFocus);
-                    pendingFocus = null;
-                }
+                pending.forEach(request => post(request));
+                pending.clear();
                 break;
             case 'export': {
                 // An export of another extension, on the tables on screen
@@ -941,12 +1097,13 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                     runLicenseAction(message.action);
                 }
                 break;
-            case 'openSettings': {
-                const query = message.target === 'frameworkPath' ? 'DrawMeDatabase.frameworkPath' : '@ext:GuillaumeCancalon.draw-me-database';
-                Promise.resolve(vscode.commands.executeCommand('workbench.action.openSettings', query))
+            case 'openSettings':
+                openSettings(output, message.target);
+                break;
+            case 'openSidebar':
+                Promise.resolve(vscode.commands.executeCommand(`workbench.view.extension.${sidebar.CONTAINER_ID}`))
                     .catch(err => reportUnexpectedError(output, err));
                 break;
-            }
             case 'save':
                 saveExport(message).catch(err => reportUnexpectedError(output, err));
                 break;
@@ -1058,6 +1215,7 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 ready = false;
                 svgRequests.forEach(resolve => resolve(null));
                 svgRequests.clear();
+                pending.clear();
                 onClose();
             }),
         ];
@@ -1065,8 +1223,24 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
     }
 
     const close = () => {
+        // Nothing to draw: what was asked for the diagram is dropped
+        pending.clear();
         if (panel) {
             panel.dispose();
+        }
+    };
+
+    // A message for the page once it shows the schema: posted at once when it is ready, else when
+    // it is; the diagram is opened when it is closed
+    const request = (message) => {
+        if (panel && ready) {
+            panel.reveal();
+            post(message);
+            return;
+        }
+        pending.set(message.type, message);
+        if (!panel) {
+            Promise.resolve(vscode.commands.executeCommand('DMDB.parseSchema')).catch(err => reportUnexpectedError(output, err));
         }
     };
 
@@ -1135,17 +1309,9 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
             post({ type: 'features', ...features() });
         },
         focus(focus) {
-            const message = focusMessage(focus);
-            if (panel && ready) {
-                panel.reveal();
-                post(message);
-            } else {
-                pendingFocus = message;
-                if (!panel) {
-                    Promise.resolve(vscode.commands.executeCommand('DMDB.parseSchema')).catch(err => reportUnexpectedError(output, err));
-                }
-            }
+            request(focusMessage(focus));
         },
+        request,
         requestSvg() {
             if (!panel || !ready || !schema) {
                 return Promise.resolve(null);

@@ -57,6 +57,10 @@ class Uri {
         return new Uri(path.join(base.fsPath, ...segments));
     }
 
+    static from(components) {
+        return Object.assign(new Uri(components.path), components);
+    }
+
     toString() {
         return `file://${this.fsPath}`;
     }
@@ -84,6 +88,35 @@ function createVscode(state) {
     const onChangeDocument = emitter();
     const onSaveDocument = emitter();
     const onCloseDocument = emitter();
+    const onWorkspaceFolders = emitter();
+
+    // A tree view of the Activity Bar; show(visible) shows or hides it like the user does
+    function createTreeView(id, options) {
+        const onVisibility = emitter();
+        const view = {
+            id,
+            options,
+            visible: state.visibleViews.includes(id),
+            description: undefined,
+            onDidChangeVisibility: onVisibility,
+            disposed: false,
+            show(visible = true) {
+                view.visible = visible;
+                onVisibility.fire({ visible });
+            },
+            // The items of the view (TreeItems with their children), as VS Code asks for them
+            items(node) {
+                return options.treeDataProvider.getChildren(node).map(child => {
+                    const item = options.treeDataProvider.getTreeItem(child);
+                    return { ...item, node: child, children: item.collapsibleState ? view.items(child) : [] };
+                });
+            },
+            dispose() {
+                view.disposed = true;
+            },
+        };
+        return view;
+    }
 
     function createPanel(viewType, title, column, options) {
         const onMessage = emitter();
@@ -138,6 +171,38 @@ function createVscode(state) {
             }
         },
         StatusBarAlignment: { Left: 1, Right: 2 },
+        TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
+        TreeItem: class TreeItem {
+            constructor(label, collapsibleState) {
+                Object.assign(this, { label, collapsibleState });
+            }
+        },
+        ThemeIcon: class ThemeIcon {
+            constructor(id, color) {
+                Object.assign(this, { id, color });
+            }
+        },
+        ThemeColor: class ThemeColor {
+            constructor(id) {
+                this.id = id;
+            }
+        },
+        FileDecoration: class FileDecoration {
+            constructor(badge, tooltip, color) {
+                Object.assign(this, { badge, tooltip, color });
+            }
+        },
+        EventEmitter: class EventEmitter {
+            constructor() {
+                this.event = emitter();
+            }
+
+            fire(value) {
+                this.event.fire(value);
+            }
+
+            dispose() {}
+        },
         ViewColumn: { One: 1, Beside: -2 },
         ConfigurationTarget: { Global: 1, Workspace: 2 },
         window: {
@@ -170,6 +235,15 @@ function createVscode(state) {
                 state.serializers.set(viewType, serializer);
                 return { dispose: () => state.serializers.delete(viewType) };
             },
+            createTreeView(id, options) {
+                const view = createTreeView(id, options);
+                state.treeViews.set(id, view);
+                return view;
+            },
+            registerFileDecorationProvider(provider) {
+                state.decorations.push(provider);
+                return { dispose: () => state.decorations.splice(state.decorations.indexOf(provider), 1) };
+            },
         },
         workspace: {
             get workspaceFolders() {
@@ -194,6 +268,7 @@ function createVscode(state) {
             onDidChangeTextDocument: onChangeDocument,
             onDidSaveTextDocument: onSaveDocument,
             onDidCloseTextDocument: onCloseDocument,
+            onDidChangeWorkspaceFolders: onWorkspaceFolders,
             createFileSystemWatcher(pattern) {
                 const events = { change: emitter(), create: emitter(), delete: emitter() };
                 const watcher = {
@@ -233,8 +308,13 @@ function createVscode(state) {
                 state.commands.set(id, callback);
                 return { dispose: () => state.commands.delete(id) };
             },
+            // The context keys go to state.context, the other commands to state.executed
             executeCommand(id, ...args) {
-                state.executed.push({ id, args });
+                if (id === 'setContext') {
+                    state.context[args[0]] = args[1];
+                } else {
+                    state.executed.push({ id, args });
+                }
                 return Promise.resolve();
             },
         },
@@ -296,6 +376,12 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] }), initial = {}
         documents: [],
         gitExtension: undefined,
         parseOptions: [],
+        // Views of the Activity Bar: the ones visible when the extension activates, the views by
+        // id, the decoration providers, the context keys
+        visibleViews: [],
+        treeViews: new Map(),
+        decorations: [],
+        context: {},
         ...initial,
     };
     const parser = {
@@ -1324,4 +1410,311 @@ test('free version: the page gets the git status of the tables, the columns come
     api.setLicenseStatus({ kind: 'expired' });
     assert.equal(panel.sent('settings').at(-1).pro, false);
     assert.equal(panel.sent('schema').at(-1).tables[0].columns[1].git, undefined);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The views of the Activity Bar (sidebar.js)
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const fires = (event) => {
+    let count = 0;
+    event(() => count++);
+    return () => count;
+};
+
+const SIDEBAR_TABLES = [
+    {
+        table: 'users',
+        git: 'untracked',
+        columns: [{ name: 'id', type: 'bigIncrements', primary: true, git: 'untracked', source: { file: 'database/migrations/2024_01_01_000000_create_users_table.php', line: 14 } }],
+        relations: [],
+        source: { file: 'database/migrations/2024_01_01_000000_create_users_table.php', line: 12 },
+    },
+    {
+        table: 'posts',
+        columns: [{ name: 'user_id', type: 'unsignedBigInteger', nullable: true }],
+        relations: [{ foreignKey: 'user_id', references: 'id', on: 'users', type: 'many-to-one' }],
+    },
+];
+
+test('views: the container has its views; the Schema view reads the schema itself, without the diagram', async () => {
+    const ext = activate(() => ({ tables: SIDEBAR_TABLES, warnings: ['x.php:1: skipped'] }));
+    const dir = folder('views', LARAVEL);
+    ext.openFolders(dir);
+    const views = ext.state.treeViews;
+    assert.deepEqual([...views.keys()], ['DMDB.schema', 'DMDB.tools', 'DMDB.exports', 'DMDB.license']);
+    assert.equal(views.get('DMDB.schema').options.showCollapseAll, true);
+    assert.deepEqual(ext.state.context, { 'drawMeDatabase.sidebar': true, 'drawMeDatabase.license': 'free' });
+
+    // Nothing is read while the view is hidden
+    const schema = views.get('DMDB.schema');
+    assert.deepEqual(schema.items(), []);
+    assert.equal(ext.state.parsed.length, 0);
+
+    const changes = fires(ext.context.api.onDidChangeSchema);
+    schema.show();
+    assert.equal(ext.state.context['drawMeDatabase.schemaState'], 'loading');
+    await sleep(10);
+    assert.equal(ext.state.parsed.length, 1);
+    assert.equal(ext.state.panels.length, 0, 'no diagram');
+    assert.equal(ext.state.context['drawMeDatabase.schemaState'], 'ready');
+    assert.equal(schema.description, 'Laravel · views');
+    assert.equal(changes(), 1, 'other extensions get the schema too');
+    assert.deepEqual(ext.context.api.getSchema().tables, SIDEBAR_TABLES);
+    // The messages go to the output only: the view tells what happened
+    assert.deepEqual(ext.state.warnings, []);
+    assert.ok(ext.state.output.includes('Warning: x.php:1: skipped'));
+
+    const [posts, users] = schema.items();
+    assert.deepEqual({ label: posts.label, description: posts.description, icon: posts.iconPath.id, collapsible: posts.collapsibleState, command: posts.command },
+        { label: 'posts', description: '1 column', icon: 'table', collapsible: 1, command: undefined });
+    assert.deepEqual(posts.children.map(column => [column.label, column.description, column.iconPath.id]), [['user_id', 'unsignedBigInteger? → users.id', 'references']]);
+    assert.equal(users.id, 'table:users');
+    assert.equal(users.contextValue, 'table');
+    assert.deepEqual(users.command, { title: 'users', command: 'DMDB.openTable', arguments: ['users'] });
+
+    // The git status of the table colors its name; the one of its columns comes with Pro
+    assert.equal(users.resourceUri.scheme, 'drawmedatabase');
+    assert.equal(users.resourceUri.query, 'git=untracked');
+    assert.equal(users.children[0].resourceUri, undefined);
+    const decoration = ext.state.decorations[0].provideFileDecoration(users.resourceUri);
+    assert.deepEqual({ badge: decoration.badge, tooltip: decoration.tooltip, color: decoration.color.id }, { badge: 'U', tooltip: 'Not in the last commit', color: 'gitDecoration.untrackedResourceForeground' });
+    assert.equal(ext.state.decorations[0].provideFileDecoration(Uri.file('/x.php')), undefined);
+    ext.context.api.setLicenseStatus({ kind: 'trial', daysLeft: 3 });
+    assert.equal(schema.items()[1].children[0].resourceUri.query, 'git=untracked');
+    ext.state.settings[''] = { 'DrawMeDatabase.showGitStatus': false };
+    assert.equal(schema.items()[1].resourceUri, undefined, 'git status hidden');
+});
+
+test('views: a click opens the file of a table or the line of a column; Show in Diagram selects the table', async () => {
+    const ext = activate(() => ({ tables: SIDEBAR_TABLES, warnings: [] }), { visibleViews: ['DMDB.schema'] });
+    const dir = folder('views-open', LARAVEL);
+    ext.openFolders(dir);
+    // Visible from the start (the layout of the window is restored)
+    await sleep(10);
+    const [, users] = ext.state.treeViews.get('DMDB.schema').items();
+    const run = (item) => ext.state.commands.get(item.command.command)(...item.command.arguments);
+
+    run(users);
+    run(users.children[0]);
+    await flush();
+    const file = path.join(dir, 'database', 'migrations', '2024_01_01_000000_create_users_table.php');
+    assert.deepEqual(ext.state.opened.map(opened => [opened.path, opened.options.selection.startLine]), [[file, 11], [file, 13]]);
+
+    // Show in Diagram: the diagram is opened, then shows the table once it is ready
+    const show = ext.state.commands.get('DMDB.showInDiagram');
+    show(users.node);
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDB.parseSchema', args: [] }]);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(panel.posted.slice(-2).map(message => message.type), ['schema', 'showTable']);
+    assert.deepEqual(panel.sent('showTable'), [{ type: 'showTable', table: 'users' }]);
+    // Once ready, at once (a column shows its table); invalid arguments do nothing
+    show(users.children[0].node);
+    show({ table: 3 });
+    show(undefined);
+    assert.deepEqual(panel.sent('showTable').at(-1), { type: 'showTable', table: 'users' });
+    assert.equal(panel.sent('showTable').length, 2);
+    assert.ok(panel.reveals >= 1);
+});
+
+test('views: the tools, exports and license of the side panel, Pro ones greyed until it adds them', async () => {
+    const ext = activate();
+    const api = ext.context.api;
+    ext.openFolders(folder('views-tools', LARAVEL));
+    const tools = ext.state.treeViews.get('DMDB.tools');
+    const exportsView = ext.state.treeViews.get('DMDB.exports');
+    const license = ext.state.treeViews.get('DMDB.license');
+    const command = (id) => ext.state.commands.get(id);
+    const toolsChanged = fires(tools.options.treeDataProvider.onDidChangeTreeData);
+
+    const free = tools.items();
+    assert.ok(free.length >= 10 && free.every(item => item.description === 'PRO' && item.resourceUri.query === 'state=missing'), 'every Pro tool is greyed');
+    assert.equal(free[0].iconPath.color.id, 'disabledForeground');
+    const greyed = ext.state.decorations[0].provideFileDecoration(free[0].resourceUri);
+    assert.deepEqual({ badge: greyed.badge, color: greyed.color.id, tooltip: greyed.tooltip }, { badge: undefined, color: 'disabledForeground', tooltip: 'Available with DrawMeDatabase Pro' });
+
+    // A missing tool or export opens the page of DrawMeDatabase Pro
+    command('DMDB.runTool')('pro.canvas');
+    command('DMDB.runExport')('pro.sql-mysql');
+    command('DMDB.runTool')(undefined);
+    await flush();
+    assert.deepEqual(ext.state.executed, [
+        { id: 'extension.open', args: ['GuillaumeCancalon.draw-me-database-pro'] },
+        { id: 'extension.open', args: ['GuillaumeCancalon.draw-me-database-pro'] },
+    ]);
+
+    // Pro adds them: they run their command
+    api.registerTool({ id: 'pro.canvas', label: 'Schema canvas', command: 'DMDBPro.openCanvas', pro: true });
+    api.registerExporter({ id: 'pro.sql-mysql', label: 'SQL', extension: 'sql', export: () => 'SQL' });
+    assert.ok(toolsChanged() >= 1);
+    const canvas = tools.items().find(item => item.id === 'tool:pro.canvas');
+    assert.deepEqual({ label: canvas.label, description: canvas.description, resourceUri: canvas.resourceUri, icon: canvas.iconPath.id, color: canvas.iconPath.color },
+        { label: 'Schema canvas', description: undefined, resourceUri: undefined, icon: 'layout', color: undefined });
+    assert.equal(exportsView.items().find(item => item.id === 'export:pro.sql-mysql').description, undefined);
+    ext.state.executed = [];
+    command(canvas.command.command)(...canvas.command.arguments);
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.openCanvas', args: [] }]);
+
+    // An export asks the diagram (opened first), which runs it on what it shows
+    ext.state.executed = [];
+    command('DMDB.runExport')('svg');
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDB.parseSchema', args: [] }]);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(panel.sent('runExport'), [{ type: 'runExport', id: 'svg' }]);
+    command('DMDB.runExport')('pro.sql-mysql');
+    assert.deepEqual(panel.sent('runExport').at(-1), { type: 'runExport', id: 'pro.sql-mysql' });
+
+    // The license: the view is hidden without Pro (context key), then follows its state
+    assert.equal(ext.state.context['drawMeDatabase.license'], 'free');
+    api.setLicenseStatus({ kind: 'trial', daysLeft: 9, commands: { buy: 'DMDBPro.buyLicense', enter: 'DMDBPro.enterLicense' } });
+    assert.equal(ext.state.context['drawMeDatabase.license'], 'trial');
+    assert.deepEqual(license.items().map(item => item.label), ['Pro trial: 9 days left', 'Buy a license', 'Enter a license key']);
+    ext.state.executed = [];
+    command('DMDB.licenseAction')('buy');
+    command('DMDB.licenseAction')('manage');
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.buyLicense', args: [] }]);
+    api.setLicenseStatus({ kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
+    assert.equal(tools.items().find(item => item.id === 'tool:pro.canvas').iconPath.id, 'lock');
+    api.setLicenseStatus(null);
+    assert.equal(ext.state.context['drawMeDatabase.license'], 'free');
+});
+
+test('views: the welcome content tells why there is no schema, without notifications', async () => {
+    let parse = () => ({ tables: TABLES, warnings: [] });
+    const ext = activate((basePath, options) => parse(basePath, options), { visibleViews: ['DMDB.schema'] });
+    const state = () => ext.state.context['drawMeDatabase.schemaState'];
+    const refresh = async () => {
+        ext.state.commands.get('DMDB.refreshSchema')();
+        await sleep(10);
+    };
+    await sleep(10);
+    assert.equal(state(), 'noFolder');
+
+    const empty = folder('views-empty');
+    ext.openFolders(empty);
+    await refresh();
+    assert.equal(state(), 'noProject');
+
+    // The framework folder is set: the view reads it again
+    folder('views-empty/backend', LARAVEL);
+    ext.state.settings[path.resolve(empty)] = { 'DrawMeDatabase.frameworkPath': 'backend' };
+    ext.vscode.changeConfiguration('DrawMeDatabase.frameworkPath');
+    await sleep(600);
+    assert.equal(state(), 'ready');
+    assert.equal(ext.state.treeViews.get('DMDB.schema').items().length, 2);
+
+    parse = () => ({ tables: [], warnings: [] });
+    await refresh();
+    assert.equal(state(), 'noTables');
+    assert.deepEqual(ext.state.treeViews.get('DMDB.schema').items(), []);
+    assert.equal(ext.context.api.getSchema(), null);
+
+    parse = () => {
+        throw new ParserError('composer.json is not valid JSON');
+    };
+    await refresh();
+    assert.equal(state(), 'error');
+    parse = () => {
+        throw new Error('boom');
+    };
+    await refresh();
+    assert.equal(state(), 'error');
+    assert.deepEqual(ext.state.errors, []);
+    assert.deepEqual(ext.state.infos, []);
+    assert.ok(ext.state.output.some(line => line.includes('boom')));
+
+    ext.state.commands.get('DMDB.showOutput')();
+    assert.equal(ext.state.outputShown, 1);
+    ext.state.commands.get('DMDB.openSettings')('frameworkPath');
+    ext.state.commands.get('DMDB.openSettings')();
+    await flush();
+    assert.deepEqual(ext.state.executed.slice(-2), [
+        { id: 'workbench.action.openSettings', args: ['DrawMeDatabase.frameworkPath'] },
+        { id: 'workbench.action.openSettings', args: ['@ext:GuillaumeCancalon.draw-me-database'] },
+    ]);
+});
+
+test('views: the Schema view follows the code while it is visible, and stops when it is hidden', async () => {
+    const ext = activate(() => ({ tables: TABLES, warnings: [] }), { visibleViews: ['DMDB.schema'] });
+    const dir = folder('views-live', LARAVEL);
+    ext.openFolders(dir);
+    await sleep(10);
+    assert.equal(ext.state.parsed.length, 1);
+    assert.equal(ext.state.watchers.length, 1);
+    const watcher = ext.state.watchers[0];
+    assert.equal(watcher.pattern.base.fsPath, path.join(dir, 'database', 'migrations'));
+
+    watcher.fire('create');
+    await sleep(600);
+    assert.equal(ext.state.parsed.length, 2);
+    assert.equal(ext.state.panels.length, 0);
+
+    const schema = ext.state.treeViews.get('DMDB.schema');
+    schema.show(false);
+    assert.equal(watcher.disposed, true);
+    // Shown again: the code may have changed meanwhile
+    schema.show(true);
+    await sleep(10);
+    assert.equal(ext.state.parsed.length, 3);
+    assert.equal(ext.state.watchers.length, 2);
+
+    // The diagram, once closed, leaves the view following the code
+    ext.run();
+    ext.state.panels[0].dispose();
+    assert.equal(ext.state.watchers.at(-1).disposed, false);
+    // The refresh of the view redraws the open diagram quietly, without bringing it to the front
+    ext.run();
+    const panel = ext.state.panels[1];
+    panel.postFromPage({ type: 'ready' });
+    const reveals = panel.reveals;
+    ext.state.commands.get('DMDB.refreshSchema')();
+    assert.equal(panel.reveals, reveals);
+    assert.equal(ext.state.parsed.length, 6);
+});
+
+test('views: the language and the git settings redraw the views; the options panel opens them', async () => {
+    const ext = activate();
+    ext.openFolders(folder('views-language', LARAVEL));
+    const tools = ext.state.treeViews.get('DMDB.tools');
+    const changed = fires(tools.options.treeDataProvider.onDidChangeTreeData);
+    const decorations = fires(ext.state.decorations[0].onDidChangeFileDecorations);
+    assert.equal(tools.items()[0].label, 'Schema canvas');
+
+    ext.state.settings[''] = { 'DrawMeDatabase.language': 'fr' };
+    ext.vscode.changeConfiguration('DrawMeDatabase.language');
+    assert.equal(changed(), 1);
+    assert.equal(decorations(), 1);
+    assert.equal(tools.items()[0].label, 'Canevas du schéma');
+    assert.equal(tools.items()[0].tooltip, 'Déplacez les tables et les liens à la main\nDisponible avec DrawMeDatabase Pro');
+    ext.vscode.changeConfiguration('DrawMeDatabase.showGitStatus');
+    assert.equal(changed(), 2);
+
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'openSidebar' });
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'workbench.view.extension.drawMeDatabase', args: [] }]);
+});
+
+test('views: what was asked for the diagram is dropped when there is nothing to draw', async () => {
+    let tables = TABLES;
+    const ext = activate(() => ({ tables, warnings: [] }));
+    ext.openFolders(folder('views-dropped', LARAVEL));
+    ext.state.commands.get('DMDB.runExport')('png');
+    // DMDB.parseSchema finds no tables: the panel is not opened, the export is forgotten
+    tables = [];
+    ext.run();
+    tables = TABLES;
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(panel.sent('runExport'), []);
 });

@@ -38,7 +38,7 @@
             'zoom.fit': 'Fit to window (F)',
             'export.button': 'Export',
             'refresh': 'Refresh from the code',
-            'panel.toggle': 'Options, appearance and tools',
+            'panel.toggle': 'Options and appearance',
             'viewport.label': 'Database diagram. Drag to move it, Ctrl and the mouse wheel to zoom, F to fit.',
             'legend.label': 'Git status of the tables',
             'legend.untracked': 'New',
@@ -208,6 +208,14 @@
             'panel.license.buy': 'Buy a license',
             'panel.license.enter': 'Enter a license key',
             'panel.license.manage': 'License',
+            'panel.sidebar': 'Tools, exports and license',
+            'panel.sidebar.hint': 'They are in the DrawMeDatabase view of the Activity Bar.',
+            'panel.sidebar.open': 'Open the DrawMeDatabase view',
+
+            // Views of the Activity Bar (sidebar.js)
+            'sidebar.primaryKey': 'Primary key',
+            'sidebar.foreignKey': 'Foreign key to {target}',
+            'sidebar.export.hint': 'What the diagram shows: the search result when there is one',
 
             // Tools of DrawMeDatabase Pro (shown before it is installed)
             'tool.pro.canvas': 'Schema canvas',
@@ -286,7 +294,7 @@
             'zoom.fit': 'Ajuster à la fenêtre (F)',
             'export.button': 'Exporter',
             'refresh': 'Relire le code',
-            'panel.toggle': 'Options, apparence et outils',
+            'panel.toggle': 'Options et apparence',
             'viewport.label': 'Diagramme de la base de données. Glissez pour le déplacer, Ctrl et la molette pour zoomer, F pour l\'ajuster.',
             'legend.label': 'Statut git des tables',
             'legend.untracked': 'Nouvelles',
@@ -452,6 +460,13 @@
             'panel.license.buy': 'Acheter une licence',
             'panel.license.enter': 'Saisir une clé de licence',
             'panel.license.manage': 'Licence',
+            'panel.sidebar': 'Outils, exports et licence',
+            'panel.sidebar.hint': 'Ils sont dans la vue DrawMeDatabase de la barre d\'activité.',
+            'panel.sidebar.open': 'Ouvrir la vue DrawMeDatabase',
+
+            'sidebar.primaryKey': 'Clé primaire',
+            'sidebar.foreignKey': 'Clé étrangère vers {target}',
+            'sidebar.export.hint': 'Ce que montre le diagramme : le résultat de la recherche s\'il y en a un',
 
             'tool.pro.canvas': 'Canevas du schéma',
             'tool.pro.canvas.hint': 'Déplacez les tables et les liens à la main',

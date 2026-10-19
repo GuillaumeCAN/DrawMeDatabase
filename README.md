@@ -40,14 +40,22 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 - Live: the diagram follows what you type in a migration or an entity, before you save it
 - Git status of the tables: new, modified, and changed in an editor but not saved yet, in the colors of the git decorations of VS Code (Laravel and Symfony, when the project is a git repository)
 
-**Options panel** (the panel button at the right of the toolbar): everything in one place, saved in your settings.
+**DrawMeDatabase in the Activity Bar** (the database icon), like GitLens:
+
+- **Schema**: the tables of the project and their columns (keys, types, foreign keys, git status), read from the code without opening the diagram. A click opens the migration or the entity, or the line of a column; *Show in Diagram* selects the table in the diagram
+- **Tools** and **Exports**: the exports of the diagram, and the tools and exports of DrawMeDatabase Pro, greyed with PRO until it is installed
+- **License**: the state of DrawMeDatabase Pro, once it is installed
+- Without a Laravel or Symfony project, the Schema view tells why and how to set the framework folder
+
+![The DrawMeDatabase sidebar: the tables and columns of the project, the tools of DrawMeDatabase Pro greyed with PRO, the exports, and the diagram](images/screenshots/sidebar.png)
+
+**Options panel** of the diagram (the panel button at the right of the toolbar): everything about the diagram in one place, saved in your settings.
 
 - **Diagram**: layout, direction, git status, keys only (primary and foreign keys), relation names, background grid
 - **Appearance**: like VS Code, light or dark whatever the VS Code theme, and the size of the text. The palettes, your own colors and the fonts come with DrawMeDatabase Pro
-- **Language**: English or French, or the language of VS Code (the diagram, the messages, and the commands and settings of VS Code)
-- **Tools and exports** of DrawMeDatabase Pro, greyed with a PRO badge until it is installed, and the state of its license
+- **Settings**: English or French, or the language of VS Code (the diagram, the views, the messages, and the commands and settings of VS Code), live refresh, the framework folder
 
-![The options panel: the options of the diagram and the theme; the git status of each column, the palettes, the colors, and the tools and exports of DrawMeDatabase Pro, greyed with a PRO badge](images/screenshots/options-panel.png)
+![The options panel: the options of the diagram and the theme, the git status of each column, the palettes and the colors of DrawMeDatabase Pro with a PRO badge, the settings](images/screenshots/options-panel.png)
 
 **JSON viewer:** the parsed schema, colored like code, to save or copy.
 
@@ -85,7 +93,7 @@ It has a free 14-day trial. Search for "DrawMeDatabase Pro" in the Extensions vi
 
 ## Usage
 
-Open your project, then click **DrawMeDatabase** in the status bar (or run `DrawMeDatabase: Draw Database Schema` from the Command Palette).
+Open your project, then click **DrawMeDatabase** in the status bar (or run `DrawMeDatabase: Draw Database Schema` from the Command Palette, or click the diagram button of the Schema view in the DrawMeDatabase sidebar).
 
 In the panel:
 
@@ -143,5 +151,5 @@ GitHub Actions runs these checks on every pull request, the integration tests al
 
 ## Changelog
 
-Latest release : **v1.6.0**
+Latest release : **v1.7.0**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

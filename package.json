@@ -3,7 +3,7 @@
   "displayName": "DrawMeDatabase",
   "publisher": "GuillaumeCancalon",
   "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "icon": "images/logo_128.png",
   "engines": {
     "vscode": "^1.96.0"
@@ -39,6 +39,91 @@
         "title": "%command.refresh%",
         "category": "DrawMeDatabase",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "DMDB.refreshSchema",
+        "title": "%command.refreshSchema%",
+        "category": "DrawMeDatabase",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "DMDB.showInDiagram",
+        "title": "%command.showInDiagram%",
+        "category": "DrawMeDatabase",
+        "icon": "$(target)"
+      },
+      {
+        "command": "DMDB.openSettings",
+        "title": "%command.openSettings%",
+        "category": "DrawMeDatabase",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "DMDB.showOutput",
+        "title": "%command.showOutput%",
+        "category": "DrawMeDatabase",
+        "icon": "$(output)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "drawMeDatabase",
+          "title": "DrawMeDatabase",
+          "icon": "images/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "drawMeDatabase": [
+        {
+          "id": "DMDB.schema",
+          "name": "%view.schema%",
+          "contextualTitle": "DrawMeDatabase"
+        },
+        {
+          "id": "DMDB.tools",
+          "name": "%view.tools%",
+          "contextualTitle": "DrawMeDatabase"
+        },
+        {
+          "id": "DMDB.exports",
+          "name": "%view.exports%",
+          "contextualTitle": "DrawMeDatabase"
+        },
+        {
+          "id": "DMDB.license",
+          "name": "%view.license%",
+          "contextualTitle": "DrawMeDatabase",
+          "when": "drawMeDatabase.license && drawMeDatabase.license != free"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "DMDB.schema",
+        "contents": "%welcome.noFolder%",
+        "when": "workspaceFolderCount == 0"
+      },
+      {
+        "view": "DMDB.schema",
+        "contents": "%welcome.loading%",
+        "when": "workspaceFolderCount > 0 && drawMeDatabase.schemaState == loading"
+      },
+      {
+        "view": "DMDB.schema",
+        "contents": "%welcome.noProject%",
+        "when": "workspaceFolderCount > 0 && drawMeDatabase.schemaState == noProject"
+      },
+      {
+        "view": "DMDB.schema",
+        "contents": "%welcome.noTables%",
+        "when": "workspaceFolderCount > 0 && drawMeDatabase.schemaState == noTables"
+      },
+      {
+        "view": "DMDB.schema",
+        "contents": "%welcome.error%",
+        "when": "workspaceFolderCount > 0 && drawMeDatabase.schemaState == error"
       }
     ],
     "configuration": {
@@ -252,6 +337,45 @@
           "command": "DMDB.refresh",
           "when": "activeWebviewPanelId == 'drawMeDatabase'",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "DMDB.parseSchema",
+          "when": "view == DMDB.schema",
+          "group": "navigation@1"
+        },
+        {
+          "command": "DMDB.refreshSchema",
+          "when": "view == DMDB.schema",
+          "group": "navigation@2"
+        },
+        {
+          "command": "DMDB.openSettings",
+          "when": "view == DMDB.schema",
+          "group": "9_settings"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "DMDB.showInDiagram",
+          "when": "view == DMDB.schema && viewItem == table",
+          "group": "inline"
+        },
+        {
+          "command": "DMDB.showInDiagram",
+          "when": "view == DMDB.schema && viewItem =~ /^(table|column)$/",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "DMDB.refreshSchema",
+          "when": "false"
+        },
+        {
+          "command": "DMDB.showInDiagram",
+          "when": "false"
         }
       ]
     }
