@@ -257,6 +257,48 @@ describe('sql parser: statements', () => {
         assert.equal(parser.sniffDialect(["CREATE TABLE a (id serial, b text DEFAULT ''::text);"]), 'postgresql');
         assert.equal(parser.sniffDialect(['CREATE TABLE a (id int);']), 'unknown');
     });
+
+    it('data statements (INSERT, REPLACE) that skipData skips are not read past their first tokens, their strings and comments still ending them; each statement is given as soon as it is read', () => {
+        const text = [
+            'CREATE TABLE a (id int);',
+            "INSERT INTO a VALUES (1, 'x;y', E'z\\';', $$w;$$, \"q;\"), (2, 'it''s -- not a comment; /* nor */');",
+            'insert into a values (3);INSERT INTO a VALUES (4) -- c;',
+            ';',
+            'REPLACE INTO a SELECT 1 /* ; */;',
+            'CREATE TABLE b (id int);',
+            "INSERT INTO migrations VALUES (1, 'm;');",
+            "INSERT INTO a VALUES ('never",
+        ].join('\n');
+        const scan = (skipData) => {
+            const read = [];
+            const asked = [];
+            const result = parser.scanStatements(text, 'postgresql', {
+                skipData: (tokens) => {
+                    asked.push(tokens.length);
+                    return skipData(tokens);
+                },
+                onStatement: (statement) => read.push(statement.tokens.map(t => t.value).join(' ')),
+            });
+            return { read, asked, statements: result.statements, problems: result.problems.map(p => `${text.slice(0, p.offset).split('\n').length}: ${p.message}`) };
+        };
+        // The rows of migrations are read, as for the schema dump of Laravel
+        const byName = scan((tokens) => (tokens.length < 3 ? null : tokens[2].value !== 'migrations'));
+        assert.deepEqual(byName.read, ['CREATE TABLE a ( id int )', 'INSERT INTO a', 'insert into a', 'INSERT INTO a', 'REPLACE INTO a', 'CREATE TABLE b ( id int )', 'INSERT INTO migrations VALUES ( 1 , m; )', 'INSERT INTO a never']);
+        assert.deepEqual(byName.statements, [], 'given to onStatement, not kept');
+        assert.deepEqual(byName.problems, ['8: string not closed: the end of the file is skipped.']);
+        assert.ok(Math.max(...byName.asked) <= 3, 'asked on the first tokens only');
+        // Skipped at their first word: the data statements that follow one another are passed over at once
+        const all = scan(() => true);
+        assert.deepEqual(all.read, ['CREATE TABLE a ( id int )', 'INSERT', 'CREATE TABLE b ( id int )', 'INSERT never']);
+        assert.deepEqual(all.problems, byName.problems);
+        // Without skipData, the same statements in full
+        assert.deepEqual(statementsOf(text).filter(s => !/^(?:INSERT|insert|REPLACE)/.test(s)), ['CREATE TABLE a ( id int )', 'CREATE TABLE b ( id int )']);
+        // MySQL: backslashes, double-quoted strings, # comments and a DELIMITER
+        const mysql = "INSERT INTO `t` VALUES ('a\\';b', \"c\\\";d\", 'e'); # f;\nDELIMITER ;;\nINSERT INTO t VALUES ('g;');;\nCREATE TABLE `u` (id int);;\nDELIMITER ;\nCREATE TABLE v (id int);";
+        const read = [];
+        parser.scanStatements(mysql, 'mysql', { skipData: () => true, onStatement: (statement) => read.push(statement.tokens.map(t => t.value).join(' ')) });
+        assert.deepEqual(read, ['INSERT', 'INSERT', 'CREATE TABLE u ( id int )', 'CREATE TABLE v ( id int )']);
+    });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -304,6 +346,25 @@ describe('sql parser: where the SQL files are, in the order of each tool', () =>
             assert.deepEqual(tables(dir), ['a', 'a1', 'a21', 'b', 'c', 'j'], folder);
             assert.equal(parser.detect(dir), 45, folder);
         }
+    });
+
+    it('Flyway: a schema written as a placeholder (${schema}.users) is the default one, the other placeholders are left as they are', () => {
+        const dir = project({
+            'db/migration/V1__init.sql': `CREATE TABLE \${schema}.users (id int primary key, name text);
+CREATE TABLE posts (id int primary key, user_id int references \${schema}.users(id));
+CREATE TABLE "\${flyway:defaultSchema}".tags (id int primary key);
+CREATE TABLE \${flyway:defaultSchema}.post_tags (post_id int references posts(id), tag_id int references tags(id), primary key (post_id, tag_id));
+GRANT SELECT ON posts TO \${reader};
+CREATE TABLE \${table} (id int);`,
+        });
+        const { tables, warnings } = parser.parse(dir, { git: false, columnSources: true });
+        // As PostgreSQL 17 has them once Flyway gives the placeholders the value public
+        assert.deepEqual(shape(tables), { users: 'id* name?', posts: 'id* user_id?', tags: 'id*', post_tags: 'post_id* tag_id*' });
+        assert.deepEqual(relationsOf(tables), ['posts.user_id -> users.id many-to-one', 'post_tags.post_id -> posts.id many-to-one', 'post_tags.tag_id -> tags.id many-to-one']);
+        assert.deepEqual(tableNamed(tables, 'posts').columns[1].source, { file: 'db/migration/V1__init.sql', line: 2 });
+        assert.deepEqual(warnings, ['db/migration/V1__init.sql:6: CREATE TABLE not understood, skipped: CREATE TABLE ${table} (id int)']);
+        // Only Flyway replaces them
+        assert.deepEqual(Object.keys(shape(replayed('CREATE TABLE ${schema}.users (id int);').tables)), []);
     });
 
     it('Flyway: a folder reached through symbolic links is read once, and a link back to a parent folder is not followed', () => {
@@ -789,6 +850,140 @@ CREATE UNLOGGED TABLE cache (k text PRIMARY KEY);`);
         assert.deepEqual(tableNamed(tables, 'child').columns[1], { name: 'at', type: 'timestamptz', defaultRaw: 'now()' });
         assert.deepEqual(warnings, []);
     });
+
+    it('a column named begin in a table that has one named event is a column, not the body of a routine: the next statements are read', () => {
+        const { tables, warnings } = replayed(`create table bookings (id int primary key, event text, begin timestamptz, "end" timestamptz);
+create table rooms (id int primary key);
+create function f(a int) returns int language sql begin atomic select a + 1; select a; end;
+create table users (id int primary key);
+alter table rooms add column name text;`);
+        assert.deepEqual(shape(tables), { bookings: 'id* event? begin? end?', rooms: 'id* name?', users: 'id*' });
+        assert.deepEqual(warnings, []);
+    });
+
+    it('nextval() of a serial column, quoted (pg_dump --quote-all-identifiers, supabase db dump) or in pg_catalog, is an auto-increment', () => {
+        const { tables } = replayed(`CREATE TABLE "public"."t" ("id" integer NOT NULL, "n" integer, "q" integer, "o" integer);
+ALTER TABLE ONLY "public"."t" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."t_id_seq"'::"regclass");
+ALTER TABLE t ALTER COLUMN n SET DEFAULT pg_catalog.nextval('t_n_seq');
+ALTER TABLE t ALTER COLUMN q SET DEFAULT "pg_catalog"."nextval"('t_q_seq'::regclass);
+ALTER TABLE t ALTER COLUMN o SET DEFAULT "NextVal"('t_o_seq');`);
+        assert.deepEqual(tableNamed(tables, 't').columns.map(c => [c.name, c.autoIncrement || c.defaultRaw]), [['id', true], ['n', true], ['q', true], ['o', '"NextVal"(\'t_o_seq\')']]);
+    });
+
+    it('the search path: RESET search_path and RESET ALL give the default one back, SET LOCAL lasts until COMMIT or ROLLBACK', () => {
+        const { tables } = replayed(`create schema app;
+set search_path to app;
+create table a (id int primary key);
+reset search_path;
+create table b (id int primary key, a_id int references app.a);
+begin;
+set local search_path to app;
+create table c (id int);
+commit;
+create table d (id int);
+begin;
+set search_path = app;
+set local search_path = public;
+create table e (id int);
+commit;
+create table f (id int);
+reset all;
+begin;
+set search_path = app;
+rollback;
+create table g (id int);
+begin;
+set local search_path = app;
+savepoint s;
+rollback to savepoint s;
+create table h (id int);
+end;
+create table i (id int);
+start transaction;
+select pg_catalog.set_config('search_path', 'app', true);
+create table j (id int);
+commit;
+create table k (id int);
+set local search_path = app;
+create table l (id int);`);
+        // As PostgreSQL 17 creates them, run one by one; a SET LOCAL outside BEGIN lasts until the end of the file, which the
+        // migration tools run in a transaction
+        assert.deepEqual(tables.map(t => t.table), ['app.a', 'b', 'app.c', 'd', 'e', 'app.f', 'g', 'app.h', 'i', 'app.j', 'k', 'app.l']);
+        assert.deepEqual(relationsOf(tables), ['b.a_id -> app.a.id many-to-one']);
+    });
+
+    it('a default name already taken gets 1, 2... as PostgreSQL gives it: a second foreign key or index on the same columns is kept, and dropped by that name', () => {
+        const text = `create table a (id int primary key);
+create table b (id int primary key);
+create table c (x int references a, y int, z int unique);
+alter table c add foreign key (x) references b;
+alter table c add unique (z);
+create table accounts (id int primary key, mixed int, other int);
+create index on accounts (mixed);
+create index on accounts (mixed);
+create index on accounts (lower(other::text));
+create index on accounts (lower(other::text));
+create table c_y_fkey (id int);
+alter table c add foreign key (y) references a;`;
+        const indexes = (tables) => tableNamed(tables, 'accounts').indexes.map(index => index.columns.join(','));
+        const first = replayed(text);
+        assert.deepEqual(relationsOf(first.tables), ['c.x -> a.id many-to-one', 'c.x -> b.id many-to-one', 'c.y -> a.id many-to-one']);
+        assert.deepEqual(indexes(first.tables), ['mixed', 'mixed', 'lower(other::text)', 'lower(other::text)']);
+        // The names of PostgreSQL 17: c_x_fkey1, c_z_key1, accounts_mixed_idx1, accounts_lower_idx1 (c_y_fkey: a table of that name is no constraint)
+        const dropped = replayed(`${text}\nalter table c drop constraint c_x_fkey1;\nalter table c drop constraint c_y_fkey;\nalter table c drop constraint c_z_key1;\ndrop index accounts_mixed_idx1;\ndrop index accounts_lower_idx;`);
+        assert.deepEqual(relationsOf(dropped.tables), ['c.x -> a.id many-to-one']);
+        assert.deepEqual(indexes(dropped.tables), ['mixed', 'lower(other::text)']);
+        assert.equal(tableNamed(dropped.tables, 'c').columns[2].unique, true);
+        assert.deepEqual(dropped.warnings, []);
+    });
+
+    it('DROP COLUMN drops the indexes whose expression, WHERE or INCLUDE uses the column, as PostgreSQL does', () => {
+        const { tables } = replayed(`create table accounts (id int primary key, mail text, other text, note text, kind text, keep text);
+create unique index accounts_lower_mail on accounts (lower(mail));
+create index accounts_partial on accounts (other) where mail is not null;
+create index accounts_cover on accounts (id) include (note);
+create index accounts_kind on accounts ((kind::text));
+create index accounts_keep on accounts (keep) where keep <> '';
+create index accounts_renamed on accounts (lower(other));
+alter table accounts add constraint accounts_excl exclude using btree (keep with =) where (kind is not null);
+alter table accounts drop column mail;
+alter table accounts drop column note;
+alter table accounts rename column other to other2;
+alter table accounts drop column other2;
+alter table accounts drop column kind cascade;`);
+        assert.deepEqual(tableNamed(tables, 'accounts').indexes, [{ columns: ['keep'], type: 'index', name: 'accounts_keep' }]);
+        // A function or a type named as the column is not the column
+        const kept = replayed('create table t (id int, lower text, text text, x text);\ncreate index t_x on t (lower(x::text));\nalter table t drop column lower;\nalter table t drop column text;').tables;
+        assert.deepEqual(tableNamed(kept, 't').indexes, [{ columns: ['lower(x::text)'], type: 'index', name: 't_x' }]);
+    });
+
+    it('the columns added, dropped, renamed or altered on a parent are those of the tables that inherit it (INHERITS), unless ONLY or their own; DROP ... CASCADE drops them', () => {
+        const { tables, warnings } = replayed(`create table parent (id int primary key, old text, shared text);
+create table child (extra text, shared text) inherits (parent);
+create table grandchild (g int) inherits (child);
+create table other_parent (id int primary key);
+create table loner (id int primary key) inherits (other_parent);
+alter table parent add column added int references other_parent(id);
+alter table parent rename column added to added2;
+alter table parent alter column added2 type bigint;
+alter table parent alter column old set not null;
+alter table parent drop column shared;
+alter table parent drop column old;
+alter table parent add column only_drop int;
+alter table only parent drop column only_drop;
+alter table parent add column only_drop int;
+alter table parent drop column only_drop;
+alter table loner no inherit other_parent;
+alter table other_parent add column after_no int;
+create table droppable (id int primary key);
+create table droppable_child (x int) inherits (droppable);
+drop table droppable cascade;`);
+        // As PostgreSQL 17 has them; the foreign key of a parent is not inherited
+        assert.deepEqual(shape(tables), { parent: 'id* added2?', child: 'id shared? extra? added2? only_drop?', grandchild: 'id shared? extra? g? added2? only_drop?', other_parent: 'id* after_no?', loner: 'id*' });
+        assert.deepEqual(tableNamed(tables, 'grandchild').columns.find(c => c.name === 'added2').type, 'bigint');
+        assert.deepEqual(relationsOf(tables), ['parent.added2 -> other_parent.id many-to-one']);
+        assert.deepEqual(warnings, []);
+    });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -874,6 +1069,49 @@ ALTER TABLE a ADD COLUMN (c int, d int), ADD UNIQUE INDEX a_b (b, c), ADD KEY a_
         assert.deepEqual(tables[0].columns.map(c => `${c.name}${c.unique ? '!' : ''}`), ['id!', 'b', 'c', 'd']);
         assert.deepEqual(tables[0].indexes, [{ columns: ['b', 'c'], type: 'unique', name: 'a_b' }, { columns: ['c', 'd'], type: 'index', name: 'a_cd' }]);
     });
+
+    it('mysqldump --databases a b: the tables of the first database without its name, those of the others with theirs, as each USE tells', () => {
+        const { tables, warnings } = replayed(`CREATE DATABASE /*!32312 IF NOT EXISTS*/ \`app1\`;
+USE \`app1\`;
+DROP TABLE IF EXISTS \`users\`;
+CREATE TABLE \`users\` (\`id\` int NOT NULL, \`a1\` int, PRIMARY KEY (\`id\`)) ENGINE=InnoDB;
+CREATE TABLE \`posts\` (\`id\` int NOT NULL, \`user_id\` int, PRIMARY KEY (\`id\`), CONSTRAINT \`posts_ibfk_1\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`)) ENGINE=InnoDB;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ \`app2\`;
+USE \`app2\`;
+DROP TABLE IF EXISTS \`orders\`;
+CREATE TABLE \`orders\` (\`id\` int NOT NULL, \`user_id\` int, \`buyer_id\` int, PRIMARY KEY (\`id\`), CONSTRAINT \`orders_ibfk_1\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`), CONSTRAINT \`orders_ibfk_2\` FOREIGN KEY (\`buyer_id\`) REFERENCES \`app1\`.\`users\` (\`id\`)) ENGINE=InnoDB;
+DROP TABLE IF EXISTS \`users\`;
+CREATE TABLE \`users\` (\`id\` int NOT NULL, \`a2\` int, PRIMARY KEY (\`id\`)) ENGINE=InnoDB;
+ALTER TABLE app1.users ADD COLUMN extra int;`, 'mysql');
+        // As MySQL 8.4 has them after the dump is loaded
+        assert.deepEqual(shape(tables), { users: 'id* a1? extra?', posts: 'id* user_id?', 'app2.orders': 'id* user_id? buyer_id?', 'app2.users': 'id* a2?' });
+        assert.deepEqual(relationsOf(tables), ['posts.user_id -> users.id many-to-one', 'app2.orders.user_id -> app2.users.id many-to-one', 'app2.orders.buyer_id -> users.id many-to-one']);
+        assert.deepEqual(warnings, []);
+    });
+
+    it('a REFERENCES written on a column is no foreign key on MySQL 8.4 (told), but one on MariaDB; an unnamed foreign key is <table>_ibfk_<n> after the highest one', () => {
+        const text = `CREATE TABLE users (id INT PRIMARY KEY, email VARCHAR(100)) ENGINE=InnoDB;
+CREATE TABLE posts (id INT PRIMARY KEY, user_id INT REFERENCES users(id) ON DELETE CASCADE, author_id INT, FOREIGN KEY (author_id) REFERENCES users(id)) ENGINE=InnoDB;
+ALTER TABLE posts ADD COLUMN editor_id INT REFERENCES users(id);`;
+        const mysql = replayed(text, 'mysql');
+        assert.deepEqual(relationsOf(mysql.tables), ['posts.author_id -> users.id many-to-one']);
+        assert.deepEqual(mysql.warnings, [
+            'schema.sql:2: posts.user_id: MySQL 8.4 ignores a REFERENCES written on the column (MariaDB creates the key), no relation drawn: FOREIGN KEY (user_id) REFERENCES ... creates one.',
+            'schema.sql:3: posts.editor_id: MySQL 8.4 ignores a REFERENCES written on the column (MariaDB creates the key), no relation drawn: FOREIGN KEY (editor_id) REFERENCES ... creates one.',
+        ]);
+        // MariaDB: told by the header of its dump, or by the folder of the migrations
+        const mariadb = ['posts.user_id -> users.id many-to-one cascade', 'posts.author_id -> users.id many-to-one', 'posts.editor_id -> users.id many-to-one'];
+        assert.deepEqual(relationsOf(replayed(`-- MariaDB dump 10.19  Distrib 10.11.6-MariaDB, for debian-linux-gnu (x86_64)\n${text}`, 'mysql').tables), mariadb);
+        const dir = project({ 'mariadb/migrations/1_init.sql': text });
+        assert.deepEqual(relationsOf(parser.parse(path.join(dir, 'mariadb'), { git: false, details: true }).tables), mariadb);
+        // MySQL 8.4 numbers the unnamed foreign keys after the highest one
+        const { tables } = replayed(`CREATE TABLE a (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t (id INT PRIMARY KEY, x INT, y INT, z INT, FOREIGN KEY (x) REFERENCES a(id), FOREIGN KEY (y) REFERENCES a(id)) ENGINE=InnoDB;
+ALTER TABLE t DROP FOREIGN KEY t_ibfk_1;
+ALTER TABLE t ADD FOREIGN KEY (z) REFERENCES a(id);
+ALTER TABLE t DROP FOREIGN KEY t_ibfk_2;`, 'mysql');
+        assert.deepEqual(relationsOf(tables), ['t.z -> a.id many-to-one']);
+    });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -915,6 +1153,18 @@ CREATE VIRTUAL TABLE t_fts USING fts5(body, content='t');
 ALTER TABLE t ALTER COLUMN "body" TO "text" text NOT NULL DEFAULT '';`, 'sqlite');
         assert.deepEqual(tables[0].columns, [{ name: 'id', type: 'integer', primary: true }, { name: 'text', type: 'text', default: '' }]);
         assert.deepEqual(warnings, []);
+    });
+
+    it('PRIMARY KEY (id) of an INTEGER column is the rowid too, NOT NULL; INTEGER PRIMARY KEY DESC and INTEGER(11) are not', () => {
+        const { tables } = replayed(`CREATE TABLE a (id INTEGER PRIMARY KEY, name TEXT);
+CREATE TABLE b (id INTEGER, name TEXT, PRIMARY KEY (id));
+CREATE TABLE c (id INTEGER PRIMARY KEY DESC, name TEXT);
+CREATE TABLE d (id INTEGER, name TEXT, PRIMARY KEY (id DESC));
+CREATE TABLE e (id INT, name TEXT, PRIMARY KEY (id));
+CREATE TABLE f (a INTEGER, b INTEGER, PRIMARY KEY (a, b));
+CREATE TABLE h (id INTEGER(11) PRIMARY KEY, name TEXT);`, 'sqlite');
+        // As sqlite3 stores a NULL id: the rowid, or NULL
+        assert.deepEqual(shape(tables), { a: 'id* name?', b: 'id* name?', c: 'id?* name?', d: 'id* name?', e: 'id?* name?', f: 'a?* b?*', h: 'id?* name?' });
     });
 });
 
@@ -969,6 +1219,15 @@ CREATE UNIQUE INDEX bad;`);
             'schema.sql:1: ALTER TABLE t1 on a table that no file creates: table added.',
             'schema.sql:2: ALTER TABLE t1: ALTER COLUMN x DO SOMETHING VERY LONG AND UNKNOWN ALTER COLU... not understood, skipped.',
             'schema.sql:3: string not closed: the end of the file is skipped.',
+        ]);
+    });
+
+    it('a REFERENCES that cannot be read, a BEGIN that no END closes: told, not passed over in silence', () => {
+        const { tables, warnings } = replayed('CREATE TABLE a (id int PRIMARY KEY);\nCREATE TABLE b (id int, a_id int REFERENCES (id));\nCREATE TRIGGER t AFTER INSERT ON a BEGIN\n  SELECT 1;\nCREATE TABLE c (id int);\n', 'sqlite');
+        assert.deepEqual(shape(tables), { a: 'id?*', b: 'id? a_id?' });
+        assert.deepEqual(warnings, [
+            'schema.sql:2: column a_id: REFERENCES not understood, no relation drawn: REFERENCES (id)',
+            'schema.sql:3: a BEGIN that no END closes: the end of the file is read as the body of this statement.',
         ]);
     });
 });
@@ -1104,6 +1363,42 @@ describe('sql parser: robustness', () => {
         const results = inputs.map(text => replayed(text));
         assert.ok(Date.now() - started < 3000, `${Date.now() - started} ms`);
         assert.deepEqual(results.map(r => shape(r.tables)), [{ d: 'a? b? c?' }, { z: 'id?' }, { w: 'a? b?' }, { g: 'a? b?' }, { o: 'a?' }]);
+    });
+
+    it('a dump of 60 MB of data (mysqldump, pg_dump --inserts, COPY, sqlite3 .dump): its tables in a few hundred milliseconds, without holding its data as tokens', () => {
+        const build = (head, count, row, tail) => {
+            const parts = [head];
+            for (let k = 0; k < count; k++) {
+                parts.push(row(k));
+            }
+            parts.push(tail);
+            return parts.join('');
+        };
+        // Strings with what would end a statement or start a comment, and the table names of the schema
+        const rows = (k) => Array.from({ length: 50 }, (_, n) => `(${k * 50 + n},'it\\'s ${n}; -- no /* no */ # no \\\\ CREATE TABLE fake (id int);',${n}.5,NULL)`).join(',');
+        const dumps = [
+            ['mysql', build('CREATE TABLE `a` (`id` int NOT NULL, `b` text, `c` double, `d` int, PRIMARY KEY (`id`)) ENGINE=InnoDB;\nLOCK TABLES `a` WRITE;\n/*!40000 ALTER TABLE `a` DISABLE KEYS */;\n', 8000, k => `INSERT INTO \`a\` VALUES ${rows(k)};\n`,
+                '/*!40000 ALTER TABLE `a` ENABLE KEYS */;\nUNLOCK TABLES;\nCREATE TABLE `z` (`id` int NOT NULL, `a_id` int, PRIMARY KEY (`id`), CONSTRAINT `z_a` FOREIGN KEY (`a_id`) REFERENCES `a` (`id`)) ENGINE=InnoDB;\n')],
+            ['postgresql', build('CREATE TABLE public.a (id integer NOT NULL, b text, c double precision, d integer);\n', 200000, k => `INSERT INTO public.a VALUES (${k}, 'it''s ${k}; -- no /* no */ $$ CREATE TABLE fake (id int);', ${k}.5, NULL);\n`,
+                'ALTER TABLE ONLY public.a ADD CONSTRAINT a_pkey PRIMARY KEY (id);\nCREATE TABLE public.z (id integer PRIMARY KEY, a_id integer REFERENCES public.a(id));\n')],
+            ['postgresql', build('CREATE TABLE public.a (id integer NOT NULL, b text, c double precision, d integer);\nCOPY public.a (id, b, c, d) FROM stdin;\n', 400000, k => `${k}\tit's ${k}; -- no \\\\.\tCREATE TABLE fake (id int);\t\\N\n`,
+                '\\.\n\nALTER TABLE ONLY public.a ADD CONSTRAINT a_pkey PRIMARY KEY (id);\nCREATE TABLE public.z (id integer PRIMARY KEY, a_id integer REFERENCES public.a(id));\n')],
+            ['sqlite', build('PRAGMA foreign_keys=OFF;\nBEGIN TRANSACTION;\nCREATE TABLE a (id INTEGER PRIMARY KEY, b TEXT, c REAL, d INTEGER);\n', 250000, k => `INSERT INTO a VALUES(${k},'it''s ${k}; -- no /* no */ [no CREATE TABLE fake (id int);',${k}.5,NULL);\n`,
+                'CREATE TABLE z (id INTEGER PRIMARY KEY, a_id INTEGER REFERENCES a(id));\nCOMMIT;\n')],
+        ];
+        assert.ok(dumps.reduce((size, [, text]) => size + text.length, 0) > 60e6);
+        const before = process.memoryUsage().rss;
+        const started = Date.now();
+        const results = dumps.map(([dialect, text]) => replayed(text, dialect));
+        const elapsed = Date.now() - started;
+        const grown = (process.memoryUsage().rss - before) / 1048576;
+        for (const result of results) {
+            assert.deepEqual(shape(result.tables), { a: 'id* b? c? d?', z: 'id* a_id?' });
+            assert.deepEqual(relationsOf(result.tables), ['z.a_id -> a.id many-to-one']);
+            assert.deepEqual(result.warnings, []);
+        }
+        assert.ok(elapsed < 1500, `${elapsed} ms`);
+        assert.ok(grown < 256, `${Math.round(grown)} MB more`);
     });
 
     it('a UTF-8 byte order mark and CRLF line endings', () => {

@@ -161,6 +161,28 @@ describe('createStatusReader with the sources of a parser', () => {
         assert.equal(none.statusOf(file('a.php'))(1, 1), null);
     });
 
+    it('reads a saved file only to compare it with the text of an editor (a large SQL dump is not read twice)', () => {
+        const { dir, file } = repository({ 'a.php': 'one\ntwo\n', 'b.php': 'three\n' });
+        commitAll(dir);
+        fs.writeFileSync(file('a.php'), 'one\nTWO\n');
+        const reads = [];
+        const readFileSync = fs.readFileSync;
+        fs.readFileSync = function (filePath, ...rest) {
+            reads.push(path.basename(String(filePath)));
+            return readFileSync.call(this, filePath, ...rest);
+        };
+        try {
+            const reader = createStatusReader([dir], { overrides: new Map([[file('b.php'), 'three\nfour\n']]) });
+            assert.deepEqual([reader.statusOf(file('a.php'))(1, 1), reader.statusOf(file('a.php'))(2, 2), reader.addedOf(file('a.php'))(2)], ['committed', 'modified', true]);
+            assert.deepEqual([reader.statusOf(file('b.php'))(1, 1), reader.statusOf(file('b.php'))(2, 2)], ['committed', 'unsaved']);
+            // A folder or a missing file has no status, as before
+            assert.deepEqual([reader.statusOf(path.join(dir, 'database'))(1, 1), reader.statusOf(file('missing.php'))(1, 1)], [null, null]);
+        } finally {
+            fs.readFileSync = readFileSync;
+        }
+        assert.deepEqual(reads, ['b.php']);
+    });
+
     it('takes a folder, a list of paths, or sources', () => {
         assert.deepEqual(sourcePaths('/app/db'), ['/app/db']);
         assert.deepEqual(sourcePaths(['/app/db', 3, '/app/x']), ['/app/db', '/app/x']);

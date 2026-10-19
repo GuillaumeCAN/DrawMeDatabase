@@ -17,7 +17,6 @@ const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
 const { createStatusReader, tableStatus, changedStatus } = require('./git');
-const { createLineLocator } = require('./ts-utils');
 
 // Details of a column (option `details`), in the order of docs/pivot-format.md
 const DETAIL_KEYS = ['length', 'precision', 'scale', 'unsigned', 'default', 'defaultRaw', 'onUpdateCurrent', 'values', 'unique', 'autoIncrement', 'comment'];
@@ -30,6 +29,8 @@ const BOOKKEEPING = new Set(['schema_migrations', 'ar_internal_metadata', 'flywa
 const MAX_NAME = 63;
 // Excerpts of statements in the warnings
 const EXCERPT = 60;
+// The characters of the files read to tell their dialect
+const SNIFF_SAMPLE = 400000;
 // Parentheses around a default value read at most
 const MAX_DEPTH = 8;
 
@@ -65,7 +66,8 @@ function readText(filePath, overrides) {
         return overrides.get(filePath);
     }
     try {
-        return fs.readFileSync(filePath, 'utf8');
+        // Decoded from a buffer: twice as fast as readFileSync(filePath, 'utf8') on a large dump
+        return fs.readFileSync(filePath).toString('utf8');
     } catch {
         return null;
     }
@@ -82,6 +84,27 @@ const DOLLAR_TAG = /\$(?:[A-Za-z_\u0080-\uffff][A-Za-z0-9_\u0080-\uffff]*)?\$/y;
 const NUMBER = /(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/y;
 // The MySQL version whose executable comments (/*!80003 ... */) are read as code: MySQL 8.4
 const MYSQL_VERSION = 80499;
+
+// The line (1-based) of an offset of `text`
+function lineLocator(text) {
+    const starts = [0];
+    for (let k = text.indexOf('\n'); k !== -1; k = text.indexOf('\n', k + 1)) {
+        starts.push(k + 1);
+    }
+    return (offset) => {
+        let low = 0;
+        let high = starts.length - 1;
+        while (low < high) {
+            const mid = (low + high + 1) >> 1;
+            if (starts[mid] <= offset) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return low + 1;
+    };
+}
 
 // The end of the line of text[i] (the offset of its '\n', or `to`)
 function lineEnd(text, i, to) {
@@ -154,18 +177,44 @@ function sectionsOf(text) {
     return null;
 }
 
+// The kinds of objects of CREATE: TABLE, INDEX and TYPE are read, the others passed over
+const CREATE_KINDS = new Set(['TABLE', 'INDEX', 'TYPE', 'VIEW', 'FUNCTION', 'PROCEDURE', 'TRIGGER', 'EVENT', 'SEQUENCE', 'EXTENSION', 'SCHEMA', 'DATABASE', 'POLICY', 'ROLE', 'USER', 'GROUP', 'DOMAIN', 'AGGREGATE', 'OPERATOR', 'CAST', 'COLLATION', 'CONVERSION', 'PUBLICATION', 'SUBSCRIPTION', 'RULE', 'SERVER', 'STATISTICS', 'TABLESPACE', 'LANGUAGE', 'TRANSFORM', 'ACCESS', 'TEXT', 'MAPPING', 'LOGFILE']);
+// The modifiers read before the kind of a CREATE (OR REPLACE, TEMPORARY, DEFINER = ...), at most
+const CREATE_MODIFIERS = 24;
+// The kinds of CREATE whose body (BEGIN ... END) may hold semicolons
+const ROUTINE_KINDS = new Set(['TRIGGER', 'FUNCTION', 'PROCEDURE', 'EVENT']);
+// The index of the word that tells the kind of object of a CREATE statement (tokens[0]), or -1
+function createKindAt(tokens, end = tokens.length) {
+    for (let k = 1; k < end && k <= CREATE_MODIFIERS; k++) {
+        if (isWord(tokens[k]) && CREATE_KINDS.has(tokens[k].upper)) {
+            return k;
+        }
+    }
+    return -1;
+}
+// The statements that only hold data, whose body is skipped without being read (option skipData)
+const DATA_STATEMENTS = new Set(['INSERT', 'REPLACE']);
+// The tokens of a data statement read at most to decide whether it is skipped
+const DATA_HEAD = 64;
+
 // Splits SQL text into statements of tokens: { statements: [{ tokens, start, end, copy }],
 // problems: [{ offset, message }] }. dialect: 'postgresql', 'mysql', 'sqlite' or 'unknown' (how
 // strings, identifiers and comments are quoted). Comments are skipped, and so are the client
 // commands (psql `\` commands, DELIMITER, which changes the end of the statements); the data of a
 // COPY ... FROM STDIN is skipped, its range kept in `copy`. options: from, to (a part of the text),
-// sections (only the up sections: see SECTION_MARKERS). Tokens: { type: 'word' (with `upper`),
-// 'ident' (a quoted name), 'string', 'dollar' (a dollar-quoted text, with bodyStart and bodyEnd),
-// 'number' or 'punct', value, start, end, prefix (of a string: 'e', 'x', 'b', 'n') }.
+// sections (only the up sections: see SECTION_MARKERS), onStatement (called with each statement as
+// soon as it is read, instead of keeping them in `statements`: a dump is not held as tokens),
+// skipData (tokens → true | false | null, asked while the first tokens of an INSERT or a REPLACE are
+// read: true skips the rest of it up to its end without reading it, false reads it, null asks
+// again at the next token). Tokens: { type: 'word' (with `upper`), 'ident' (a quoted name),
+// 'string', 'dollar' (a dollar-quoted text, with bodyStart and bodyEnd), 'number' or 'punct',
+// value, start, end, prefix (of a string: 'e', 'x', 'b', 'n') }.
 function scanStatements(text, dialect, options = {}) {
     const from = options.from || 0;
     const to = options.to === undefined ? text.length : options.to;
     const markers = options.sections ? SECTION_MARKERS[options.sections] : null;
+    const onStatement = options.onStatement || null;
+    const skipData = options.skipData || null;
     const mysql = dialect === 'mysql';
     const dollars = dialect === 'postgresql' || dialect === 'unknown';
     const brackets = dialect === 'sqlite';
@@ -182,24 +231,37 @@ function scanStatements(text, dialect, options = {}) {
     const body = [];
     let pendingEnd = false;
     let routine = null;
+    // A data statement: 'head' while its first tokens are read (skipData), 'skip' once its body is
+    // skipped
+    let data = null;
     let i = from;
     let lineStart = true;
     // Executable comments being read as code (MySQL /*!...*/)
     let executable = 0;
 
-    const finish = () => {
-        let copy = false;
+    const emit = (statement) => {
+        if (onStatement) {
+            onStatement(statement);
+        } else {
+            statements.push(statement);
+        }
+    };
+    // Ends the statement being read; at a semicolon (`atEnd`), the data lines of a COPY ... FROM
+    // STDIN that follow it are skipped first
+    const finish = (atEnd = false) => {
         if (tokens.length > 0) {
             const statement = { tokens, start: tokens[0].start, end: tokens[tokens.length - 1].end, copy: null };
-            statements.push(statement);
-            copy = isCopyFromStdin(tokens) ? statement : false;
+            if (atEnd && isCopyFromStdin(tokens)) {
+                skipCopy(statement);
+            }
+            emit(statement);
         }
         tokens = [];
         body.length = 0;
         pendingEnd = false;
         routine = null;
         forced = false;
-        return copy;
+        data = null;
     };
     const closeEnd = () => {
         if (pendingEnd) {
@@ -223,7 +285,10 @@ function scanStatements(text, dialect, options = {}) {
                 }
             } else if (token.upper === 'BEGIN' || (token.upper === 'CASE' && body.length > 0)) {
                 if (routine === null) {
-                    routine = isWord(tokens[0], 'CREATE') && tokens.slice(0, 16).some(t => isWord(t, 'TRIGGER', 'FUNCTION', 'PROCEDURE', 'EVENT'));
+                    // The body of a trigger or a routine: the kind of the CREATE, not a column
+                    // named `begin` of a table that has one named `event`
+                    const kind = isWord(tokens[0], 'CREATE') ? createKindAt(tokens) : -1;
+                    routine = kind !== -1 && ROUTINE_KINDS.has(tokens[kind].upper);
                 }
                 if (routine) {
                     body.push(token.upper);
@@ -235,26 +300,222 @@ function scanStatements(text, dialect, options = {}) {
             closeEnd();
         }
         tokens.push(token);
+        if (skipData && !forced && body.length === 0) {
+            if (tokens.length === 1 && token.type === 'word' && DATA_STATEMENTS.has(token.upper)) {
+                data = 'head';
+            }
+            if (data === 'head') {
+                const skip = tokens.length > DATA_HEAD ? false : skipData(tokens);
+                data = skip === true ? 'skip' : skip === false ? null : 'head';
+            }
+        }
     };
     // Skips the data lines of a COPY ... FROM STDIN, up to the line `\.`
     const skipCopy = (statement) => {
         let start = lineEnd(text, i, to);
         start = start < to ? start + 1 : to;
-        let j = start;
-        while (j < to) {
-            const end = lineEnd(text, j, to);
-            if (text.slice(j, end).replace(/\r$/, '') === '\\.') {
-                statement.copy = { start, end: j };
-                i = end;
+        for (let j = start; ;) {
+            const k = text.indexOf('\\.', j);
+            if (k === -1 || k + 2 > to) {
+                break;
+            }
+            const after = k + 2 < to ? text.charCodeAt(k + 2) : 10;
+            if ((k === start || text.charCodeAt(k - 1) === 10) && (after === 10 || (after === 13 && (k + 3 >= to || text.charCodeAt(k + 3) === 10)))) {
+                statement.copy = { start, end: k };
+                i = lineEnd(text, k, to);
                 return;
             }
-            j = end + 1;
+            j = k + 1;
         }
         statement.copy = { start, end: to };
         i = to;
     };
+    // The characters that skipBody() looks at (and the first one of the delimiter); the others,
+    // most of the data, are passed over by a search
+    const SPECIAL = `'"\`;*/${mysql ? '#' : ''}${dollars ? '$' : ''}${brackets ? '[' : ''}`;
+    let special = null;
+    let specialDelimiter = null;
+    // The next offset of ' " ` and \ from k on, or -1 (cached: the scan only goes forward)
+    const found = [-2, -2, -2, -2];
+    const nextOf = (slot, char, k) => {
+        let at = found[slot];
+        if (at === -2 || (at !== -1 && at < k)) {
+            at = text.indexOf(char, k);
+            found[slot] = at;
+        }
+        return at === -1 || at >= to ? -1 : at;
+    };
+    // The end of a string or a quoted name that starts at text[j] = quote (doubled to escape it,
+    // and a backslash escapes too with `backslash`), or -1 when it is not closed
+    const quotedEnd = (j, quote, backslash) => {
+        const code = quote.charCodeAt(0);
+        const slot = code === 39 ? 0 : code === 34 ? 1 : 2;
+        let k = j + 1;
+        for (;;) {
+            const close = nextOf(slot, quote, k);
+            if (close === -1) {
+                return -1;
+            }
+            const escape = backslash ? nextOf(3, '\\', k) : -1;
+            if (escape !== -1 && escape < close) {
+                k = escape + 2;
+            } else if (close + 1 < to && text.charCodeAt(close + 1) === code) {
+                k = close + 2;
+            } else {
+                return close + 1;
+            }
+        }
+    };
+    // Whether text[k] starts a line: only blanks before it on its line
+    const startsLine = (k) => {
+        for (let j = k - 1; j >= from; j--) {
+            const code = text.charCodeAt(j);
+            if (code === 10) {
+                return true;
+            }
+            if (!(code === 32 || code === 9 || code === 13 || code === 11 || code === 12 || code === 0xfeff)) {
+                return false;
+            }
+        }
+        return true;
+    };
+    // When the statement after text[k] (blanks first) is a data statement that skipData skips at
+    // its first word, the end of that word, else -1 (skipData is asked once for each word)
+    const skippedAtFirstWord = new Map();
+    const nextData = (k) => {
+        while (k < to) {
+            const code = text.charCodeAt(k);
+            if (!(code === 10 || code === 32 || code === 9 || code === 13 || code === 11 || code === 12 || code === 0xfeff)) {
+                break;
+            }
+            k++;
+        }
+        for (const upper of DATA_STATEMENTS) {
+            const j = k + upper.length;
+            if (j > to || (j < to && isWordPart(text.charCodeAt(j)))) {
+                continue;
+            }
+            let same = true;
+            for (let n = 0; n < upper.length && same; n++) {
+                // ASCII letters, in any case
+                const code = text.charCodeAt(k + n);
+                same = code < 128 && (code & 0xdf) === upper.charCodeAt(n);
+            }
+            if (!same) {
+                continue;
+            }
+            if (!skippedAtFirstWord.has(upper)) {
+                skippedAtFirstWord.set(upper, skipData([{ type: 'word', value: upper, upper, start: k, end: j }]) === true);
+            }
+            return skippedAtFirstWord.get(upper) ? j : -1;
+        }
+        return -1;
+    };
+    // Skips the body of a data statement (skipData) from text[i] without reading its tokens: up to
+    // the end of the statement, or to what the main loop must read (a marker in a comment, a
+    // comment, a string not closed, which it tells); returns whether text[i] then starts a line
+    const skipBody = () => {
+        if (specialDelimiter !== delimiter) {
+            special = new RegExp(`[${(SPECIAL + delimiter[0]).replace(/[\\\]^-]/g, '\\$&')}-]`, 'g');
+            specialDelimiter = delimiter;
+        }
+        // Locals: `i` and the others are shared with the closures of the scan, slower to reach
+        const source = text;
+        const last = to;
+        const search = special;
+        let k = i;
+        // Stops at text[at]: returns whether it starts a line
+        const stop = (at, lineStarts) => {
+            i = at;
+            return lineStarts && startsLine(at);
+        };
+        while (k < last) {
+            search.lastIndex = k;
+            if (!search.test(source) || search.lastIndex > last) {
+                break;
+            }
+            k = search.lastIndex - 1;
+            const code = source.charCodeAt(k);
+            if (delimiter !== ';') {
+                if (source.startsWith(delimiter, k)) {
+                    return stop(k, false);
+                }
+            } else if (code === 59) {
+                // The end of the statement: the data statements that follow it and are skipped too
+                // are passed over with it (a dump of INSERTs, one row each)
+                const next = nextData(k + 1);
+                if (next === -1) {
+                    return stop(k, false);
+                }
+                k = next;
+                continue;
+            }
+            if (code === 39 || code === 34 || code === 96 || (code === 91 && brackets)) {
+                // ' " ` [, and the letter of E'...', N'...', X'...', B'...'
+                const letter = code === 39 && k - 1 >= from ? source.charCodeAt(k - 1) | 0x20 : 0;
+                const prefixed = (letter === 101 || letter === 120 || letter === 98 || letter === 110) && !(k - 2 >= from && isWordPart(source.charCodeAt(k - 2)));
+                let close;
+                if (code === 91) {
+                    close = source.indexOf(']', k + 1);
+                    close = close === -1 || close >= last ? -1 : close + 1;
+                } else {
+                    // E'...': backslash escapes (MySQL: in every string)
+                    close = quotedEnd(k, source[k], mysql ? code !== 96 : prefixed && letter === 101);
+                }
+                if (close === -1) {
+                    // The main loop reads it from its prefix (N'...)
+                    return stop(prefixed ? k - 1 : k, true);
+                }
+                k = close;
+                continue;
+            }
+            if (code === 45 && source.charCodeAt(k + 1) === 45) {
+                // -- comment: the main loop reads the markers and the breakpoints
+                if (source.charCodeAt(k + 2) === 62 || (markers && startsLine(k))) {
+                    return stop(k, true);
+                }
+                k = lineEnd(source, k, last);
+                continue;
+            }
+            if (code === 35 && mysql) {
+                // # comment (MySQL)
+                k = lineEnd(source, k, last);
+                continue;
+            }
+            if (code === 42 && source.charCodeAt(k + 1) === 47 && executable > 0) {
+                executable--;
+                k += 2;
+                continue;
+            }
+            if (code === 47 && source.charCodeAt(k + 1) === 42) {
+                // A block comment, a MySQL executable comment: the main loop reads them
+                return stop(k, true);
+            }
+            if (code === 36 && dollars && (k === from || !isWordPart(source.charCodeAt(k - 1)))) {
+                // $tag$...$tag$ (PostgreSQL)
+                DOLLAR_TAG.lastIndex = k;
+                const tag = DOLLAR_TAG.exec(source);
+                if (tag) {
+                    const close = source.indexOf(tag[0], k + tag[0].length);
+                    if (close === -1 || close + tag[0].length > last) {
+                        return stop(k, true);
+                    }
+                    k = close + tag[0].length;
+                    continue;
+                }
+            }
+            k++;
+        }
+        return stop(last, false);
+    };
 
     while (i < to) {
+        if (data === 'skip') {
+            lineStart = skipBody();
+            if (i >= to) {
+                break;
+            }
+        }
         const code = text.charCodeAt(i);
         if (code === 10) {
             lineStart = true;
@@ -361,10 +622,7 @@ function scanStatements(text, dialect, options = {}) {
                 continue;
             }
             i++;
-            const copy = finish();
-            if (copy) {
-                skipCopy(copy);
-            }
+            finish(true);
             continue;
         }
         // Strings and quoted names
@@ -456,6 +714,10 @@ function scanStatements(text, dialect, options = {}) {
         }
         push({ type: 'punct', value: c, start: i, end: i + 1 });
         i++;
+    }
+    if (body.length > 0 && tokens.length > 0) {
+        // The semicolons after a BEGIN that no END closes did not end the statements
+        problems.push({ offset: tokens[0].start, message: 'a BEGIN that no END closes: the end of the file is read as the body of this statement.' });
     }
     finish();
     return { statements, problems };
@@ -625,9 +887,18 @@ function createState(dialect, options = {}) {
         skipped: new Set(),
         skip: options.skip || (() => false),
         searchPath: ['public'],
+        // The transaction opened by BEGIN: the search path before it, and the one it keeps at
+        // COMMIT (SET LOCAL changes the search path until the end of the transaction only)
+        transaction: null,
+        // MySQL: the current database (USE), and the first one, whose tables are not prefixed
         database: null,
+        home: null,
         warnings: [],
         rows: options.collect ? { table: options.collect, values: [] } : null,
+        // The names taken in each schema, for the default names (namesOf())
+        names: null,
+        // MySQL: MariaDB, which creates the foreign keys written on a column
+        mariadb: Boolean(options.mariadb),
     };
 }
 
@@ -640,13 +911,18 @@ const keyOf = (state, schema, name) => {
 };
 
 // A reference to a table or a type from its name parts: { schema, name }. The schema is null for
-// the default one on MySQL (the current database) and SQLite (main); unqualified PostgreSQL names
-// are looked up in the search path (`resolve`), or created in its first schema
+// the default one on MySQL (the first database of USE, or the database of the connection when
+// there is none: unqualified names are in the current database) and SQLite (main); unqualified
+// PostgreSQL names are looked up in the search path (`resolve`), or created in its first schema
 function refOf(state, parts, { resolve = null } = {}) {
     const name = fold(state, parts[parts.length - 1]);
     let schema = parts.length > 1 ? fold(state, parts[parts.length - 2]) : null;
-    if (state.dialect === 'mysql' && schema !== null && state.database !== null && keyOf(state, schema, '') === keyOf(state, state.database, '')) {
-        schema = null;
+    if (state.dialect === 'mysql') {
+        // mysqldump --databases a b: the tables of b after USE b are b's
+        schema = schema === null ? state.database : schema;
+        if (schema !== null && state.home !== null && keyOf(state, schema, '') === keyOf(state, state.home, '')) {
+            schema = null;
+        }
     }
     if (state.dialect === 'sqlite' && schema !== null && schema.toLowerCase() === 'main') {
         schema = null;
@@ -727,9 +1003,10 @@ function placeColumn(state, table, column, position) {
     table.columns.splice(at, 0, column);
 }
 
-// Drops a column: PostgreSQL and SQLite drop the indexes and constraints built on it, MySQL removes
-// it from them (an index left without columns is dropped). Foreign keys of other tables that
-// reference it are dropped too (PostgreSQL needs CASCADE, which the migration then has).
+// Drops a column: PostgreSQL and SQLite drop the indexes and constraints built on it (an
+// expression, the WHERE of a partial index or the INCLUDE of an index that uses it too), MySQL
+// removes it from them (an index left without columns is dropped). Foreign keys of other tables
+// that reference it are dropped too (PostgreSQL needs CASCADE, which the migration then has).
 function dropColumn(state, table, name) {
     table.columns = table.columns.filter(column => !sameName(state, column.name, name));
     const uses = (names) => names.some(other => sameName(state, other, name));
@@ -741,6 +1018,9 @@ function dropColumn(state, table, name) {
         }
     }
     table.indexes = table.indexes.filter(index => {
+        if (!shrink && (index.items.some(item => item.refs && uses(item.refs)) || uses(index.predicate || []) || uses(index.include || []))) {
+            return false;
+        }
         if (!uses(index.items.filter(item => item.column).map(item => item.column))) {
             return true;
         }
@@ -767,7 +1047,9 @@ function renameColumn(state, table, from, to) {
         table.primaryKey.columns = rename(table.primaryKey.columns);
     }
     for (const index of table.indexes) {
-        index.items = index.items.map(item => (item.column && sameName(state, item.column, from) ? { column: to } : item));
+        index.items = index.items.map(item => (item.column && sameName(state, item.column, from) ? { column: to } : item.refs ? { ...item, refs: rename(item.refs) } : item));
+        index.predicate = index.predicate && rename(index.predicate);
+        index.include = index.include && rename(index.include);
     }
     for (const fk of table.foreignKeys) {
         fk.columns = rename(fk.columns);
@@ -804,22 +1086,32 @@ function moveTable(state, table, ref) {
     }
     table.ref = ref;
     state.tables.set(refKey(state, ref), table);
+    // The names of its schema are read again
+    state.names = null;
 }
 
-// Drops a table; with CASCADE (PostgreSQL), the foreign keys that reference it are dropped too
+// Drops a table; with CASCADE (PostgreSQL), the foreign keys that reference it and the tables that
+// inherit it are dropped too
 function dropTable(state, table, cascade) {
+    const children = cascade ? childrenOf(state, table) : [];
     state.tables.delete(refKey(state, table.ref));
     if (cascade) {
         for (const other of state.tables.values()) {
             other.foreignKeys = other.foreignKeys.filter(fk => refKey(state, fk.target) !== refKey(state, table.ref));
         }
+        children.forEach(child => dropTable(state, child, true));
     }
 }
+
+// SQLite: whether the primary key on this column alone is the rowid, never NULL: its declared type
+// is INTEGER, without arguments (INTEGER(11) is not)
+const isRowidType = (column) => column.typeInfo.base === 'integer' && column.typeInfo.args.length === 0;
 
 // Sets the primary key of a table: its columns are NOT NULL (on SQLite, only for an INTEGER PRIMARY
 // KEY, or in a WITHOUT ROWID table)
 function setPrimaryKey(state, table, name, columns) {
-    table.primaryKey = { name: name || (state.dialect === 'mysql' ? 'PRIMARY' : objectName(table.ref.name, [], 'pkey')), columns: [...columns] };
+    table.primaryKey = { name: name || (state.dialect === 'mysql' ? 'PRIMARY' : chooseName(state, table, [], 'pkey')), columns: [...columns] };
+    noteName(state, table, table.primaryKey.name);
     for (const columnName of columns) {
         const column = columnOf(state, table, columnName);
         if (column && state.dialect !== 'sqlite') {
@@ -838,7 +1130,47 @@ function indexName(state, table, items, label) {
         }
         return name;
     }
-    return objectName(table.ref.name, names, label);
+    return chooseName(state, table, names, label);
+}
+
+// The default name of a constraint or an index of `table`, as PostgreSQL chooses it
+// (ChooseRelationName, ChooseConstraintName): 1, 2... is added to the label of a name already
+// taken in the schema, by a relation (a table, an index, a key) for an index or a key, by a
+// constraint (a key, a foreign key) for a foreign key or a key: a second foreign key on the same
+// column is `posts_user_id_fkey1`, not a replacement of the first one
+function chooseName(state, table, names, label) {
+    const relation = label !== 'fkey';
+    const constraint = label !== 'idx';
+    const key = refKey(state, table.ref);
+    // Whether a table holds the name: as a relation, a constraint, or either (`any`)
+    const holds = (other, name, any) => ((relation || any) && sameName(state, other.ref.name, name))
+        || (other.primaryKey && sameName(state, other.primaryKey.name, name))
+        || other.indexes.some(index => index.name && (relation || index.constraint || any) && sameName(state, index.name, name))
+        || ((constraint || any) && other.foreignKeys.some(fk => fk.name && sameName(state, fk.name, name)));
+    const owners = namesOf(state).get(keyOf(state, table.ref.schema, '')) || new Map();
+    const taken = (name) => {
+        if (holds(table, name, false) || (relation && state.skipped.has(keyOf(state, table.ref.schema, name)))) {
+            return true;
+        }
+        const others = owners.get(state.exact ? name : name.toLowerCase());
+        for (const other of others ? [...others] : []) {
+            if (other === table || refKey(state, other.ref) === key) {
+                continue;
+            }
+            if (state.tables.get(refKey(state, other.ref)) !== other || !holds(other, name, true)) {
+                // Dropped or renamed since
+                others.delete(other);
+            } else if (holds(other, name, false)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    let name = objectName(table.ref.name, names, label);
+    for (let pass = 1; taken(name) && pass < 1000; pass++) {
+        name = objectName(table.ref.name, names, `${label}${pass}`);
+    }
+    return name;
 }
 
 function addIndex(state, table, index) {
@@ -846,7 +1178,41 @@ function addIndex(state, table, index) {
         table.indexes = table.indexes.filter(other => other.name !== index.name);
     }
     table.indexes.push(index);
+    noteName(state, table, index.name);
 }
+
+// The names of each schema (tables, keys, indexes, foreign keys: state.names, schema → name →
+// tables), for chooseName(): read once from the tables, then kept with the names given since; a
+// name dropped or renamed since is found out when it is looked up
+function namesOf(state) {
+    if (!state.names) {
+        state.names = new Map();
+        for (const table of state.tables.values()) {
+            noteNames(state, table);
+        }
+    }
+    return state.names;
+}
+
+// A name given to an object of a table of the schema (unless the table is not created yet: its
+// names are noted with it)
+function noteName(state, table, name) {
+    if (!state.names || !name || state.tables.get(refKey(state, table.ref)) !== table) {
+        return;
+    }
+    const schema = keyOf(state, table.ref.schema, '');
+    if (!state.names.has(schema)) {
+        state.names.set(schema, new Map());
+    }
+    const names = state.names.get(schema);
+    const key = state.exact ? name : name.toLowerCase();
+    if (!names.has(key)) {
+        names.set(key, new Set());
+    }
+    names.get(key).add(table);
+}
+
+const noteNames = (state, table) => [table.ref.name, table.primaryKey && table.primaryKey.name, ...table.indexes.map(index => index.name), ...table.foreignKeys.map(fk => fk.name)].forEach(name => noteName(state, table, name));
 
 // Drops the constraint `name` of a table: its primary key, a foreign key or a unique constraint.
 // Returns whether one was found (check constraints are not kept)
@@ -974,6 +1340,14 @@ function typeDetails(type) {
 
 const isNumericType = (type) => NUMERIC_TYPE.test(type.base) || /int$/.test(type.base);
 
+// Whether tokens[k] starts a call of nextval(), the default of a serial column: nextval(...),
+// pg_catalog.nextval(...), "nextval"(...) (pg_dump --quote-all-identifiers, supabase db dump)
+function isNextval(tokens, k) {
+    const named = (token, name) => (isWord(token) && token.upper === name.toUpperCase()) || (Boolean(token) && token.type === 'ident' && token.value === name);
+    const at = named(tokens[k], 'pg_catalog') && isPunct(tokens[k + 1], '.') ? k + 2 : k;
+    return named(tokens[at], 'nextval') && isPunct(tokens[at + 1], '(');
+}
+
 // The default of a column from its expression tokens [from, to): { default } (a literal: string,
 // number, boolean or null), { defaultRaw } (an SQL expression, as written), or { autoIncrement }
 // for nextval() (a serial column of a dump)
@@ -986,7 +1360,7 @@ function defaultOf(ctx, tokens, from, to, type) {
         end--;
     }
     const raw = () => ({ defaultRaw: textOf(ctx.text, tokens, from, to) });
-    if (isWord(tokens[start], 'NEXTVAL') && isPunct(tokens[start + 1], '(')) {
+    if (isNextval(tokens, start)) {
         return { autoIncrement: true };
     }
     // A literal: [sign] value, with an optional charset introducer (_utf8mb4'x'), then casts (::text)
@@ -1132,7 +1506,7 @@ function readColumn(ctx, c, end, origin) {
     };
     const type = readType(ctx, c, end);
     applyType(column, type);
-    const result = { column, primary: false, unique: null, references: null, position: null, primaryName: null };
+    const result = { column, primary: false, unique: null, references: null, referencesAt: null, position: null, primaryName: null };
     let constraintName = null;
     while (c.i < end) {
         const t = tokens[c.i];
@@ -1152,7 +1526,8 @@ function readColumn(ctx, c, end, origin) {
         } else if (accept(c, 'PRIMARY', 'KEY') || (state.dialect === 'mysql' && accept(c, 'KEY'))) {
             result.primary = true;
             result.primaryName = constraintName;
-            accept(c, 'ASC') || accept(c, 'DESC');
+            // SQLite: INTEGER PRIMARY KEY DESC is not the rowid
+            result.primaryDesc = !accept(c, 'ASC') && accept(c, 'DESC');
         } else if (accept(c, 'UNIQUE')) {
             accept(c, 'KEY') || accept(c, 'INDEX');
             accept(c, 'NULLS', 'NOT', 'DISTINCT') || accept(c, 'NULLS', 'DISTINCT');
@@ -1161,6 +1536,9 @@ function readColumn(ctx, c, end, origin) {
             const fk = readReferences(ctx, c);
             if (fk) {
                 result.references = { ...fk, name: constraintName };
+                result.referencesAt = t;
+            } else {
+                warnAt(ctx, t, `column ${column.name}: REFERENCES not understood, no relation drawn: ${excerpt(textOf(ctx.text, tokens, c.i - 1, end))}`);
             }
         } else if (accept(c, 'CHECK')) {
             skipGroup(c);
@@ -1259,14 +1637,29 @@ function indexItem(ctx, tokens, from, to) {
     const first = tokens[from];
     const second = tokens[from + 1];
     const columnName = (token) => ({ column: fold(ctx.state, { value: token.value, quoted: token.type === 'ident' }) });
+    // An expression, with the names it may use (refs: a dropped column drops the index)
+    const expression = (start, end) => ({ expression: textOf(ctx.text, tokens, start, end), refs: namesIn(ctx.state, tokens, start, end) });
     if (isPunct(first, '(')) {
-        return { expression: textOf(ctx.text, tokens, from + 1, closing(tokens, from, to)) };
+        return expression(from + 1, closing(tokens, from, to));
     }
     if (isName(first) && isPunct(second, '(')) {
         const prefix = tokens[from + 2] && tokens[from + 2].type === 'number' && isPunct(tokens[from + 3], ')');
-        return prefix ? columnName(first) : { expression: textOf(ctx.text, tokens, from, Math.min(closing(tokens, from + 1, to) + 1, to)) };
+        return prefix ? columnName(first) : expression(from, Math.min(closing(tokens, from + 1, to) + 1, to));
     }
-    return isName(first) ? columnName(first) : { expression: textOf(ctx.text, tokens, from, to) };
+    return isName(first) ? columnName(first) : expression(from, to);
+}
+
+// The names of tokens [from, to) of an expression that may be columns, folded: not the functions
+// (a name before '('), the types (after '::' or AS) nor the qualifiers (before '.')
+function namesIn(state, tokens, from, to) {
+    const names = [];
+    for (let k = from; k < to; k++) {
+        const t = tokens[k];
+        if (isName(t) && !isPunct(tokens[k + 1], '(') && !isPunct(tokens[k + 1], '.') && !isPunct(tokens[k - 1], '::') && !(k > from && isWord(tokens[k - 1], 'AS'))) {
+            names.push(fold(state, { value: t.value, quoted: t.type === 'ident' }));
+        }
+    }
+    return names;
 }
 
 // The items of an index or a key at the cursor ('(' a, lower(b), c DESC ')'): [{ column } |
@@ -1333,6 +1726,11 @@ function applyConstraint(ctx, table, c, end, origin) {
             return false;
         }
         setPrimaryKey(state, table, name, items.map(item => item.column || item.expression));
+        // SQLite: PRIMARY KEY (id) of an INTEGER column is the rowid too, NOT NULL (even with DESC)
+        const rowid = state.dialect === 'sqlite' && items.length === 1 && items[0].column ? columnOf(state, table, items[0].column) : null;
+        if (rowid && isRowidType(rowid)) {
+            rowid.notNull = true;
+        }
         return true;
     }
     if (accept(c, 'UNIQUE')) {
@@ -1384,8 +1782,9 @@ function applyConstraint(ctx, table, c, end, origin) {
         }
         const close = closing(c.tokens, c.i, end);
         const items = splitCommas(c.tokens, c.i + 1, close).map(([from, to]) => indexItem(ctx, c.tokens, from, findWord(c.tokens, from, to, new Set(['WITH']))));
-        const partial = findWord(c.tokens, close, end, new Set(['WHERE'])) < end;
-        addIndex(state, table, { name: name || indexName(state, table, items, 'excl'), named: Boolean(name), items, type: 'index', partial, constraint: true });
+        const where = findWord(c.tokens, close + 1, end, new Set(['WHERE']));
+        const partial = where < end;
+        addIndex(state, table, { name: name || indexName(state, table, items, 'excl'), named: Boolean(name), items, type: 'index', partial, constraint: true, predicate: partial ? namesIn(state, c.tokens, where + 1, end) : [] });
         c.i = end;
         return true;
     }
@@ -1420,7 +1819,7 @@ function applyConstraint(ctx, table, c, end, origin) {
         // MySQL copies everything but the foreign keys; PostgreSQL the columns, and what INCLUDING adds
         const options = c.tokens.slice(c.i, end).filter(t => t.type === 'word').map(t => t.upper);
         const including = (what) => state.dialect === 'mysql' || (options.includes('INCLUDING') && (options.includes('ALL') || options.includes(what)));
-        copyColumns(source, table, origin, { defaults: including('DEFAULTS'), indexes: including('INDEXES') || including('CONSTRAINTS') });
+        copyColumns(state, source, table, origin, { defaults: including('DEFAULTS'), indexes: including('INDEXES') || including('CONSTRAINTS') });
         c.i = end;
         return true;
     }
@@ -1428,7 +1827,7 @@ function applyConstraint(ctx, table, c, end, origin) {
 }
 
 // Copies the columns of a table (CREATE TABLE ... LIKE, INHERITS)
-function copyColumns(source, table, origin, { defaults = false, indexes = false } = {}) {
+function copyColumns(state, source, table, origin, { defaults = false, indexes = false, inherited = false } = {}) {
     for (const column of source.columns) {
         const details = { ...column.details };
         if (!defaults) {
@@ -1436,13 +1835,15 @@ function copyColumns(source, table, origin, { defaults = false, indexes = false 
             delete details.defaultRaw;
             delete details.autoIncrement;
         }
-        table.columns.push({ ...column, details, origin, declaredIn: origin.path, changes: [], inCreate: true });
+        // inherited (INHERITS): dropped with the column of the parent, unless the child declares it
+        table.columns.push({ ...column, details, origin, declaredIn: origin.path, changes: [], inCreate: true, inherited });
     }
     if (indexes) {
         if (source.primaryKey) {
             table.primaryKey = { name: objectName(table.ref.name, [], 'pkey'), columns: [...source.primaryKey.columns] };
         }
         table.indexes.push(...source.indexes.map(index => ({ ...index, items: index.items.map(item => ({ ...item })), named: false })));
+        noteNames(state, table);
     }
 }
 
@@ -1467,16 +1868,19 @@ function promoteIndex(ctx, table, c, name, kind) {
         index.named = true;
         index.constraint = true;
         index.type = 'unique';
+        noteName(state, table, index.name);
     }
     return true;
 }
 
 function addForeignKey(state, table, fk) {
-    const name = fk.name || (state.dialect === 'mysql'
-        ? `${table.ref.name}_ibfk_${table.foreignKeys.length + 1}`
-        : objectName(table.ref.name, fk.columns, 'fkey'));
+    // MySQL: <table>_ibfk_<n>, n after the highest one of the table
+    const ibfk = `${table.ref.name}_ibfk_`;
+    const highest = Math.max(0, ...table.foreignKeys.map(other => (other.name && other.name.toLowerCase().startsWith(ibfk.toLowerCase()) && /^\d+$/.test(other.name.slice(ibfk.length)) ? Number(other.name.slice(ibfk.length)) : 0)));
+    const name = fk.name || (state.dialect === 'mysql' ? `${ibfk}${highest + 1}` : chooseName(state, table, fk.columns, 'fkey'));
     table.foreignKeys = table.foreignKeys.filter(other => !(other.name && sameName(state, other.name, name)));
     table.foreignKeys.push({ ...fk, name });
+    noteName(state, table, name);
 }
 
 // Applies the constraints written on a column: its primary key, unique, references
@@ -1485,14 +1889,16 @@ function applyColumnConstraints(ctx, table, read) {
     const { column } = read;
     if (read.primary) {
         setPrimaryKey(state, table, read.primaryName, [column.name]);
-        if (state.dialect === 'sqlite' && (column.typeInfo.base === 'integer' || table.withoutRowid)) {
+        if (state.dialect === 'sqlite' && ((isRowidType(column) && !read.primaryDesc) || table.withoutRowid)) {
             column.notNull = true;
         }
     }
     if (read.unique) {
         addIndex(state, table, { name: read.unique.name || indexName(state, table, [{ column: column.name }], 'key'), named: Boolean(read.unique.name), items: [{ column: column.name }], type: 'unique', partial: false, constraint: true });
     }
-    if (read.references) {
+    if (read.references && state.dialect === 'mysql' && !state.mariadb) {
+        warnAt(ctx, read.referencesAt, `${display(state, table.ref)}.${column.name}: MySQL 8.4 ignores a REFERENCES written on the column (MariaDB creates the key), no relation drawn: FOREIGN KEY (${column.name}) REFERENCES ... creates one.`);
+    } else if (read.references) {
         addForeignKey(state, table, { ...read.references, columns: [column.name] });
     }
 }
@@ -1544,11 +1950,29 @@ function applyStatement(ctx, tokens) {
             return doStatement(ctx, c);
         case 'SET':
             return setStatement(ctx, c);
+        case 'RESET':
+            // RESET search_path, RESET ALL: the default search path
+            if (accept(c, 'SEARCH_PATH') || accept(c, 'ALL')) {
+                setSearchPath(ctx.state, ['public'], false);
+            }
+            return undefined;
+        case 'BEGIN':
+        case 'START':
+            if (first.upper === 'BEGIN' || accept(c, 'TRANSACTION')) {
+                ctx.state.transaction = ctx.state.transaction || { before: ctx.state.searchPath, session: ctx.state.searchPath };
+            }
+            return undefined;
+        case 'COMMIT':
+        case 'END':
+        case 'ROLLBACK':
+        case 'ABORT':
+            return endTransaction(ctx, c, first.upper === 'ROLLBACK' || first.upper === 'ABORT');
         case 'SELECT':
             return selectStatement(ctx, c);
         case 'USE':
             if (isName(peek(c))) {
                 ctx.state.database = peek(c).value;
+                ctx.state.home = ctx.state.home === null ? ctx.state.database : ctx.state.home;
             }
             return undefined;
         case 'INSERT':
@@ -1560,24 +1984,17 @@ function applyStatement(ctx, tokens) {
     }
 }
 
-// The kinds of objects of CREATE: TABLE, INDEX and TYPE are read, the others passed over
-const CREATE_KINDS = new Set(['TABLE', 'INDEX', 'TYPE', 'VIEW', 'FUNCTION', 'PROCEDURE', 'TRIGGER', 'EVENT', 'SEQUENCE', 'EXTENSION', 'SCHEMA', 'DATABASE', 'POLICY', 'ROLE', 'USER', 'GROUP', 'DOMAIN', 'AGGREGATE', 'OPERATOR', 'CAST', 'COLLATION', 'CONVERSION', 'PUBLICATION', 'SUBSCRIPTION', 'RULE', 'SERVER', 'STATISTICS', 'TABLESPACE', 'LANGUAGE', 'TRANSFORM', 'ACCESS', 'TEXT', 'MAPPING', 'LOGFILE']);
-
 // CREATE [modifiers] kind ...: the modifiers before the kind (OR REPLACE, TEMPORARY, UNIQUE,
-// ALGORITHM=..., DEFINER=...) are kept
+// ALGORITHM=..., DEFINER=...) are kept (CREATE_KINDS: TABLE, INDEX and TYPE are read, the other
+// kinds passed over)
 function createStatement(ctx, c) {
     const { tokens } = c;
-    const modifiers = new Set();
-    let k = c.i;
-    for (; k < c.end && k < c.i + 24 && !(isWord(tokens[k]) && CREATE_KINDS.has(tokens[k].upper)); k++) {
-        if (isWord(tokens[k])) {
-            modifiers.add(tokens[k].upper);
-        }
-    }
-    const kind = tokens[k];
-    if (k >= c.end || !isWord(kind) || !CREATE_KINDS.has(kind.upper)) {
+    const k = createKindAt(tokens, c.end);
+    if (k === -1) {
         return;
     }
+    const modifiers = new Set(tokens.slice(1, k).filter(t => isWord(t)).map(t => t.upper));
+    const kind = tokens[k];
     c.i = k + 1;
     if (kind.upper === 'TABLE') {
         if (modifiers.has('TEMP') || modifiers.has('TEMPORARY') || modifiers.has('VIRTUAL') || modifiers.has('FOREIGN')) {
@@ -1644,7 +2061,7 @@ function createTableStatement(ctx, c, keyword, replace) {
             warnAt(ctx, keyword, `CREATE TABLE ${display(state, ref)} LIKE a table that no file creates, skipped.`);
             return;
         }
-        copyColumns(from, table, range, { defaults: true, indexes: true });
+        copyColumns(state, from, table, range, { defaults: true, indexes: true });
         registerTable(ctx, table, existing, keyword, replace);
         return;
     }
@@ -1670,7 +2087,8 @@ function createTableStatement(ctx, c, keyword, replace) {
                 for (const [from, to] of splitCommas(tokens, after.i + 1, end)) {
                     const parent = findTable(state, tableRef(state, readName(cursorOf(tokens, from, to)) || [{ value: '', quoted: true }]));
                     if (parent) {
-                        copyColumns(parent, table, range, { defaults: true });
+                        copyColumns(state, parent, table, range, { defaults: true, inherited: true });
+                        parent.children = [...(parent.children || []), table];
                     }
                 }
                 after.i = end + 1;
@@ -1751,6 +2169,7 @@ function registerTable(ctx, table, existing, keyword, replace) {
     }
     state.skipped.delete(key);
     state.tables.set(key, table);
+    noteNames(state, table);
 }
 
 // The lines that hold the tokens [from, to) of a statement (a table added to a committed file has
@@ -1806,10 +2225,13 @@ function createIndexStatement(ctx, c, keyword, modifiers) {
         warnAt(ctx, keyword, `CREATE INDEX on ${display(state, ref)} not understood, skipped: ${excerpt(textOf(ctx.text, tokens, 0, c.end))}`);
         return;
     }
-    const partial = findWord(tokens, c.i, c.end, new Set(['WHERE'])) < c.end;
+    // INCLUDE (columns) and WHERE predicate: a dropped column that they use drops the index
+    const include = accept(c, 'INCLUDE') ? readColumnList(ctx, c) || [] : [];
+    const where = findWord(tokens, c.i, c.end, new Set(['WHERE']));
+    const partial = where < c.end;
     const type = modifiers.has('UNIQUE') ? 'unique' : modifiers.has('FULLTEXT') ? 'fulltext' : modifiers.has('SPATIAL') ? 'spatial' : 'index';
     const given = nameParts ? fold(state, nameParts[nameParts.length - 1]) : null;
-    addIndex(state, table, { name: given || indexName(state, table, items, 'idx'), named: Boolean(given), items, type, partial, constraint: false });
+    addIndex(state, table, { name: given || indexName(state, table, items, 'idx'), named: Boolean(given), items, type, partial, constraint: false, predicate: partial ? namesIn(state, tokens, where + 1, c.end) : [], include });
     touchTable(table, rangeOf(ctx, tokens, 0, c.end));
 }
 
@@ -1854,7 +2276,8 @@ function alterTableStatement(ctx, c, keyword) {
     const { state } = ctx;
     const { tokens } = c;
     const ifExists = accept(c, 'IF', 'EXISTS');
-    accept(c, 'ONLY');
+    // ONLY: not the tables that inherit it
+    const only = accept(c, 'ONLY');
     const parts = readName(c);
     if (!parts) {
         warnAt(ctx, keyword, `ALTER TABLE not understood, skipped: ${excerpt(textOf(ctx.text, tokens, 0, c.end))}`);
@@ -1880,6 +2303,7 @@ function alterTableStatement(ctx, c, keyword) {
             table = createTable(ref, range, { file: ctx.file.rel, line: range.first });
             table.statementLines = linesOf(ctx, tokens, 0, c.end);
             state.tables.set(refKey(state, ref), table);
+            noteNames(state, table);
         } else {
             if (changes) {
                 warnAt(ctx, keyword, `ALTER TABLE ${display(state, ref)}: no file creates this table, skipped.`);
@@ -1893,17 +2317,64 @@ function alterTableStatement(ctx, c, keyword) {
             return;
         }
         const range = rangeOf(ctx, tokens, from, to);
-        const effect = alterAction(ctx, table, cursorOf(tokens, from, to), range);
+        const done = {};
+        const effect = alterAction(ctx, table, cursorOf(tokens, from, to), range, done);
         if (effect === false) {
             warnAt(ctx, tokens[from], `ALTER TABLE ${display(state, table.ref)}: ${excerpt(textOf(ctx.text, tokens, from, to))} not understood, skipped.`);
         } else if (effect !== 'passive') {
             touchTable(table, range);
         }
+        if (done.column && !only) {
+            inheritAction(ctx, table, done.column, cursorOf(tokens, from, to), range);
+        } else if (done.column && done.column.kind === 'drop') {
+            // ONLY: the columns of the tables that inherit it become their own
+            childrenOf(state, table).map(child => columnOf(state, child, done.column.name)).filter(Boolean).forEach(column => {
+                column.inherited = false;
+            });
+        }
     }
 }
 
-// One action of ALTER TABLE: true (applied), 'passive' (nothing drawn changes), false (not understood)
-function alterAction(ctx, table, c, range) {
+// The tables that inherit `table` (INHERITS) and are still in the schema
+const childrenOf = (state, table) => (table.children || []).filter(child => state.tables.get(refKey(state, child.ref)) === child);
+
+// A change of the columns of a table passed on to the tables that inherit it, and theirs, as
+// PostgreSQL does without ONLY: an added column (unless they have one of this name), a dropped one
+// (unless they declare it too), a renamed or altered one. action: done.column of alterAction(); c:
+// the action.
+function inheritAction(ctx, table, action, c, range, seen = new Set([table])) {
+    const { state } = ctx;
+    for (const child of childrenOf(state, table)) {
+        if (seen.has(child)) {
+            continue;
+        }
+        seen.add(child);
+        if (action.kind === 'add') {
+            if (columnOf(state, child, action.column.name)) {
+                continue;
+            }
+            child.columns.push({ ...action.column, details: { ...action.column.details }, changes: [], inherited: true });
+        } else if (action.kind === 'drop') {
+            const column = columnOf(state, child, action.name);
+            if (!column || !column.inherited) {
+                continue;
+            }
+            dropColumn(state, child, action.name);
+        } else {
+            const done = {};
+            if (alterAction(ctx, child, cursorOf(c.tokens, c.i, c.end), range, done) === false || !done.column) {
+                continue;
+            }
+        }
+        touchTable(child, range);
+        inheritAction(ctx, child, action, c, range, seen);
+    }
+}
+
+// One action of ALTER TABLE: true (applied), 'passive' (nothing drawn changes), false (not
+// understood). done.column: the change of a column, that the tables inheriting it get too (add,
+// drop, or redo: the same action on them)
+function alterAction(ctx, table, c, range, done = {}) {
     const { state } = ctx;
     const { tokens } = c;
     const first = peek(c);
@@ -1960,6 +2431,7 @@ function alterAction(ctx, table, c, range) {
         }
         placeColumn(state, table, read.column, read.position);
         applyColumnConstraints(ctx, table, read);
+        done.column = { kind: 'add', column: read.column };
         return true;
     }
 
@@ -2009,6 +2481,7 @@ function alterAction(ctx, table, c, range) {
             return ifExists ? 'passive' : missing(name, 'DROP COLUMN');
         }
         dropColumn(state, table, name);
+        done.column = { kind: 'drop', name };
         return true;
     }
 
@@ -2033,6 +2506,7 @@ function alterAction(ctx, table, c, range) {
             }
             renameColumn(state, table, name, read.column.name);
             redefineColumn(ctx, table, column, read, range);
+            done.column = { kind: 'redo' };
             return true;
         }
         if (accept(c, 'SET', 'DATA', 'TYPE') || accept(c, 'TYPE')) {
@@ -2064,6 +2538,7 @@ function alterAction(ctx, table, c, range) {
             return false;
         }
         touchColumn(ctx, column, range);
+        done.column = { kind: 'redo' };
         return true;
     }
 
@@ -2145,6 +2620,7 @@ function alterAction(ctx, table, c, range) {
         }
         renameColumn(state, table, from, to);
         touchColumn(ctx, column, range);
+        done.column = { kind: 'redo' };
         return true;
     }
 
@@ -2166,6 +2642,21 @@ function alterAction(ctx, table, c, range) {
             state.skipped.add(refKey(state, partition.ref));
         }
         return true;
+    }
+
+    if (accept(c, 'NO', 'INHERIT') || accept(c, 'INHERIT')) {
+        // PostgreSQL: the table stops or starts inheriting a parent (its columns are then its own)
+        const parts = readName(c);
+        const parent = parts ? findTable(state, tableRef(state, parts)) : null;
+        if (parent && isWord(first, 'NO')) {
+            parent.children = (parent.children || []).filter(child => child !== table);
+            table.columns.filter(column => columnOf(state, parent, column.name)).forEach(column => {
+                column.inherited = false;
+            });
+        } else if (parent && parent !== table) {
+            parent.children = [...(parent.children || []).filter(child => child !== table), table];
+        }
+        return 'passive';
     }
 
     if (PASSIVE_ACTIONS.has(first.upper) || isWord(first, 'SET')) {
@@ -2191,6 +2682,7 @@ function redefineColumn(ctx, table, column, read, range) {
 }
 
 function renameConstraint(state, table, from, to) {
+    noteName(state, table, to);
     if (table.primaryKey && sameName(state, table.primaryKey.name, from)) {
         table.primaryKey.name = to;
     }
@@ -2287,11 +2779,13 @@ function alterIndexStatement(ctx, c) {
             if (index.name && sameName(state, index.name, name)) {
                 index.name = to;
                 index.named = true;
+                noteName(state, table, to);
                 return;
             }
         }
         if (table.primaryKey && sameName(state, table.primaryKey.name, name)) {
             table.primaryKey.name = to;
+            noteName(state, table, to);
             return;
         }
     }
@@ -2394,7 +2888,7 @@ function dropStatement(ctx, c) {
                 continue;
             }
             const schema = fold(state, parts[0]);
-            const dropped = state.dialect === 'mysql' && state.database !== null && sameName(state, schema, state.database) ? null : schema;
+            const dropped = state.dialect === 'mysql' && state.home !== null && sameName(state, schema, state.home) ? null : schema;
             for (const table of [...state.tables.values()]) {
                 if ((table.ref.schema === null ? dropped === null : dropped !== null && sameName(state, table.ref.schema, dropped))) {
                     dropTable(state, table, true);
@@ -2477,15 +2971,15 @@ function commentStatement(ctx, c) {
     touchColumn(ctx, column, rangeOf(ctx, tokens, 0, c.end));
 }
 
-// SET search_path = a, b (PostgreSQL): the schema of the unqualified names
+// SET [SESSION | LOCAL] search_path = a, b (PostgreSQL): the schema of the unqualified names
 function setStatement(ctx, c) {
-    accept(c, 'SESSION') || accept(c, 'LOCAL');
+    const local = !accept(c, 'SESSION') && accept(c, 'LOCAL');
     if (!accept(c, 'SEARCH_PATH') && !accept(c, 'SCHEMA')) {
         return;
     }
     acceptPunct(c, '=') || accept(c, 'TO');
     if (accept(c, 'DEFAULT')) {
-        ctx.state.searchPath = ['public'];
+        setSearchPath(ctx.state, ['public'], local);
         return;
     }
     const names = [];
@@ -2495,19 +2989,36 @@ function setStatement(ctx, c) {
             names.push(...(t.type === 'string' ? t.value.split(',') : [t.value]).map(name => name.trim()));
         }
     }
-    setSearchPath(ctx.state, names);
+    setSearchPath(ctx.state, names, local);
 }
 
-function setSearchPath(state, names) {
+// Sets the search path; `local` (SET LOCAL) until the end of the transaction. Outside a BEGIN, SET
+// LOCAL lasts until the end of the file: the migration tools run a file as one transaction
+function setSearchPath(state, names, local) {
     state.searchPath = names.map(name => name.replace(/^"(.*)"$/, '$1')).filter(name => name !== '' && name !== '$user' && name.toLowerCase() !== 'pg_catalog');
+    if (state.transaction && !local) {
+        state.transaction.session = state.searchPath;
+    }
 }
 
-// SELECT pg_catalog.set_config('search_path', '', false), as pg_dump writes it
+// COMMIT, END: the search path set by SET LOCAL ends; ROLLBACK, ABORT: the one before BEGIN comes
+// back (ROLLBACK TO SAVEPOINT does not end the transaction)
+function endTransaction(ctx, c, rollback) {
+    const { state } = ctx;
+    accept(c, 'WORK') || accept(c, 'TRANSACTION');
+    if (!state.transaction || (rollback && accept(c, 'TO'))) {
+        return;
+    }
+    state.searchPath = rollback ? state.transaction.before : state.transaction.session;
+    state.transaction = null;
+}
+
+// SELECT pg_catalog.set_config('search_path', '', false), as pg_dump writes it (true: SET LOCAL)
 function selectStatement(ctx, c) {
     const { tokens } = c;
     for (let k = c.i; k + 4 < c.end; k++) {
         if (isWord(tokens[k], 'SET_CONFIG') && isPunct(tokens[k + 1], '(') && tokens[k + 2].type === 'string' && tokens[k + 2].value.toLowerCase() === 'search_path' && tokens[k + 4] && tokens[k + 4].type === 'string') {
-            setSearchPath(ctx.state, tokens[k + 4].value.split(','));
+            setSearchPath(ctx.state, tokens[k + 4].value.split(','), isWord(tokens[k + 6], 'TRUE'));
             return;
         }
     }
@@ -2671,7 +3182,14 @@ function applyDynamic(ctx, at, sql) {
 // The dialect of SQL files, from what only one dialect writes: 'postgresql', 'mysql', 'sqlite', or
 // 'unknown' (read as PostgreSQL, without folding the names to lower case)
 function sniffDialect(texts) {
-    const sample = texts.join('\n').slice(0, 400000);
+    // The start of the files, up to 400000 characters (not a copy of a whole dump)
+    let sample = '';
+    for (const text of texts) {
+        if (sample.length >= SNIFF_SAMPLE) {
+            break;
+        }
+        sample += `${sample === '' ? '' : '\n'}${text.slice(0, SNIFF_SAMPLE - sample.length)}`;
+    }
     const count = (re) => (sample.match(re) || []).length;
     const scores = {
         mysql: 3 * count(/\bENGINE\s*=/gi) + 3 * count(/\bAUTO_INCREMENT\b/gi) + 3 * count(/\/\*!\d{5}/g) + 3 * count(/\bDEFAULT\s+CHARSET\b/gi) + 2 * count(/\bLOCK\s+TABLES\b/gi) + count(/\bUNSIGNED\b/gi) + 2 * count(/\bCOLLATE\s*=?\s*utf8/gi),
@@ -2683,24 +3201,53 @@ function sniffDialect(texts) {
     return best[1] > 0 ? best[0] : 'unknown';
 }
 
-// Replays SQL files in order. files: [{ path, rel, text, sections }]; options: dialect (else read
-// from the files, else `hint`), skip(ref) (tables not drawn), collect (the name of a table whose
-// inserted rows are kept: state.rows). Returns the state.
+// Flyway placeholders: a schema written as a placeholder (${schema}.users, "${flyway:defaultSchema}".
+// users) is left out, the table being in the default schema; the lines do not move
+const withoutPlaceholders = (text) => text.replace(/(?:"\$\{[^{}"\r\n]*\}"|`\$\{[^{}`\r\n]*\}`|\[\$\{[^{}\]\r\n]*\}\]|\$\{[^{}\r\n]*\})\.(?=[\w$"`[\u0080-\uffff])/g, '');
+
+// Whether the data statement (INSERT, REPLACE) whose first tokens are `tokens` is skipped without
+// being read (scanStatements' skipData): yes, unless it inserts into the table whose rows are
+// collected (state.rows), read as insertStatement() reads it; null while its name is not read yet
+function skipsData(state, tokens) {
+    if (!state.rows) {
+        return true;
+    }
+    const c = cursorOf(tokens, 1);
+    accept(c, 'IGNORE');
+    accept(c, 'INTO');
+    const parts = readName(c);
+    if (c.i >= tokens.length || isPunct(peek(c), '.')) {
+        // The name may go on
+        return null;
+    }
+    return !parts || !sameName(state, refOf(state, parts).name, state.rows.table);
+}
+
+// Replays SQL files in order. files: [{ path, rel, text, sections, placeholders (Flyway's) }];
+// options: dialect (else read from the files, else `hint`), mariadb (else told by the header of a
+// dump), skip(ref) (tables not drawn), collect (the name of a table whose inserted rows are kept:
+// state.rows). Returns the state. Each statement is applied as soon as it is read, and the data of
+// a dump (INSERT, COPY) is skipped without being read.
 function replay(files, options = {}) {
     const sniffed = options.dialect || sniffDialect(files.map(file => file.text));
     const dialect = sniffed === 'unknown' && options.hint ? options.hint : sniffed;
-    const state = createState(dialect, options);
+    const mariadb = dialect === 'mysql' && (Boolean(options.mariadb) || files.some(file => /^-- MariaDB dump\b|\/\*M!/m.test(file.text.slice(0, 4096))));
+    const state = createState(dialect, { ...options, mariadb });
     for (const file of files) {
-        const text = file.text.replace(/^\uFEFF/, ' ');
-        const ctx = { state, file, text, lineAt: createLineLocator(text) };
+        const text = (file.placeholders ? withoutPlaceholders(file.text) : file.text).replace(/^\uFEFF/, ' ');
+        const ctx = { state, file, text, lineAt: lineLocator(text) };
         state.searchPath = ['public'];
-        const { statements, problems } = scanStatements(text, dialect, { sections: file.sections });
-        for (const statement of statements) {
-            applyStatement(ctx, statement.tokens);
-            if (statement.copy) {
-                copyRows(ctx, statement);
-            }
-        }
+        state.transaction = null;
+        const { problems } = scanStatements(text, dialect, {
+            sections: file.sections,
+            skipData: (tokens) => skipsData(state, tokens),
+            onStatement: (statement) => {
+                applyStatement(ctx, statement.tokens);
+                if (statement.copy) {
+                    copyRows(ctx, statement);
+                }
+            },
+        });
         for (const problem of problems) {
             state.warnings.push(`${file.rel}:${ctx.lineAt(problem.offset)}: ${problem.message}`);
         }
@@ -3052,9 +3599,10 @@ function sourcesOf(basePath, location) {
 
 // The dialect that the folders of the migrations, or the name of the dump, tell (migrations/sqlite,
 // migrate/postgres, mysql-schema.sql), for SQL that only one dialect would not tell
-function pathDialect(location) {
-    return namesDialect([...(location.folder ? location.folder.split(/[\\/]/).slice(-3) : []), ...location.files.slice(0, 1).map(file => path.basename(file.path, '.sql'))]);
-}
+const locationNames = (location) => [...(location.folder ? location.folder.split(/[\\/]/).slice(-3) : []), ...location.files.slice(0, 1).map(file => path.basename(file.path, '.sql'))];
+const pathDialect = (location) => namesDialect(locationNames(location));
+// Whether these names tell MariaDB (migrations/mariadb)
+const namesMariadb = (names) => names.some(name => /^mariadb(?:\b|[-_])/i.test(name));
 
 // The dialect of the last of these names that tells one, or null
 function namesDialect(names) {
@@ -3147,10 +3695,10 @@ module.exports.parse = function (basePath, options = {}) {
     for (const file of filesUntil(location, options.until)) {
         const text = readText(file.path, overrides);
         if (text !== null) {
-            files.push({ path: file.path, rel: toPosix(path.relative(basePath, file.path)), text, sections: location.layout.files ? null : sectionsOf(text) });
+            files.push({ path: file.path, rel: toPosix(path.relative(basePath, file.path)), text, sections: location.layout.files ? null : sectionsOf(text), placeholders: location.layout.id === 'flyway' });
         }
     }
-    const state = replay(files, { dialect: location.dialect, hint: pathDialect(location), skip: (ref) => BOOKKEEPING.has(ref.name.toLowerCase()) || /^sqlite_/i.test(ref.name) });
+    const state = replay(files, { dialect: location.dialect, hint: pathDialect(location), mariadb: namesMariadb(locationNames(location)), skip: (ref) => BOOKKEEPING.has(ref.name.toLowerCase()) || /^sqlite_/i.test(ref.name) });
     state.warnings.unshift(...warnings);
     const reader = createStatusReader(sourcesOf(basePath, location), { git: options.git !== false, overrides, cache: options.gitCache });
     if (reader.warning) {
@@ -3165,8 +3713,10 @@ module.exports.parse = function (basePath, options = {}) {
 // case, besides the tables of the migration tools), collect.
 function readDump(file, options = {}) {
     const skip = new Set(options.skip || []);
+    const names = [path.basename(file.path).replace(/\.\w+$/, '')];
     const state = replay([{ ...file, sections: null }], {
-        hint: namesDialect([path.basename(file.path).replace(/\.\w+$/, '')]),
+        hint: namesDialect(names),
+        mariadb: namesMariadb(names),
         skip: (ref) => skip.has(ref.name.toLowerCase()) || BOOKKEEPING.has(ref.name.toLowerCase()) || /^sqlite_/i.test(ref.name),
         collect: options.collect,
     });

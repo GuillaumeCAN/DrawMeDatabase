@@ -346,15 +346,25 @@ function createStatusReader(sources, { git: useGit = true, overrides = null, cac
 
     const byFile = new Map();
     const fileStatus = (filePath) => {
+        const edited = overrides ? overrides.get(filePath) : undefined;
+        // The saved text is only compared with an editor's: otherwise, whether the file can be
+        // read is enough (a large SQL dump is not read twice)
         let saved = null;
+        let readable = false;
         try {
-            saved = fs.readFileSync(filePath, 'utf8');
+            if (edited !== undefined) {
+                saved = fs.readFileSync(filePath, 'utf8');
+                readable = true;
+            } else {
+                fs.accessSync(filePath, fs.constants.R_OK);
+                readable = fs.statSync(filePath).isFile();
+            }
         } catch {
             saved = null;
+            readable = false;
         }
-        const edited = overrides ? overrides.get(filePath) : undefined;
         let committed = null;
-        if (gitStatus && saved !== null) {
+        if (gitStatus && readable) {
             try {
                 committed = gitStatus(filePath);
             } catch {
