@@ -1483,8 +1483,7 @@
           "source": {
             "file": "src/schema/incidents/incident.ts",
             "line": 40
-          },
-          "unique": true
+          }
         },
         {
           "name": "slack_team_id",
@@ -1560,7 +1559,7 @@
           "foreignKey": "status_report_id",
           "references": "id",
           "on": "status_report",
-          "type": "one-to-one",
+          "type": "many-to-one",
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1593,6 +1592,13 @@
           ],
           "type": "unique",
           "name": "incident_slack_channel_idx"
+        },
+        {
+          "columns": [
+            "status_report_id"
+          ],
+          "type": "unique",
+          "name": "incident_status_report_id_idx"
         }
       ]
     },
@@ -2464,8 +2470,7 @@
           "source": {
             "file": "src/schema/monitor_incidents/monitor_incident.ts",
             "line": 35
-          },
-          "unique": true
+          }
         },
         {
           "name": "workspace_id",
@@ -2575,7 +2580,7 @@
           "foreignKey": "monitor_id",
           "references": "id",
           "on": "monitor",
-          "type": "one-to-one",
+          "type": "many-to-one",
           "onDelete": "set default",
           "onUpdate": "no action"
         },
@@ -2623,6 +2628,13 @@
           ],
           "type": "index",
           "name": "monitor_incident_workspace_id_started_at_idx"
+        },
+        {
+          "columns": [
+            "monitor_id"
+          ],
+          "type": "unique",
+          "name": "monitor_incident_open_idx"
         }
       ]
     },

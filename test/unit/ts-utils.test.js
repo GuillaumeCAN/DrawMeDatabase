@@ -11,7 +11,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { tokenize, context, parseExpression, scanModule, blockReturns, createLineLocator, cook } = require('../../parsers/ts-utils');
+const { tokenize, context, parseExpression, scanModule, blockReturns, blockDeclarations, hasNestedReturn, createLineLocator, cook } = require('../../parsers/ts-utils');
 
 // A node without its offsets, for the comparisons
 const strip = (node) => JSON.parse(JSON.stringify(node, (key, value) => (['start', 'end', 'keyStart', 'ctx', 'parenthesized'].includes(key) ? undefined : value)));
@@ -121,6 +121,42 @@ test('modules: declarations among other statements (classes, types, ifs, calls),
     assert.deepEqual([...module.declarations.keys()], ['a', 'f']);
     assert.equal(strip(module.declarations.get('f').init).type, 'Call');
     assert.deepEqual(module.assignments.map(a => [a.target, a.value.type]), [['module.exports', 'Object']]);
+});
+
+test('modules: CommonJS: require() as imports (destructured, renamed, a namespace), exports.x =, module.exports.x =, the keys of module.exports = { ... }', () => {
+    const module = scanModule("const { sqliteTable, integer: int } = require('drizzle-orm/sqlite-core');\nconst helpers = require('./helpers');\nconst users = sqliteTable('users', {});\nexports.posts = sqliteTable('posts', {});\nmodule.exports.users = users;\nmodule.exports = { tags, extra: 1 };\n");
+    assert.deepEqual([...module.imports], [
+        ['sqliteTable', { source: 'drizzle-orm/sqlite-core', imported: 'sqliteTable' }],
+        ['int', { source: 'drizzle-orm/sqlite-core', imported: 'integer' }],
+        ['helpers', { source: './helpers', imported: '*' }],
+    ]);
+    assert.deepEqual([...module.declarations.keys()], ['users']);
+    assert.deepEqual([...module.commonExports].map(([name, declaration]) => [name, declaration.name, declaration.init.type, declaration.exported]), [
+        ['posts', 'posts', 'Call', true],
+        ['users', 'users', 'Identifier', true],
+        ['tags', 'tags', 'Identifier', true],
+        ['extra', 'extra', 'Number', true],
+    ]);
+    assert.deepEqual(module.assignments.map(a => a.target), ['module.exports']);
+});
+
+test('blocks: the declarations at the top level of a function block (const, let, var, destructuring, functions), not those of its nested blocks and functions', () => {
+    const text = "function f(a) {\n  const x = 1, y = a;\n  let { b, c: d, ...rest } = a;\n  var [e, [f2]] = a;\n  function g() { const hidden = 1; return hidden; }\n  if (a) { const inner = 2; }\n  const h = () => { const deep = 3; };\n  obj.const = 4;\n  let later;\n  return x;\n}";
+    const node = parseExpression(context(tokenize(text)), 0).node;
+    assert.deepEqual(blockDeclarations(node.body).map(d => [d.name, d.init ? d.init.type : null]), [
+        ['x', 'Number'], ['y', 'Identifier'], ['b', null], ['d', null], ['rest', null], ['e', null], ['f2', null], ['g', 'Function'], ['h', 'Arrow'], ['later', null],
+    ]);
+    assert.equal(blockDeclarations(node.body), blockDeclarations(node.body), 'read once');
+});
+
+test('blocks: the returns nested in inner blocks (if, loops, switch, try), not in nested functions, objects or classes', () => {
+    const nested = (text) => hasNestedReturn(parseExpression(context(tokenize(text)), 0).node.body);
+    assert.equal(nested('() => { if (a) { return 1; } return 2; }'), true);
+    assert.equal(nested('() => { for (const x of y) { return x; } return 2; }'), true);
+    assert.equal(nested('() => { switch (a) { case 1: { return 1; } } return 2; }'), true);
+    assert.equal(nested('() => { try { return 1; } finally { x(); } }'), true);
+    assert.equal(nested('() => { function f() { return 1; } const g = () => { return 2; }; return f(); }'), false);
+    assert.equal(nested('() => { const o = { m() { return 1; } }; class C { m() { return 1; } } return o; }'), false);
 });
 
 test('line locator: lines from 1, CRLF line endings', () => {

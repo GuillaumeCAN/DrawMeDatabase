@@ -267,7 +267,7 @@ describe('drizzle parser: where the schema is', () => {
         assert.throws(() => parser.parse(missing), error => error instanceof ParserError && error.message === `The Drizzle schema set in drizzle.config.ts was not found: ./db/schema.ts, ./db/more/*.ts (from ${missing})`);
     });
 
-    it('sources(): the schema files and the files they import, the folders of the config, package.json and the config file; every usual location while there is no schema', () => {
+    it('sources(): the schema files and the files they import, the folders of the config, package.json, the config file and tsconfig.json; every usual location while there is no schema', () => {
         const dir = project({
             'drizzle.config.ts': "export default { schema: './src/db/schema/*.ts' };\n",
             'src/db/schema/users.ts': `${PG}import { timestamps } from '../columns';\nimport type { Role } from '../types';\nimport { z } from 'zod';\n${USERS}`,
@@ -280,7 +280,7 @@ describe('drizzle parser: where the schema is', () => {
         const at = (...parts) => path.join(dir, ...parts);
         assert.deepEqual(sources, {
             folders: [{ path: at('src', 'db', 'schema'), recursive: false }],
-            files: [at('src', 'db', 'schema', 'index.ts'), at('src', 'db', 'schema', 'users.ts'), at('src', 'db', 'legacy', 'posts.ts'), at('src', 'db', 'columns.ts'), at('package.json'), at('drizzle.config.ts')],
+            files: [at('src', 'db', 'schema', 'index.ts'), at('src', 'db', 'schema', 'users.ts'), at('src', 'db', 'legacy', 'posts.ts'), at('src', 'db', 'columns.ts'), at('package.json'), at('drizzle.config.ts'), at('tsconfig.json')],
             extensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'],
         });
         assert.equal(registry.covers(sources, at('src', 'db', 'schema', 'new.ts')), true, 'a new file of the schema folder');
@@ -289,11 +289,12 @@ describe('drizzle parser: where the schema is', () => {
             { base: at('src', 'db', 'schema'), pattern: '*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}' },
             { base: at('src', 'db', 'schema'), pattern: 'index.ts' },
         ]);
-        assert.deepEqual(registry.getSources('drizzle', project({ 'drizzle.config.ts': "export default { schema: 'db/**/*.ts' };\n", 'db/a/b.ts': SCHEMA })).folders.map(f => f.recursive), [true], 'a ** glob: the sub-folders too');
+        const glob = project({ 'drizzle.config.ts': "export default { schema: 'db/**/*.ts' };\n", 'db/a/b.ts': SCHEMA });
+        assert.deepEqual(registry.getSources('drizzle', glob).folders, [{ path: path.join(glob, 'db'), recursive: true, pattern: '**/*.ts' }, { path: path.join(glob, 'db'), recursive: true, pattern: '**/*.ts/*' }], 'a ** glob: the files it matches in the sub-folders, and the files of the folders it matches');
         const none = project({ 'package.json': PACKAGE });
         assert.deepEqual(registry.getSources('drizzle', none), {
             folders: ['src/db/schema', 'src/schema', 'db/schema', 'schema'].map(folder => ({ path: path.join(none, folder), recursive: false })),
-            files: [...['src/db/schema.ts', 'src/db/schema.js', 'src/schema.ts', 'src/schema.js', 'db/schema.ts', 'db/schema.js', 'drizzle/schema.ts', 'drizzle/schema.js', 'schema.ts'].map(file => path.join(none, file)), path.join(none, 'package.json'), path.join(none, 'drizzle.config.ts')],
+            files: [...['src/db/schema.ts', 'src/db/schema.js', 'src/schema.ts', 'src/schema.js', 'db/schema.ts', 'db/schema.js', 'drizzle/schema.ts', 'drizzle/schema.js', 'schema.ts'].map(file => path.join(none, file)), path.join(none, 'package.json'), path.join(none, 'drizzle.config.ts'), path.join(none, 'tsconfig.json')],
             extensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'],
         });
     });
@@ -324,6 +325,50 @@ describe('drizzle parser: where the schema is', () => {
             assert.deepEqual(result.tables[0].columns.map(c => c.name), ['id', 'name'], line);
             assert.deepEqual(result.warnings, [], line);
         }
+    });
+
+    it('a glob through sub-folders (src/**/schema.ts): the files it matches are its sources, not every script of its base folder', () => {
+        const dir = project({
+            'package.json': PACKAGE,
+            'drizzle.config.ts': "export default { schema: './src/**/schema.ts' };\n",
+            'src/modules/users/schema.ts': PG + USERS,
+            'src/app/page.tsx': 'export default function Page() { return null; }\n',
+        });
+        const sources = registry.getSources('drizzle', dir);
+        const at = (...parts) => path.join(dir, ...parts);
+        assert.equal(registry.covers(sources, at('src', 'modules', 'users', 'schema.ts')), true);
+        assert.equal(registry.covers(sources, at('src', 'modules', 'posts', 'schema.ts')), true, 'a new schema file');
+        assert.equal(registry.covers(sources, at('src', 'modules', 'posts', 'schema.ts', 'tags.ts')), true, 'a file of a folder the glob matches, which drizzle-kit reads');
+        assert.equal(registry.covers(sources, at('src', 'app', 'page.tsx')), false, 'a page of the app');
+        assert.equal(registry.covers(sources, at('src', 'modules', 'users', 'service.ts')), false);
+        assert.deepEqual(registry.watchPatterns(sources).slice(0, 2), [{ base: at('src'), pattern: '**/schema.ts' }, { base: at('src'), pattern: '**/schema.ts/*' }]);
+    });
+
+    it('tsconfig.json is a source, and the text of its unsaved editor gives the path aliases', () => {
+        const dir = schemaProject("import { timestamps } from '@/db/columns';\nexport const t = pgTable('t', { id: integer(), ...timestamps });\n", {
+            'src/db/columns.ts': "import { timestamp } from 'drizzle-orm/pg-core';\nexport const timestamps = { createdAt: timestamp('created_at') };\n",
+            'tsconfig.json': '{ "compilerOptions": { "paths": { "@/*": ["./lib/*"] } } }',
+        });
+        const tsconfig = path.join(dir, 'tsconfig.json');
+        assert.equal(registry.covers(registry.getSources('drizzle', dir), tsconfig), true);
+        assert.deepEqual(parser.parse(dir, { git: false }).tables[0].columns.map(c => c.name), ['id'], 'the alias names a missing folder');
+        const fixed = new Map([[tsconfig, '{ "compilerOptions": { "paths": { "@/*": ["./src/*"] } } }']]);
+        assert.deepEqual(parser.parse(dir, { git: false, overrides: fixed }).tables[0].columns.map(c => c.name), ['id', 'created_at']);
+        assert.deepEqual(registry.getSources('drizzle', dir, { overrides: fixed }).files.slice(0, 2), [path.join(dir, 'src', 'db', 'schema.ts'), path.join(dir, 'src', 'db', 'columns.ts')]);
+    });
+
+    it('an import whose file does not exist yet is a source: its creation refreshes the diagram, not the other files of its folder', () => {
+        const dir = schemaProject("import { timestamps } from './columns';\nimport { audit } from '@/shared/audit';\nimport { z } from 'zod';\nexport const t = pgTable('t', { id: integer(), ...timestamps, ...audit });\n", { 'tsconfig.json': '{ "compilerOptions": { "paths": { "@/*": ["./src/*"] } } }' });
+        const sources = registry.getSources('drizzle', dir);
+        const at = (...parts) => path.join(dir, ...parts);
+        for (const file of [at('src', 'db', 'columns.ts'), at('src', 'db', 'columns.js'), at('src', 'db', 'columns', 'index.ts'), at('src', 'shared', 'audit.ts'), at('src', 'shared', 'audit', 'index.ts')]) {
+            assert.equal(registry.covers(sources, file), true, file);
+        }
+        assert.equal(registry.covers(sources, at('src', 'db', 'seed.ts')), false, 'another file of the folder');
+        assert.equal(registry.covers(sources, at('src', 'db', 'columns.md')), false);
+        assert.equal(registry.covers(sources, at('src', 'app', 'page.ts')), false);
+        writeFiles(dir, { 'src/db/columns.ts': "import { timestamp } from 'drizzle-orm/pg-core';\nexport const timestamps = { createdAt: timestamp('created_at') };\n" });
+        assert.deepEqual(parser.parse(dir, { git: false }).tables[0].columns.map(c => c.name), ['id', 'created_at']);
     });
 });
 
@@ -423,13 +468,12 @@ describe('drizzle parser: tables and columns', () => {
             'src/db/helpers.ts': "import { timestamp } from 'drizzle-orm/pg-core';\nexport const timestamps = {\n  createdAt: timestamp('created_at').defaultNow().notNull(),\n  updatedAt: timestamp('updated_at'),\n};\nexport const audit = (prefix: string) => ({\n  [`${prefix}_by`]: text(),\n  deletedAt: timestamp(),\n});\n",
         };
         const result = parseSchema("import { timestamps, audit } from './helpers';\nimport * as helpers from './helpers';\nimport { external } from 'some-package';\nconst ids = { id: serial().primaryKey() };\nexport const t = pgTable('t', {\n  ...ids,\n  ...timestamps,\n  ...audit('x'),\n  ...helpers.timestamps,\n  ...external,\n  name: text(),\n});\n", { columnSources: true }, files);
+        // ...helpers.timestamps writes createdAt and updatedAt again: each column once, as in JavaScript
         assert.deepEqual(result.tables[0].columns.map(c => [c.name, c.source.file, c.source.line]), [
             ['id', 'src/db/schema.ts', 5],
             ['created_at', 'src/db/helpers.ts', 3],
             ['updated_at', 'src/db/helpers.ts', 4],
             ['deletedAt', 'src/db/helpers.ts', 8],
-            ['created_at', 'src/db/helpers.ts', 3],
-            ['updated_at', 'src/db/helpers.ts', 4],
             ['name', 'src/db/schema.ts', 12],
         ]);
         assert.deepEqual(result.warnings, [
@@ -488,6 +532,44 @@ describe('drizzle parser: tables and columns', () => {
             { table: 'tags', columns: [{ name: 'id', type: 'serial', primary: true, autoIncrement: true }, { name: 'label', type: 'text', nullable: true }], relations: [] },
             { table: 'links', columns: [{ name: 'a', type: 'integer', primary: true }, { name: 'b', type: 'integer', primary: true }], relations: [], indexes: [{ columns: ['b'], type: 'index', name: 'links_b_idx' }] },
         ]);
+    });
+
+    it('a key written again keeps the place of the first one and takes the last value, as in JavaScript ({ ...base, id }, { note, ...base })', () => {
+        const tables = tablesOf("const base = {\n  id: serial('id').primaryKey(),\n  createdAt: timestamp('created_at'),\n  note: text('note'),\n};\nexport const events = pgTable('events', {\n  ...base,\n  id: uuid('id').primaryKey().defaultRandom(),\n  name: text('name'),\n});\nexport const logs = pgTable('logs', {\n  note: text('note').notNull(),\n  ...base,\n});\n", { columnSources: true });
+        assert.deepEqual(tables.map(t => [t.table, t.columns.map(c => `${c.name}:${c.type}${c.nullable ? '?' : ''}@${c.source.line}`)]), [
+            ['events', ['id:uuid@9', 'created_at:timestamp?@4', 'note:text?@5', 'name:text?@10']],
+            ['logs', ['note:text?@5', 'id:serial@3', 'created_at:timestamp?@4']],
+        ]);
+    });
+
+    it('helpers whose block declares local variables and functions; a local that cannot be read is told, not taken for a builder', () => {
+        const files = { 'src/db/audit.ts': "import { text, integer } from 'drizzle-orm/pg-core';\nexport function auditable(prefix: string) {\n  const col = (n: string) => text(`${prefix}_${n}`);\n  return { createdBy: col('created_by'), updatedBy: col('updated_by') };\n}\nexport function softDelete() {\n  const columns = { deletedAt: text('deleted_at') };\n  return columns;\n}\nexport function versioned(start = 1) {\n  function version() {\n    return integer('version').notNull().default(start);\n  }\n  return { version: version() };\n}\nexport function factoryColumns() {\n  const { make } = factory;\n  return { odd: make('odd') };\n}\n" };
+        const result = parseSchema("import { auditable, softDelete, versioned, factoryColumns } from './audit';\nexport const t = pgTable('t', {\n  id: serial().primaryKey(),\n  ...auditable('a'),\n  ...softDelete(),\n  ...versioned(3),\n  ...factoryColumns(),\n});\n", { details: true }, files);
+        assert.deepEqual(result.tables[0].columns, [
+            { name: 'id', type: 'serial', primary: true, autoIncrement: true },
+            { name: 'a_created_by', type: 'text', nullable: true },
+            { name: 'a_updated_by', type: 'text', nullable: true },
+            { name: 'deleted_at', type: 'text', nullable: true },
+            { name: 'version', type: 'integer', default: 3 },
+        ]);
+        assert.deepEqual(result.warnings, ['src/db/audit.ts:18: t.odd: column not understood, skipped.']);
+    });
+
+    it('a CommonJS schema (.js): require() of drizzle-orm and of helpers, exports.x = ..., module.exports.x = ..., module.exports = { ... }', () => {
+        const dir = project({
+            'package.json': PACKAGE,
+            'drizzle.config.js': "module.exports = { dialect: 'sqlite', schema: ['./db/schema.js', './db/more.js'] };\n",
+            'db/columns.js': "const { integer } = require('drizzle-orm/sqlite-core');\nexports.id = { id: integer('id').primaryKey() };\n",
+            'db/schema.js': "const { sqliteTable, integer, text } = require('drizzle-orm/sqlite-core');\nconst { id } = require('./columns');\nconst users = sqliteTable('users', {\n  ...id,\n  name: text('name').notNull(),\n});\nexports.posts = sqliteTable('posts', {\n  ...id,\n  userId: integer('user_id').references(() => users.id),\n});\nmodule.exports.users = users;\n",
+            'db/more.js': "const core = require('drizzle-orm/sqlite-core');\nconst tags = core.sqliteTable('tags', { id: core.integer('id').primaryKey() });\nconst hidden = core.sqliteTable('hidden', { id: core.integer('id') });\nmodule.exports = { tags };\n",
+        });
+        const result = parser.parse(dir, { git: false });
+        assert.deepEqual(result.tables.map(t => [t.table, t.source.line, t.columns.map(c => c.name), t.relations.map(r => `${r.foreignKey} → ${r.on}.${r.references}`)]), [
+            ['tags', 2, ['id'], []],
+            ['users', 3, ['id', 'name'], []],
+            ['posts', 7, ['id', 'user_id'], ['user_id → users.id']],
+        ]);
+        assert.deepEqual(result.warnings, ['db/more.js:3: table hidden is not exported: drizzle-kit does not create it, skipped.']);
     });
 });
 
@@ -551,6 +633,43 @@ describe('drizzle parser: relations', () => {
             'src/db/schema.ts:8: t.remoteId: the referenced column cannot be read, relation skipped.',
             'src/db/schema.ts:9: t.badId: the referenced column cannot be read, relation skipped.',
         ]);
+    });
+
+    it('the extra config: spreads, helpers of the project (of the file or imported), a nested array (flattened once, as drizzle-orm does), a namespace; what drizzle-kit ignores or what cannot be read is told', () => {
+        const files = { 'src/db/extras.ts': "import { index } from 'drizzle-orm/pg-core';\nexport const tenantIndexes = (t: any) => [index().on(t.tenantId), index().on(t.tenantId, t.createdAt)];\n" };
+        const result = parseSchema("import * as pg from 'drizzle-orm/pg-core';\nimport { tenantIndexes } from './extras';\nimport { remoteIndexes } from 'some-package';\nexport const tenants = pgTable('tenants', { id: uuid().primaryKey() });\nconst tenantScoped = (t) => [\n  primaryKey({ columns: [t.tenantId, t.id] }),\n  foreignKey({ columns: [t.tenantId], foreignColumns: [tenants.id] }).onDelete('cascade'),\n];\nconst byName = (t) => index('projects_name_idx').on(t.name);\nexport const projects = pgTable('projects', {\n  tenantId: uuid().notNull(),\n  id: uuid().notNull(),\n  name: text(),\n  createdAt: timestamp(),\n}, (t) => [\n  ...tenantScoped(t),\n  ...tenantIndexes(t),\n  [pg.uniqueIndex('projects_tenant_name').on(t.tenantId, t.name), byName(t)],\n  [[index('too_deep').on(t.name)]],\n  { pk: primaryKey({ columns: [t.id] }) },\n  ...remoteIndexes(t),\n  check('named', t.name),\n]);\nexport const tasks = pgTable('tasks', { tenantId: uuid(), createdAt: timestamp() }, (t) => tenantIndexes(t));\n", { details: true }, files);
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.filter(c => c.primary).map(c => c.name), t.relations, t.indexes]), [
+            ['tenants', ['id'], [], undefined],
+            ['projects', ['tenantId', 'id'], [{ foreignKey: 'tenantId', references: 'id', on: 'tenants', type: 'many-to-one', onDelete: 'cascade', onUpdate: 'no action' }], [
+                { columns: ['tenantId'], type: 'index' },
+                { columns: ['tenantId', 'createdAt'], type: 'index' },
+                { columns: ['tenantId', 'name'], type: 'unique', name: 'projects_tenant_name' },
+                { columns: ['name'], type: 'index', name: 'projects_name_idx' },
+            ]],
+            ['tasks', [], [], [{ columns: ['tenantId'], type: 'index' }, { columns: ['tenantId', 'createdAt'], type: 'index' }]],
+        ]);
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:20: projects: an array nested twice in the extra config is ignored by drizzle-kit, skipped.',
+            'src/db/schema.ts:21: projects: an object in the extra config is ignored by drizzle-kit, skipped.',
+            'src/db/schema.ts:22: projects: ...remoteIndexes(t) cannot be read, its keys and indexes are skipped.',
+        ]);
+    });
+
+    it('a partial unique index (.where()) makes no column unique and no relation one-to-one, as in the SQL of drizzle-kit: it is a unique index', () => {
+        const tables = tablesOf(`import { sql } from 'drizzle-orm';\n${USERS}export const subscriptions = pgTable('subscriptions', {\n  id: serial().primaryKey(),\n  userId: integer('user_id').notNull().references(() => users.id),\n  status: text().notNull(),\n}, (t) => [uniqueIndex('one_active').on(t.userId).where(sql\`status = 'active'\`)]);\n`, { details: true });
+        const subscriptions = tableNamed(tables, 'subscriptions');
+        assert.deepEqual(subscriptions.columns[1], { name: 'user_id', type: 'integer' });
+        assert.deepEqual(subscriptions.relations, [{ foreignKey: 'user_id', references: 'id', on: 'users', type: 'many-to-one', onDelete: 'no action', onUpdate: 'no action' }]);
+        assert.deepEqual(subscriptions.indexes, [{ columns: ['user_id'], type: 'unique', name: 'one_active' }]);
+    });
+
+    it('references to the tables of drizzle-orm/supabase (authUsers): the relation to auth.users, which is not drawn', () => {
+        const result = parseSchema("import { authUsers } from 'drizzle-orm/supabase';\nimport * as supabase from 'drizzle-orm/supabase';\nexport const profiles = pgTable('profiles', {\n  id: uuid().primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),\n  inviterId: uuid('inviter_id'),\n}, (t) => [foreignKey({ columns: [t.inviterId], foreignColumns: [supabase.authUsers.id] })]);\n", { details: true });
+        assert.deepEqual(result.tables.map(t => [t.table, t.relations]), [['profiles', [
+            { foreignKey: 'id', references: 'id', on: 'auth.users', type: 'one-to-one', onDelete: 'cascade', onUpdate: 'no action' },
+            { foreignKey: 'inviter_id', references: 'id', on: 'auth.users', type: 'many-to-one', onDelete: 'no action', onUpdate: 'no action' },
+        ]]]);
+        assert.deepEqual(result.warnings, []);
     });
 });
 
@@ -621,6 +740,12 @@ describe('drizzle parser: details', () => {
             { name: 'price', type: 'money', nullable: true },
             { name: 'at', type: 'point', nullable: true, nativeType: 'point' },
         ]);
+    });
+
+    it('sql.raw() of a constant: a default and an index expression, as written', () => {
+        const [table] = tablesOf("import { sql } from 'drizzle-orm';\nconst NOW = 'CURRENT_TIMESTAMP';\nexport const t = pgTable('t', {\n  at: timestamp().default(sql.raw('CURRENT_TIMESTAMP')),\n  other: timestamp().default(sql.raw(NOW)),\n  computed: timestamp().default(sql.raw(process.env.X)),\n  email: text(),\n}, (t) => [index('t_lower').on(sql.raw('lower(email)'))]);\n", { details: true });
+        assert.deepEqual(table.columns.map(c => [c.name, c.defaultRaw]), [['at', 'CURRENT_TIMESTAMP'], ['other', 'CURRENT_TIMESTAMP'], ['computed', undefined], ['email', undefined]]);
+        assert.deepEqual(table.indexes, [{ columns: ['lower(email)'], type: 'index', name: 't_lower' }]);
     });
 });
 
@@ -761,6 +886,27 @@ export const posts = pgTable(
             ['tags', 'untracked', 'src/db/schema/users.ts'],
         ]);
     });
+
+    it('a table renamed by the prefix of its table creator in another file, a column whose helper changed: modified, as their SQL changes', () => {
+        const creator = "import { pgTableCreator } from 'drizzle-orm/pg-core';\nexport const createTable = pgTableCreator((name) => `acme_${name}`);\n";
+        const helper = "import { varchar } from 'drizzle-orm/pg-core';\nexport const shortText = (name: string) => varchar(name, { length: 50 });\n";
+        const dir = project({
+            'package.json': PACKAGE,
+            'src/db/create-table.ts': creator,
+            'src/db/columns.ts': helper,
+            'src/db/schema.ts': `${PG}import { createTable } from './create-table';\nimport { shortText } from './columns';\nexport const posts = createTable('posts', {\n  id: serial('id').primaryKey(),\n  title: shortText('title'),\n});\nexport const tags = pgTable('tags', {\n  id: serial('id').primaryKey(),\n});\n`,
+        });
+        git(dir, 'init', '-q');
+        commitAll(dir);
+        assert.deepEqual(statuses(parser.parse(dir)), [['acme_posts', 'committed', 'id=committed', 'title=committed'], ['tags', 'committed', 'id=committed']]);
+        fs.writeFileSync(path.join(dir, 'src', 'db', 'create-table.ts'), creator.replace('acme_', 'corp_'));
+        assert.deepEqual(statuses(parser.parse(dir)), [['corp_posts', 'modified', 'id=committed', 'title=committed'], ['tags', 'committed', 'id=committed']]);
+        commitAll(dir);
+        fs.writeFileSync(path.join(dir, 'src', 'db', 'columns.ts'), helper.replace('length: 50', 'length: 80'));
+        assert.deepEqual(statuses(parser.parse(dir)), [['corp_posts', 'modified', 'id=committed', 'title=modified'], ['tags', 'committed', 'id=committed']]);
+        const typed = new Map([[path.join(dir, 'src', 'db', 'columns.ts'), helper.replace('length: 50', 'length: 120')]]);
+        assert.deepEqual(statuses(parser.parse(dir, { overrides: typed })), [['corp_posts', 'unsaved', 'id=committed', 'title=unsaved'], ['tags', 'committed', 'id=committed']]);
+    });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -822,5 +968,44 @@ describe('drizzle parser: warnings', () => {
             assert.doesNotMatch(source, /require\(['"]vscode['"]\)/, file);
             assert.doesNotMatch(source, /child_process|\beval\(|new Function|vm\.|import\(/, file);
         }
+    });
+
+    it('a schema of 4000 tables in one file (drizzle-kit pull) is read in a time that grows with its size, not with its square', () => {
+        let body = '';
+        for (let i = 0; i < 4000; i++) {
+            body += `export const t${i} = pgTable('t${i}', {\n  id: integer('id').primaryKey(),\n  a: text('a'),\n  b: text('b'),\n  c: integer('c'),\n});\n`;
+        }
+        const dir = schemaProject(body);
+        parser.parse(dir, { git: false });
+        const started = Date.now();
+        assert.equal(parser.parse(dir, { git: false }).tables.length, 4000);
+        assert.ok(Date.now() - started < 1000, `${Date.now() - started} ms`);
+    });
+
+    it('a barrel of 150 files (export * from) whose tables reference each other through it: each import is looked for once, not once per name', () => {
+        const files = { 'package.json': PACKAGE, 'drizzle.config.ts': "export default { schema: './src/db/schema/index.ts' };\n" };
+        let index = '';
+        for (let i = 0; i < 150; i++) {
+            index += `export * from './t${i}';\n`;
+            const references = i === 0 ? '' : [1, 2, 3].map(k => `  r${k}: integer('r${k}').references(() => schema.t${(i * 7 + k * 13) % i}.id),\n`).join('');
+            files[`src/db/schema/t${i}.ts`] = `${PG}import * as schema from './index';\nexport const t${i} = pgTable('t${i}', {\n  id: integer('id').primaryKey(),\n${references}});\n`;
+        }
+        files['src/db/schema/index.ts'] = index;
+        const dir = project(files);
+        const statSync = fs.statSync;
+        let calls = 0;
+        fs.statSync = (...args) => {
+            calls++;
+            return statSync(...args);
+        };
+        let result;
+        try {
+            result = parser.parse(dir, { git: false });
+        } finally {
+            fs.statSync = statSync;
+        }
+        assert.equal(result.tables.length, 150);
+        assert.equal(result.tables.reduce((count, t) => count + t.relations.length, 0), 447);
+        assert.ok(calls < 5 * 150, `${calls} calls of fs.statSync`);
     });
 });

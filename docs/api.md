@@ -48,7 +48,7 @@ The parsers are pluggable ([parsers.md](parsers.md)): a stack is an id (`framewo
 | Member | Description |
 |--------|-------------|
 | `getFrameworks()` | The supported stacks, in the order of detection (the first one wins a tie): `[{ id, label }]`, today `[{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }, { id: 'drizzle', label: 'Drizzle' }, { id: 'sql', label: 'SQL' }]` |
-| `getSources(basePath, framework)` | What the parser of a stack reads in a framework root: `{ folders: [{ path, recursive }], files, extensions }`, absolute paths (`recursive`: its sub-folders too; `extensions`: of the files of the folders, `['.php']`; `files`: single files, whatever their extension). For example the files to copy for a version of the schema, or to watch. Throws a `ParserError` for an unknown framework |
+| `getSources(basePath, framework)` | What the parser of a stack reads in a framework root: `{ folders: [{ path, recursive, pattern? }], files, extensions }`, absolute paths (`recursive`: its sub-folders too; `pattern`: when set, only the files of the folder that match this glob, `**/schema.ts`; `extensions`: of the files of the folders, `['.php']`; `files`: single files, whatever their extension). For example the files to copy for a version of the schema, or to watch. Throws a `ParserError` for an unknown framework |
 
 ## Sidebar (DrawMeDatabase 1.7.0)
 

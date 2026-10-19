@@ -14,8 +14,8 @@
 const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
-const { createStatusReader, tableStatus } = require('./git');
-const { scanModule, blockReturns, hasNestedReturn, createLineLocator, cook } = require('./ts-utils');
+const { createStatusReader, tableStatus, changedStatus } = require('./git');
+const { scanModule, blockReturns, blockDeclarations, hasNestedReturn, createLineLocator, cook } = require('./ts-utils');
 
 // Packages of a project that uses Drizzle ORM
 const PACKAGES = ['drizzle-orm', 'drizzle-kit'];
@@ -55,6 +55,16 @@ const DECIMAL_BUILDERS = new Set(['numeric', 'decimal', 'double', 'doublePrecisi
 const JSON_BUILDERS = new Set(['json', 'jsonb']);
 // Calls on a column in an index that keep the column (t.name.asc().nullsLast().op('text_ops'))
 const INDEX_COLUMN_METHODS = new Set(['asc', 'desc', 'nullsFirst', 'nullsLast', 'op']);
+// Functions of the extra config of a table that are read, and the ones skipped without a warning
+// (as the other functions of drizzle-orm: crudPolicy...)
+const EXTRA_FUNCTIONS = new Set(['primaryKey', 'foreignKey', 'index', 'uniqueIndex', 'unique']);
+const SKIPPED_EXTRAS = new Set(['check', 'pgPolicy']);
+// The tables of drizzle-orm/supabase (supabase/rls.ts) that a schema references without creating
+// them: their name, and the names of their columns by key
+const SUPABASE_TABLES = new Map([
+    ['authUsers', { table: 'auth.users', columns: { id: 'id', email: 'email', phone: 'phone', emailConfirmedAt: 'email_confirmed_at', phoneConfirmedAt: 'phone_confirmed_at', lastSignInAt: 'last_sign_in_at', createdAt: 'created_at', updatedAt: 'updated_at' } }],
+    ['realtimeMessages', { table: 'realtime.messages', columns: { id: 'id', topic: 'topic', extension: 'extension' } }],
+]);
 const ACTIONS = new Set(['cascade', 'restrict', 'no action', 'set null', 'set default']);
 // The schema of the tables written without their schema name
 const DEFAULT_SCHEMAS = new Map([['pg', 'public']]);
@@ -168,13 +178,13 @@ function parseJsonc(text) {
     return JSON.parse(out.replace(/^\ufeff/, '').replace(/,(\s*[}\]])/g, '$1'));
 }
 
-// The path aliases of the tsconfig.json of basePath (compilerOptions.paths): [{ prefix, suffix,
-// targets }], targets absolute with the `*` kept
-function readAliases(basePath) {
+// The path aliases of the tsconfig.json of basePath (compilerOptions.paths; its unsaved editor
+// when there is one): [{ prefix, suffix, targets }], targets absolute with the `*` kept
+function readAliases(basePath, overrides = null) {
     const file = path.resolve(basePath, 'tsconfig.json');
     let config;
     try {
-        config = parseJsonc(fs.readFileSync(file, 'utf8'));
+        config = parseJsonc(readText(file, overrides));
     } catch {
         return [];
     }
@@ -222,15 +232,17 @@ function resolveFile(candidate) {
     return null;
 }
 
-// The file an import of `dir` names: a relative path, or a path alias of tsconfig.json; null for a
-// package (drizzle-orm...) or a file that does not exist
-function resolveSpecifier(dir, specifier, aliases) {
+// The paths an import of `dir` names, before the extensions and index files are tried: a relative
+// path, or the targets of the path aliases of tsconfig.json that match it; [] for a package
+// (drizzle-orm...)
+function specifierPaths(dir, specifier, aliases) {
     if (typeof specifier !== 'string' || specifier === '') {
-        return null;
+        return [];
     }
     if (specifier.startsWith('.') || path.isAbsolute(specifier)) {
-        return resolveFile(path.resolve(dir, specifier));
+        return [path.resolve(dir, specifier)];
     }
+    const paths = [];
     for (const alias of aliases) {
         let rest = null;
         if (alias.suffix === null) {
@@ -238,17 +250,36 @@ function resolveSpecifier(dir, specifier, aliases) {
         } else if (specifier.startsWith(alias.prefix) && specifier.endsWith(alias.suffix) && specifier.length >= alias.prefix.length + alias.suffix.length) {
             rest = specifier.slice(alias.prefix.length, specifier.length - alias.suffix.length);
         }
-        if (rest === null) {
-            continue;
+        if (rest !== null) {
+            paths.push(...alias.targets.map(target => (alias.suffix === null ? target : target.replace('*', rest))));
         }
-        for (const target of alias.targets) {
-            const file = resolveFile(alias.suffix === null ? target : target.replace('*', rest));
-            if (file) {
-                return file;
-            }
+    }
+    return paths;
+}
+
+// The file an import of `dir` names: a relative path, or a path alias of tsconfig.json; null for a
+// package (drizzle-orm...) or a file that does not exist
+function resolveSpecifier(dir, specifier, aliases) {
+    for (const candidate of specifierPaths(dir, specifier, aliases)) {
+        const file = resolveFile(candidate);
+        if (file) {
+            return file;
         }
     }
     return null;
+}
+
+// resolveSpecifier(dir, specifier) for one reading of the schema (sources() or parse()): each
+// import is looked for once, not once per name read through it (`export * from` barrels)
+function createResolver(aliases) {
+    const cache = new Map();
+    return (dir, specifier) => {
+        const key = `${dir}\0${specifier}`;
+        if (!cache.has(key)) {
+            cache.set(key, resolveSpecifier(dir, specifier, aliases));
+        }
+        return cache.get(key);
+    };
 }
 
 // The files a module imports or re-exports (value imports: `import type` is left out)
@@ -256,8 +287,9 @@ function importedSources(scan) {
     return [...new Set([...[...scan.imports.values()].map(entry => entry.source), ...scan.stars, ...[...scan.exports.values()].filter(entry => entry.source !== undefined).map(entry => entry.source)])];
 }
 
-// The files reached from `files` through their imports and re-exports, the files first
-function reachableFiles(files, overrides, aliases) {
+// The files reached from `files` through their imports and re-exports, the files first. The paths
+// of the imports of the project that do not exist yet (a file being created) go to `missing`.
+function reachableFiles(files, overrides, resolver, aliases, missing = null) {
     const seen = new Set(files);
     const queue = [...files];
     for (let i = 0; i < queue.length && seen.size < MAX_FILES; i++) {
@@ -266,14 +298,45 @@ function reachableFiles(files, overrides, aliases) {
             continue;
         }
         for (const source of importedSources(scanText(queue[i], text))) {
-            const file = resolveSpecifier(path.dirname(queue[i]), source, aliases);
+            const file = resolver(path.dirname(queue[i]), source);
             if (file && !seen.has(file) && seen.size < MAX_FILES) {
                 seen.add(file);
                 queue.push(file);
+            } else if (!file && missing) {
+                missing.push(...specifierPaths(path.dirname(queue[i]), source, aliases));
             }
         }
     }
     return queue;
+}
+
+// The folders that watch the creation of the imports that do not exist yet ('./columns' of
+// src/db/schema.ts): the folder of the import (or its nearest existing parent in basePath) with
+// the files an import of that path resolves to (columns.ts, columns.ts for columns.js...,
+// columns/index.ts), as a pattern of the folder. A path with the characters of a glob is not
+// watched.
+function missingFolders(basePath, missing) {
+    const folders = [];
+    // At most 100 paths (a path alias `*` of tsconfig.json makes one of each import of a package)
+    for (const candidate of [...new Set(missing)].slice(0, 100)) {
+        let base = path.dirname(candidate);
+        while (!isDirectory(base) && base !== path.dirname(base)) {
+            base = path.dirname(base);
+        }
+        const fromBase = path.relative(basePath, base);
+        const relative = toPosix(path.relative(base, candidate));
+        if (!isDirectory(base) || /[*?[\]{}!,\\]/.test(relative) || (base !== path.dirname(candidate) && (fromBase.startsWith('..') || path.isAbsolute(fromBase)))) {
+            continue;
+        }
+        const segments = relative.split('/');
+        const name = segments.pop();
+        const stem = name.replace(/\.(?:[cm]?jsx?)$/, '');
+        const prefix = segments.map(segment => `${segment}/`).join('');
+        const names = [...new Set([name, `${name}.*`, `${stem}.*`])];
+        folders.push({ path: base, recursive: segments.length > 0, pattern: `${prefix}{${names.join(',')}}` });
+        folders.push({ path: base, recursive: true, pattern: `${prefix}${name}/index.*` });
+    }
+    return folders;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -458,8 +521,9 @@ function expandBraces(pattern) {
 }
 
 // The files and folders that a schema path of drizzle.config.ts names, relative to basePath (the
-// folder drizzle-kit runs in): a file, a folder, or a glob. { matches: [absolute paths], base, recursive }
-// with the folder to watch.
+// folder drizzle-kit runs in): a file, a folder, or a glob. { matches: [absolute paths], base,
+// recursive, pattern } with the folder to watch, and the glob from it when it reaches its
+// sub-folders (`**/schema.ts`, `*/schema.ts`).
 function expandSchemaPath(basePath, entry) {
     const absolute = path.resolve(basePath, entry);
     if (!GLOB_CHARACTERS.test(entry)) {
@@ -508,7 +572,7 @@ function expandSchemaPath(basePath, entry) {
         }
     };
     walk(path.resolve(base), 0);
-    return { matches: [...new Set(matches)].sort(), base: path.resolve(base), recursive: rest.length > 1 };
+    return { matches: [...new Set(matches)].sort(), base: path.resolve(base), recursive: rest.length > 1, pattern: rest.length > 1 ? rest.join('/') : null };
 }
 
 // The schema files of matched paths, as drizzle-kit lists them: a file, or the files directly in a
@@ -563,8 +627,15 @@ function locateSchema(basePath, overrides = null) {
                 const found = [];
                 for (const pattern of expandBraces(entry)) {
                     const expanded = expandSchemaPath(basePath, pattern);
-                    if (expanded.base && !located.folders.some(f => f.path === expanded.base && f.recursive === expanded.recursive)) {
-                        located.folders.push({ path: expanded.base, recursive: expanded.recursive });
+                    // A glob through sub-folders: the files it matches, and the files of the
+                    // folders it matches (not every script of its base folder: src/**/schema.ts)
+                    const folders = !expanded.base ? []
+                        : expanded.pattern ? [expanded.pattern, `${expanded.pattern}/*`].map(glob => ({ path: expanded.base, recursive: true, pattern: glob }))
+                            : [{ path: expanded.base, recursive: expanded.recursive }];
+                    for (const folder of folders) {
+                        if (!located.folders.some(f => f.path === folder.path && f.recursive === folder.recursive && f.pattern === folder.pattern)) {
+                            located.folders.push(folder);
+                        }
                     }
                     found.push(...schemaFilesOf(expanded.matches));
                 }
@@ -597,8 +668,9 @@ function locateSchema(basePath, overrides = null) {
 
 // The sources of a located schema (docs/parsers.md): the schema files and the files they import
 // (relative imports and path aliases), the folders of the config (each usual location while there
-// is no schema), package.json and the config file
-function sourcesOf(basePath, location, reached) {
+// is no schema), package.json, the config file and tsconfig.json (its path aliases). missing: the
+// paths of the imports that do not exist yet, watched for their creation.
+function sourcesOf(basePath, location, reached, missing = []) {
     const folders = [...location.folders];
     const files = [...(reached || [])];
     if (location.files.length === 0 && location.entries.length === 0) {
@@ -610,7 +682,12 @@ function sourcesOf(basePath, location, reached) {
             }
         }
     }
-    files.push(path.resolve(basePath, 'package.json'), location.configFile || path.resolve(basePath, 'drizzle.config.ts'));
+    for (const folder of missingFolders(basePath, missing)) {
+        if (!folders.some(f => f.path === folder.path && f.pattern === folder.pattern)) {
+            folders.push(folder);
+        }
+    }
+    files.push(path.resolve(basePath, 'package.json'), location.configFile || path.resolve(basePath, 'drizzle.config.ts'), path.resolve(basePath, 'tsconfig.json'));
     return { folders, files: [...new Set(files)], extensions: SCRIPT_EXTENSIONS };
 }
 
@@ -622,8 +699,9 @@ function sourcesOf(basePath, location, reached) {
 // node, env, decl } (an expression; decl: its declaration), 'external' ({ source, name }: an import
 // of a package), 'namespace' ({ module } or { source }), 'enum' (a TypeScript enum), 'builders' and
 // 'builder' (the column builders given to a callback), 'self' and 'column' (the table given to the
-// extra config callback), 'member' (a property that cannot be read), 'unknown' ({ name }).
-function createProgram(basePath, overrides, aliases) {
+// extra config callback), 'member' (a property that cannot be read), 'local' ({ name }: a local
+// variable of a helper whose value cannot be read), 'unknown' ({ name }).
+function createProgram(basePath, overrides, resolver) {
     const modules = new Map();
 
     const load = (file) => {
@@ -636,7 +714,7 @@ function createProgram(basePath, overrides, aliases) {
         return module;
     };
     const resolveSource = (module, source) => {
-        const file = resolveSpecifier(module.dir, source, aliases);
+        const file = resolver(module.dir, source);
         return file ? load(file) : null;
     };
 
@@ -680,13 +758,32 @@ function createProgram(basePath, overrides, aliases) {
         }
         return imported === '*' ? { kind: 'namespace', module: target } : (resolveExport(target, imported, depth + 1) || unknown(imported));
     };
-    // The value a module exports under `name`, or null
-    const resolveExport = (module, name, depth = 0, seen = new Set()) => {
+    // The value a module exports under `name`, or null. The values found through `export * from`
+    // are kept: a name of a barrel (index.ts) is looked for once in its modules.
+    const exportCache = new Map();
+    const resolveExport = (module, name, depth = 0) => {
         const key = `${module.file}\0${name}`;
-        if (depth > MAX_DEPTH || seen.has(key)) {
+        if (exportCache.has(key)) {
+            return exportCache.get(key);
+        }
+        const search = { seen: new Set(), limited: false };
+        const value = findExport(module, name, depth, search);
+        // A search stopped by the depth may find the name from a shallower lookup
+        if (!search.limited) {
+            exportCache.set(key, value);
+        }
+        return value;
+    };
+    const findExport = (module, name, depth, search) => {
+        const key = `${module.file}\0${name}`;
+        if (depth > MAX_DEPTH) {
+            search.limited = true;
             return null;
         }
-        seen.add(key);
+        if (search.seen.has(key)) {
+            return null;
+        }
+        search.seen.add(key);
         if (name === 'default') {
             const decl = defaultDecl(module);
             return decl ? declValue(module, decl) : null;
@@ -700,15 +797,20 @@ function createProgram(basePath, overrides, aliases) {
             if (!target) {
                 return entry.imported === '*' ? { kind: 'namespace', source: entry.source } : { kind: 'external', source: entry.source, name: entry.imported };
             }
-            return entry.imported === '*' ? { kind: 'namespace', module: target } : resolveExport(target, entry.imported, depth + 1, seen);
+            return entry.imported === '*' ? { kind: 'namespace', module: target } : findExport(target, entry.imported, depth + 1, search);
         }
         const decl = module.scan.declarations.get(name);
         if (decl && decl.exported) {
             return declValue(module, decl);
         }
+        // CommonJS: exports.users = ..., module.exports = { users }
+        const common = module.scan.commonExports.get(name);
+        if (common) {
+            return declValue(module, common);
+        }
         for (const source of module.scan.stars) {
             const target = resolveSource(module, source);
-            const value = target ? resolveExport(target, name, depth + 1, seen) : null;
+            const value = target ? findExport(target, name, depth + 1, search) : null;
             if (value) {
                 return value;
             }
@@ -716,8 +818,8 @@ function createProgram(basePath, overrides, aliases) {
         return null;
     };
     // The values a module exports, for drizzle-kit, which keeps the tables among them: its exported
-    // declarations, `export { ... }`, `export * from` (not `export * as`), `export default`.
-    // [{ value, module }], each declaration once
+    // declarations, `export { ... }`, `export * from` (not `export * as`), `export default`, and
+    // the exports of CommonJS. [{ value, module }], each declaration once
     const exportedValues = (module, seen = new Set()) => {
         if (seen.has(module.file) || seen.size > MAX_FILES) {
             return [];
@@ -734,6 +836,9 @@ function createProgram(basePath, overrides, aliases) {
             if (decl.exported) {
                 push(declValue(module, decl));
             }
+        }
+        for (const decl of module.scan.commonExports.values()) {
+            push(declValue(module, decl));
         }
         for (const [name, entry] of module.scan.exports) {
             if (entry.imported !== '*') {
@@ -978,7 +1083,22 @@ function createProgram(basePath, overrides, aliases) {
         const returns = blockReturns(node.body);
         return returns.length === 1 && !hasNestedReturn(node.body) ? returns[0] : null;
     };
-    // The environment of a call of a function value: its parameters bound to the arguments
+    // Binds into `env` the local variables and functions of the block of a function value (`const
+    // col = (n) => text(n)` before its `return`), which resolve in that same environment; the names
+    // of a destructuring, or of a declaration without a value, are locals that cannot be read.
+    // Returns env.
+    const bindLocals = (value, env) => {
+        if (value.node.body && value.node.body.type === 'Block') {
+            for (const local of blockDeclarations(value.node.body)) {
+                if (!env.has(local.name)) {
+                    env.set(local.name, local.init ? { module: value.module, node: local.init, env } : { kind: 'local', name: local.name });
+                }
+            }
+        }
+        return env;
+    };
+    // The environment of a call of a function value: its parameters bound to the arguments, and
+    // the locals of its block
     const bind = (value, args) => {
         const env = new Map();
         value.node.params.forEach((param, i) => {
@@ -990,8 +1110,19 @@ function createProgram(basePath, overrides, aliases) {
             } else if (param.name) {
                 // A missing argument is undefined
                 env.set(param.name, { module: value.module, node: { type: 'Literal', value: undefined, start: 0, end: 0 }, env: null });
+            } else if (param.names && arg && arg.node && arg.node.type !== 'Spread') {
+                // A destructured parameter ({ name, length }): the properties of the argument
+                for (const { key, local } of param.names) {
+                    env.set(local, { module: arg.module, node: { type: 'Member', object: arg.node, property: key, start: arg.node.start, end: arg.node.end }, env: arg.env });
+                }
+            } else if (param.names || param.rest) {
+                // Without its argument, or a rest parameter: names that cannot be read
+                for (const name of param.names ? param.names.map(item => item.local) : [param.rest]) {
+                    env.set(name, { kind: 'local', name });
+                }
             }
         });
+        bindLocals(value, env);
         // The free names of a nested function still resolve where it is declared
         if (value.env) {
             for (const [name, bound] of value.env) {
@@ -1003,7 +1134,7 @@ function createProgram(basePath, overrides, aliases) {
         return env;
     };
 
-    return { load, resolve, resolveExport, exportedValues, constant, constantProperties, functionBody, bind, modules };
+    return { load, resolve, resolveExport, exportedValues, constant, constantProperties, functionBody, bind, bindLocals, modules };
 }
 
 // The name of a function of drizzle-orm (or of another package, or not imported at all) that a value
@@ -1050,13 +1181,18 @@ module.exports.detect = function (basePath) {
 };
 
 // The files read: the schema files and the files they import, the folders of the schema set in the
-// config (its files, or its sub-folders too for a `**` glob), package.json and the config file.
+// config (its files, or the files its glob matches in its sub-folders: `**/schema.ts`), package.json,
+// the config file and tsconfig.json, and the imports that do not exist yet (watched for their
+// creation).
 // options.overrides (the text of the unsaved editors): an unsaved drizzle.config.ts that moves the
 // schema, or a schema file that imports another file, moves the sources too.
 function sources(basePath, options = {}) {
     const overrides = (options && options.overrides) || null;
     const location = locateSchema(basePath, overrides);
-    return sourcesOf(basePath, location, reachableFiles(location.files, overrides, readAliases(basePath)));
+    const aliases = readAliases(basePath, overrides);
+    const missing = [];
+    const reached = reachableFiles(location.files, overrides, createResolver(aliases), aliases, missing);
+    return sourcesOf(basePath, location, reached, missing);
 }
 module.exports.sources = sources;
 
@@ -1080,9 +1216,10 @@ module.exports.parse = function (basePath, options = {}) {
         }
         throw new ParserError(`No Drizzle schema found in ${basePath}: DrawMeDatabase reads the schema set in drizzle.config.ts (or .js, .json), else src/db/schema.ts, src/schema.ts, db/schema.ts, drizzle/schema.ts or a schema folder.`);
     }
-    const aliases = readAliases(basePath);
-    const program = createProgram(basePath, overrides, aliases);
-    const { resolve, constant, constantProperties, functionBody, bind } = program;
+    const aliases = readAliases(basePath, overrides);
+    const resolver = createResolver(aliases);
+    const program = createProgram(basePath, overrides, resolver);
+    const { resolve, constant, constantProperties, functionBody, bind, bindLocals } = program;
     const at = (module, offset) => `${module.rel}:${module.lineAt(offset)}`;
     const schemaModules = location.files.map(file => program.load(file)).filter(Boolean);
 
@@ -1109,13 +1246,15 @@ module.exports.parse = function (basePath, options = {}) {
             return schema && typeof schema.value === 'string' ? schema.value : null;
         };
         const fn = externalName(resolve(calleeRef, depth + 1));
+        // source: the code of the schema, which names the table
+        const source = { module: value.module, start: value.node.start, end: value.node.end };
         if (fn && SCHEMA_FUNCTIONS.has(fn)) {
-            return { dialect: dialectOf(resolve(calleeRef, depth + 1), SCHEMA_FUNCTIONS.get(fn)), schema: schemaName(), casing: casingOf(1), computed: !schemaName() };
+            return { dialect: dialectOf(resolve(calleeRef, depth + 1), SCHEMA_FUNCTIONS.get(fn)), schema: schemaName(), casing: casingOf(1), computed: !schemaName(), source };
         }
         if (value.node.callee.type === 'Member' && value.node.callee.property === 'schema') {
             const owner = ownerOf({ module: value.module, node: value.node.callee.object, env: value.env }, depth + 1);
             if (owner && owner.casing && !owner.schema) {
-                return { ...owner, schema: schemaName(), computed: !schemaName() };
+                return { ...owner, schema: schemaName(), computed: !schemaName(), source };
             }
         }
         return null;
@@ -1200,7 +1339,9 @@ module.exports.parse = function (basePath, options = {}) {
         const args = node.args.map(arg => (arg.type === 'Spread' ? null : { module: ref.module, node: arg, env: ref.env }));
         if (fn.kind === 'wrapper') {
             const body = functionBody(fn.value.node);
-            return body ? tableCall({ module: fn.value.module, node: body, env: bind(fn.value, args) }, depth + 1) : null;
+            const inner = body ? tableCall({ module: fn.value.module, node: body, env: bind(fn.value, args) }, depth + 1) : null;
+            // wrappers: the functions of the project that make the table, which may name it
+            return inner && !inner.view ? { ...inner, wrappers: [{ module: fn.value.module, start: fn.value.node.start, end: fn.value.node.end }, ...(inner.wrappers || [])] } : inner;
         }
         return { fn, args, ref: { ...ref, node } };
     };
@@ -1225,7 +1366,14 @@ module.exports.parse = function (basePath, options = {}) {
         const decl = value.decl || { name: 'default', start: value.node.start, end: value.node.end, nameStart: value.node.start };
         const module = value.module;
         const { fn, args } = call;
-        const model = { decl, module, dialect: fn.dialect, columns: [], indexes: [], primaryKeys: [], uniques: [], foreignKeys: [], valid: true };
+        // nameSources: the code outside of the declaration that names the table (the prefix of a
+        // table creator, the pgSchema() of its schema, a wrapper, a constant), for its git status
+        const model = { decl, module, dialect: fn.dialect, columns: [], indexes: [], primaryKeys: [], uniques: [], foreignKeys: [], nameSources: [], valid: true };
+        const addNameSource = (source) => {
+            if (source && source.module && !(source.module === module && source.start >= decl.start && source.end <= decl.end)) {
+                model.nameSources.push({ module: source.module, start: source.start, end: source.end });
+            }
+        };
         const location = at(module, decl.nameStart);
         // The name: a constant, with the prefix of a table creator and the schema
         const name = args[0] && constant(args[0]);
@@ -1234,9 +1382,18 @@ module.exports.parse = function (basePath, options = {}) {
             model.valid = false;
             return model;
         }
+        const nameValue = resolve(args[0]);
+        if (nameValue.kind === 'node') {
+            addNameSource({ module: nameValue.module, start: nameValue.node.start, end: nameValue.node.end });
+        }
+        (call.wrappers || []).forEach(addNameSource);
+        addNameSource(fn.source);
         let table = name.value;
         if (fn.prefix) {
             const prefixValue = resolve(fn.prefix);
+            if (prefixValue.kind === 'node') {
+                addNameSource({ module: prefixValue.module, start: prefixValue.node.start, end: prefixValue.node.end });
+            }
             const body = prefixValue.kind === 'node' ? functionBody(prefixValue.node) : null;
             const prefixed = body && constant({ module: prefixValue.module, node: body, env: bind(prefixValue, [{ module, node: { type: 'String', value: table } }]) });
             if (prefixed && typeof prefixed.value === 'string') {
@@ -1256,8 +1413,9 @@ module.exports.parse = function (basePath, options = {}) {
         model.casing = casing;
 
         // Columns: the object (or the callback that returns it), its spreads (an object that spreads
-        // itself is read once)
-        const entries = [];
+        // itself is read once). As in JavaScript, a key written again (`{ ...base, id: uuid() }`)
+        // keeps the place of the first one and takes the last value.
+        const entries = new Map();
         const visiting = new Set();
         const collect = (ref, depth) => {
             const object = resolve(ref, depth + 1);
@@ -1266,12 +1424,18 @@ module.exports.parse = function (basePath, options = {}) {
             }
             if (object.node.type === 'Arrow' || object.node.type === 'Function') {
                 // (d) => ({ id: d.integer() }), ({ integer }) => ({ id: integer() })
-                const env = new Map(object.env || []);
+                const env = new Map();
                 const param = object.node.params[0];
                 if (param && param.name) {
                     env.set(param.name, { kind: 'builders' });
                 } else if (param && param.names) {
                     param.names.forEach(({ key: builder, local }) => env.set(local, { kind: 'builder', name: builder }));
+                }
+                bindLocals(object, env);
+                for (const [name, bound] of object.env || []) {
+                    if (!env.has(name)) {
+                        env.set(name, bound);
+                    }
                 }
                 const body = functionBody(object.node);
                 return Boolean(body) && collect({ module: object.module, node: body, env }, depth + 1);
@@ -1288,7 +1452,7 @@ module.exports.parse = function (basePath, options = {}) {
             visiting.add(object.node);
             for (const property of object.node.properties) {
                 if (property.kind === 'init' && !property.computed) {
-                    entries.push({ key: property.key, ref: { module: object.module, node: property.value, env: object.env }, module: object.module, start: property.start, end: property.end });
+                    entries.set(property.key, { key: property.key, ref: { module: object.module, node: property.value, env: object.env }, module: object.module, start: property.start, end: property.end });
                 } else if (property.kind === 'spread') {
                     if (!collect({ module: object.module, node: property.value, env: object.env }, depth + 1)) {
                         warnings.push(`${at(object.module, property.start)}: ${model.table}: ...${sourceText(object.module, property.value)} cannot be read, its columns are skipped.`);
@@ -1303,7 +1467,7 @@ module.exports.parse = function (basePath, options = {}) {
         if (!args[1] || !collect(args[1], 0)) {
             warnings.push(`${location}: ${model.table}: the columns cannot be read.`);
         }
-        for (const entry of entries) {
+        for (const entry of entries.values()) {
             const column = readColumn(entry, model, casing);
             if (column) {
                 model.columns.push(column);
@@ -1326,8 +1490,9 @@ module.exports.parse = function (basePath, options = {}) {
     };
 
     // A column value as a builder call and its chained calls, in the order of the code: { builder:
-    // { name, enumValue, custom, args }, calls: [{ name, args }] }, or null. Helpers of the project
-    // are inlined (`id: idColumn()`, `id: nanoId('id')`), shared builders followed (`id: id`).
+    // { name, enumValue, custom, args }, calls: [{ name, args }], sources }, or null. Helpers of the
+    // project are inlined (`id: idColumn()`, `id: nanoId('id')`), shared builders followed (`id:
+    // id`); sources: where their code is ({ module, start, end }), for the git status of the column.
     const flatten = (ref, depth = 0) => {
         if (depth > MAX_DEPTH || !ref.node) {
             return null;
@@ -1340,7 +1505,7 @@ module.exports.parse = function (basePath, options = {}) {
             if (callee.type === 'Member') {
                 const object = resolve(refOf(callee.object), depth + 1);
                 if (object.kind === 'builders' || (object.kind === 'namespace' && !object.module)) {
-                    return { builder: { name: callee.property, args }, calls: [] };
+                    return { builder: { name: callee.property, args }, calls: [], sources: [] };
                 }
                 if (object.kind === 'namespace' && object.module) {
                     return builderOf(resolve(refOf(callee), depth + 1), callee.property, args, depth);
@@ -1363,36 +1528,51 @@ module.exports.parse = function (basePath, options = {}) {
         }
         if (node.type === 'Identifier' || node.type === 'Member') {
             const value = resolve(ref, depth + 1);
-            return value.kind === 'node' && value.node !== node ? flatten(value, depth + 1) : null;
+            const inner = value.kind === 'node' && value.node !== node ? flatten(value, depth + 1) : null;
+            if (inner) {
+                inner.sources.push({ module: value.module, start: value.node.start, end: value.node.end });
+            }
+            return inner;
         }
         return null;
     };
-    // The builder of a call of `value` (named `local` in the code) with `args`
+    // The builder of a call of `value` (named `local` in the code) with `args`. A local variable of
+    // a helper that cannot be read, or a value that is no function (a parameter without its
+    // argument), is no builder: null.
     const builderOf = (value, local, args, depth) => {
         if (value.kind === 'builder') {
-            return { builder: { name: value.name, args }, calls: [] };
+            return { builder: { name: value.name, args }, calls: [], sources: [] };
+        }
+        if (value.kind === 'local') {
+            return null;
         }
         if (value.kind === 'node') {
             const node = value.node;
+            const source = { module: value.module, start: node.start, end: node.end };
             if (node.type === 'Arrow' || node.type === 'Function') {
                 const body = functionBody(node);
-                return body ? flatten({ module: value.module, node: body, env: bind(value, args) }, depth + 1) : null;
+                const inner = body ? flatten({ module: value.module, node: body, env: bind(value, args) }, depth + 1) : null;
+                if (inner) {
+                    inner.sources.push(source);
+                }
+                return inner;
             }
             if (node.type === 'Call') {
                 const calleeRef = { module: value.module, node: node.callee, env: value.env };
                 const fn = externalName(resolve(calleeRef, depth + 1));
                 // const role = pgEnum('role', [...]) and pgSchema('auth').enum(...)
                 if (fn === 'pgEnum' || (node.callee.type === 'Member' && node.callee.property === 'enum' && ownerOf({ module: value.module, node: node.callee.object, env: value.env }, depth))) {
-                    return { builder: { name: local, enumValue: enumOf(value), args }, calls: [] };
+                    return { builder: { name: local, enumValue: enumOf(value), args }, calls: [], sources: [source] };
                 }
                 if (fn === 'customType') {
-                    return { builder: { name: local, custom: customOf(value), args }, calls: [] };
+                    return { builder: { name: local, custom: customOf(value), args }, calls: [], sources: [source] };
                 }
+                return { builder: { name: local, args }, calls: [], sources: [source] };
             }
-            return { builder: { name: local, args }, calls: [] };
+            return null;
         }
         const name = externalName(value);
-        return { builder: { name: name || local, args }, calls: [] };
+        return { builder: { name: name || local, args }, calls: [], sources: [] };
     };
     // The values and the name of a pgEnum: { name, values }
     const enumOf = (value) => {
@@ -1471,6 +1651,8 @@ module.exports.parse = function (basePath, options = {}) {
             module: entry.module,
             start: entry.start,
             end: entry.end,
+            // The code of the helpers and shared builders that make it, out of its own lines
+            sources: flat.sources.filter(source => !(source.module === entry.module && source.start >= entry.start && source.end <= entry.end)),
             references: [],
         };
         const details = column.details;
@@ -1576,9 +1758,15 @@ module.exports.parse = function (basePath, options = {}) {
     };
 
     // The SQL of a sql`...` template, its substitutions written by `substitute` (null: not a
-    // column) or as constants; null when it is not a template or a substitution is computed
+    // column) or as constants, or of sql.raw('...') with a constant; null when it is not a
+    // template or a substitution is computed
     const sqlText = (ref, substitute = () => null) => {
         const value = resolve(ref);
+        if (value.kind === 'node' && value.node.type === 'Call' && value.node.callee.type === 'Member' && value.node.callee.property === 'raw' && value.node.args.length === 1
+            && isSqlTag(resolve({ module: value.module, node: value.node.callee.object, env: value.env }))) {
+            const raw = constant({ module: value.module, node: value.node.args[0], env: value.env });
+            return raw && typeof raw.value === 'string' ? raw.value : null;
+        }
         if (value.kind !== 'node' || value.node.type !== 'Tagged' || !isSqlTag(resolve({ module: value.module, node: value.node.tag, env: value.env }))) {
             return null;
         }
@@ -1596,13 +1784,15 @@ module.exports.parse = function (basePath, options = {}) {
         return text;
     };
 
-    // The default of `.default(value)`: { default } for a constant, { defaultRaw } for sql`...`
-    // (the SQL as written), {} for a value computed at run time
+    // The default of `.default(value)`: { default } for a constant, { defaultRaw } for sql`...` and
+    // sql.raw('...') (the SQL as written), {} for a value computed at run time
     const defaultOf = (ref, isArray, isJson) => {
         const value = resolve(ref);
-        if (value.kind === 'node' && value.node.type === 'Tagged') {
+        if (value.kind === 'node' && (value.node.type === 'Tagged' || value.node.type === 'Call')) {
             const text = sqlText(value);
-            return text === null ? {} : { defaultRaw: text };
+            if (text !== null || value.node.type === 'Tagged') {
+                return text === null ? {} : { defaultRaw: text };
+            }
         }
         const item = constant(value);
         if (!item || item.value === undefined) {
@@ -1638,6 +1828,16 @@ module.exports.parse = function (basePath, options = {}) {
         }
         return null;
     };
+    // The tables of drizzle-orm/supabase that a schema references without creating them
+    // (authUsers: auth.users), one model each
+    const stubs = new Map();
+    const stubModel = (name) => {
+        if (!stubs.has(name)) {
+            const known = SUPABASE_TABLES.get(name);
+            stubs.set(name, { table: known.table, columns: Object.entries(known.columns).map(([key, column]) => ({ key, name: column })), casing: undefined, valid: true });
+        }
+        return stubs.get(name);
+    };
     // The table and the key of a column of another table (users.id): { model, key } or null
     const foreignColumn = (ref, depth = 0) => {
         let value = resolve(ref);
@@ -1651,6 +1851,10 @@ module.exports.parse = function (basePath, options = {}) {
         if (value.kind === 'column') {
             return { model: value.table, key: value.key };
         }
+        // authUsers.id of drizzle-orm/supabase
+        if (value.kind === 'member' && value.object.kind === 'external' && /^drizzle-orm\/supabase(?:\/|$)/.test(value.object.source) && SUPABASE_TABLES.has(value.object.name)) {
+            return { model: stubModel(value.object.name), key: value.name };
+        }
         if (value.kind !== 'member' || value.object.kind !== 'node') {
             return null;
         }
@@ -1658,60 +1862,165 @@ module.exports.parse = function (basePath, options = {}) {
         return target && target.valid ? { model: target, key: value.name } : null;
     };
 
-    // The extra config of a table (third argument): primary keys, unique constraints and indexes,
-    // foreign keys. Policies, checks and the other items are skipped.
-    const readExtras = (ref, model) => {
-        const fn = resolve(ref);
-        if (fn.kind !== 'node' || (fn.node.type !== 'Arrow' && fn.node.type !== 'Function')) {
-            return;
+    // The value of an expression, the calls of the functions of the project inlined (a helper that
+    // returns the indexes of a table): their returned expression, with their parameters bound to
+    // the arguments; { kind: 'opaque' } for a function of the project that cannot be read
+    const evaluate = (ref, depth = 0) => {
+        const value = ref.kind ? ref : resolve(ref, depth + 1);
+        if (depth > MAX_DEPTH || value.kind !== 'node' || value.node.type !== 'Call') {
+            return value;
         }
-        const env = new Map(fn.env || []);
-        const param = fn.node.params[0];
-        if (param && param.name) {
-            env.set(param.name, { kind: 'self', table: model });
-        } else if (param && param.names) {
-            param.names.forEach(({ key, local }) => env.set(local, { kind: 'column', table: model, key }));
+        const callee = resolve({ module: value.module, node: value.node.callee, env: value.env }, depth + 1);
+        if (callee.kind !== 'node' || (callee.node.type !== 'Arrow' && callee.node.type !== 'Function')) {
+            return value;
         }
-        const body = functionBody(fn.node);
-        const list = body ? resolve({ module: fn.module, node: body, env }) : null;
-        if (!list || list.kind !== 'node') {
-            return;
+        const body = functionBody(callee.node);
+        if (!body) {
+            return { kind: 'opaque' };
         }
-        const items = list.node.type === 'Array'
-            ? list.node.elements.filter(element => element.type !== 'Spread')
-            : list.node.type === 'Object' ? list.node.properties.filter(p => p.kind === 'init').map(p => p.value) : [];
-        for (const item of items) {
-            readExtra({ module: list.module, node: item, env: list.env }, model);
-        }
+        const args = value.node.args.map(arg => ({ module: value.module, node: arg, env: value.env }));
+        return evaluate({ module: callee.module, node: body, env: bind(callee, args) }, depth + 1);
     };
-    const readExtra = (ref, model) => {
-        // The chain: index('name').on(t.a).where(...)
-        const calls = [];
-        let node = ref.node;
-        while (node.type === 'Call' && node.callee.type === 'Member') {
-            calls.unshift({ name: node.callee.property, args: node.args });
-            node = node.callee.object;
+
+    // The extra config of a table (third argument): primary keys, unique constraints and indexes,
+    // foreign keys. As drizzle-orm reads it: the items of the array it returns, a nested array
+    // flattened once (extraConfig.flat(1)), or the values of the object it returns (before 0.29);
+    // the spreads and the helpers of the project are followed. Policies and checks are skipped; an
+    // item that cannot be read is told.
+    const readExtras = (ref, model) => {
+        const told = (itemRef, text) => warnings.push(`${at(itemRef.module, itemRef.node.start)}: ${model.table}: ${text}`);
+        const fn = evaluate(ref);
+        const env = new Map();
+        if (fn.kind === 'node' && (fn.node.type === 'Arrow' || fn.node.type === 'Function')) {
+            const param = fn.node.params[0];
+            if (param && param.name) {
+                env.set(param.name, { kind: 'self', table: model });
+            } else if (param && param.names) {
+                param.names.forEach(({ key, local }) => env.set(local, { kind: 'column', table: model, key }));
+            }
+            bindLocals(fn, env);
+            for (const [name, bound] of fn.env || []) {
+                if (!env.has(name)) {
+                    env.set(name, bound);
+                }
+            }
         }
-        if (node.type !== 'Call') {
+        const body = fn.kind === 'node' ? functionBody(fn.node) : null;
+        const list = body ? evaluate({ module: fn.module, node: body, env }) : null;
+        if (!list || list.kind !== 'node' || (list.node.type !== 'Array' && list.node.type !== 'Object')) {
+            told(ref, 'the extra config cannot be read, its keys and indexes are skipped.');
             return;
         }
-        const refOf = (child) => ({ module: ref.module, node: child, env: ref.env });
-        const fn = externalName(resolve(refOf(node.callee)));
-        const args = node.args.map(refOf);
-        const location = at(ref.module, ref.node.start);
+        // The items of an array, its spreads read (`unread`: a spread that cannot be read), in the
+        // order of the code
+        const arrayItems = (array, depth) => {
+            const items = [];
+            for (const element of array.node.elements) {
+                const itemRef = { module: array.module, node: element.type === 'Spread' ? element.argument : element, env: array.env };
+                const spread = element.type === 'Spread' ? evaluate(itemRef) : null;
+                if (!spread) {
+                    items.push(itemRef);
+                } else if (spread.kind === 'node' && spread.node.type === 'Array' && depth < MAX_DEPTH) {
+                    items.push(...arrayItems(spread, depth + 1));
+                } else {
+                    items.push({ ...itemRef, unread: true });
+                }
+            }
+            return items;
+        };
+        // The values of an object, its spreads read
+        const objectValues = (object, depth) => {
+            const values = [];
+            for (const property of object.node.properties) {
+                const itemRef = property.value ? { module: object.module, node: property.value, env: object.env } : null;
+                const spread = itemRef && property.kind === 'spread' ? evaluate(itemRef) : null;
+                if (itemRef && property.kind === 'init') {
+                    values.push(itemRef);
+                } else if (spread && spread.kind === 'node' && spread.node.type === 'Object' && depth < MAX_DEPTH) {
+                    values.push(...objectValues(spread, depth + 1));
+                } else if (spread) {
+                    values.push({ ...itemRef, unread: true });
+                }
+            }
+            return values;
+        };
+        // An item, unless it is a spread that cannot be read; nested: in a nested array
+        const readItem = (itemRef, nested) => {
+            if (itemRef.unread) {
+                told(itemRef, `...${sourceText(itemRef.module, itemRef.node)} cannot be read, its keys and indexes are skipped.`);
+                return;
+            }
+            const item = evaluate(itemRef);
+            if (list.node.type === 'Array' && item.kind === 'node' && item.node.type === 'Array') {
+                // A nested array, flattened once by drizzle-orm
+                if (nested) {
+                    told(itemRef, 'an array nested twice in the extra config is ignored by drizzle-kit, skipped.');
+                } else {
+                    arrayItems(item, 0).forEach(innerRef => readItem(innerRef, true));
+                }
+                return;
+            }
+            readExtra(item, itemRef, model);
+        };
+        (list.node.type === 'Array' ? arrayItems(list, 0) : objectValues(list, 0)).forEach(itemRef => readItem(itemRef, false));
+    };
+    // An item of the extra config (`value`, written at itemRef)
+    const readExtra = (value, itemRef, model) => {
+        const location = at(itemRef.module, itemRef.node.start);
+        const notRead = () => warnings.push(`${location}: ${model.table}: ${sourceText(itemRef.module, itemRef.node)} in the extra config cannot be read, skipped.`);
+        if (value.kind === 'node' && value.node.type === 'Object') {
+            warnings.push(`${location}: ${model.table}: an object in the extra config is ignored by drizzle-kit, skipped.`);
+            return;
+        }
+        // The chain: index('name').on(t.a).where(...), its calls with their arguments; a helper of
+        // the project at its root is inlined (tenantIndex(t).where(...))
+        const calls = [];
+        let current = value;
+        let root = null;
+        for (let depth = 0; !root; depth++) {
+            if (current.kind !== 'node' || depth > MAX_DEPTH) {
+                notRead();
+                return;
+            }
+            const scope = current;
+            const refOf = (child) => ({ module: scope.module, node: child, env: scope.env });
+            const chain = [];
+            let node = scope.node;
+            // pg.index(...): the function of a namespace, not a call on a chain
+            while (node.type === 'Call' && node.callee.type === 'Member' && resolve(refOf(node.callee.object)).kind !== 'namespace') {
+                chain.unshift({ name: node.callee.property, args: node.args.map(refOf) });
+                node = node.callee.object;
+            }
+            calls.unshift(...chain);
+            if (node.type !== 'Call') {
+                notRead();
+                return;
+            }
+            const callee = resolve(refOf(node.callee));
+            if (callee.kind === 'node' && (callee.node.type === 'Arrow' || callee.node.type === 'Function')) {
+                current = evaluate(refOf(node));
+            } else {
+                root = { callee, args: node.args.map(refOf) };
+            }
+        }
+        const fn = externalName(root.callee);
+        if (!EXTRA_FUNCTIONS.has(fn)) {
+            // Checks, policies (pgPolicy, crudPolicy of drizzle-orm/neon...) are not drawn
+            if (!SKIPPED_EXTRAS.has(fn) && !(root.callee.kind === 'external' && /^drizzle-orm(?:\/|$)/.test(root.callee.source))) {
+                notRead();
+            }
+            return;
+        }
+        const { args } = root;
         const keysOf = (refs) => {
             const keys = refs.map(item => columnKey(item, model));
             return keys.every(Boolean) ? keys : null;
         };
         const onCall = calls.find(call => call.name === 'on' || call.name === 'onOnly' || call.name === 'using');
         // The columns of an index: { key } of a column, or { expression }: the SQL of an expression
-        // (lower(email)), its columns by name
+        // (lower(email)), its columns by name; null when one cannot be read
         const indexColumns = () => {
-            if (!onCall) {
-                return [];
-            }
-            const items = (onCall.name === 'using' ? onCall.args.slice(1) : onCall.args).map(refOf);
-            return items.map(item => {
+            const items = (onCall.name === 'using' ? onCall.args.slice(1) : onCall.args).map(item => {
                 const key = columnKey(item, model);
                 if (key) {
                     return { key };
@@ -1722,11 +2031,12 @@ module.exports.parse = function (basePath, options = {}) {
                     return column ? (found ? found.name : applyCasing(model.casing, column)) : null;
                 });
                 return expression !== null ? { expression } : null;
-            }).filter(Boolean);
+            });
+            return items.every(Boolean) ? items : null;
         };
         const nameOf = (i = 0) => {
-            const value = args[i] && constant(args[i]);
-            return value && typeof value.value === 'string' ? value.value : undefined;
+            const name = args[i] && constant(args[i]);
+            return name && typeof name.value === 'string' ? name.value : undefined;
         };
         if (fn === 'primaryKey') {
             const config = args[0] && resolve(args[0]);
@@ -1737,8 +2047,8 @@ module.exports.parse = function (basePath, options = {}) {
                 const list = columns && resolve({ module: config.module, node: columns.value, env: config.env });
                 keys = list && list.kind === 'node' && list.node.type === 'Array' ? keysOf(list.node.elements.map(e => ({ module: list.module, node: e, env: list.env }))) : null;
                 const nameProperty = config.node.properties.find(p => p.kind === 'init' && p.key === 'name');
-                const value = nameProperty && constant({ module: config.module, node: nameProperty.value, env: config.env });
-                pkName = value && typeof value.value === 'string' ? value.value : undefined;
+                const name = nameProperty && constant({ module: config.module, node: nameProperty.value, env: config.env });
+                pkName = name && typeof name.value === 'string' ? name.value : undefined;
             } else {
                 // primaryKey(t.a, t.b), the form of drizzle-orm before 0.29
                 keys = keysOf(args);
@@ -1758,8 +2068,8 @@ module.exports.parse = function (basePath, options = {}) {
             }
             const property = (key) => {
                 const found = config.node.properties.find(p => p.kind === 'init' && p.key === key);
-                const value = found && resolve({ module: config.module, node: found.value, env: config.env });
-                return value && value.kind === 'node' && value.node.type === 'Array' ? value.node.elements.map(e => ({ module: value.module, node: e, env: value.env })) : null;
+                const list = found && resolve({ module: config.module, node: found.value, env: config.env });
+                return list && list.kind === 'node' && list.node.type === 'Array' ? list.node.elements.map(e => ({ module: list.module, node: e, env: list.env })) : null;
             };
             const columns = property('columns');
             const foreign = property('foreignColumns');
@@ -1771,26 +2081,31 @@ module.exports.parse = function (basePath, options = {}) {
             const actions = {};
             for (const call of calls) {
                 if (call.name === 'onDelete' || call.name === 'onUpdate') {
-                    const action = call.args[0] && constant(refOf(call.args[0]));
+                    const action = call.args[0] && constant(call.args[0]);
                     if (action && typeof action.value === 'string') {
                         actions[call.name] = action.value.toLowerCase();
                     }
                 }
             }
-            model.foreignKeys.push({ keys, foreign, actions, module: ref.module, start: ref.node.start });
+            model.foreignKeys.push({ keys, foreign, actions, module: itemRef.module, start: itemRef.node.start });
             return;
         }
-        if (fn === 'index' || fn === 'uniqueIndex' || fn === 'unique') {
-            const items = indexColumns();
-            if (items.length === 0) {
-                return;
-            }
-            const type = fn === 'index' ? 'index' : 'unique';
-            if (type === 'unique' && items.every(item => item.key)) {
-                model.uniques.push(items.map(item => item.key));
-            }
-            model.indexes.push({ items, type, name: nameOf(0) });
+        // index(), uniqueIndex(), unique(): without .on(), drizzle-kit creates nothing
+        if (!onCall) {
+            return;
         }
+        const items = indexColumns();
+        if (!items || items.length === 0) {
+            warnings.push(`${location}: ${model.table}: the columns of the index cannot be read, index skipped.`);
+            return;
+        }
+        const type = fn === 'index' ? 'index' : 'unique';
+        // A partial unique index (.where()) makes no column unique, as in the SQL drizzle-kit writes
+        const partial = calls.some(call => call.name === 'where');
+        if (type === 'unique' && !partial && items.every(item => item.key)) {
+            model.uniques.push(items.map(item => item.key));
+        }
+        model.indexes.push({ items, type, name: nameOf(0), partial });
     };
 
     // -----------------------------------------------------------------------------------------
@@ -1844,7 +2159,7 @@ module.exports.parse = function (basePath, options = {}) {
     created.sort((a, b) => (a.module.rel < b.module.rel ? -1 : a.module.rel > b.module.rel ? 1 : a.decl.start - b.decl.start));
 
     // Git status (and unsaved changes) of lines of the schema files and of the files they import
-    const reached = reachableFiles(location.files, overrides, aliases);
+    const reached = reachableFiles(location.files, overrides, resolver, aliases);
     const loaded = [...program.modules.values()].filter(Boolean).map(module => module.file);
     const reader = createStatusReader(sourcesOf(basePath, location, [...new Set([...reached, ...loaded])]), { git: options.git !== false, overrides, cache: options.gitCache });
     if (reader.warning) {
@@ -1852,17 +2167,33 @@ module.exports.parse = function (basePath, options = {}) {
     }
     const linesOf = (module, start, end) => [module.lineAt(start), module.lineAt(Math.max(end - 1, start))];
     // A table added to a file that is in HEAD: every line of its declaration that holds code (not
-    // only closing brackets, which may match older lines) is new
+    // only closing brackets, which may match older lines) is new. The tokens of the declaration
+    // are found by a binary search: a schema of many tables in one file (drizzle-kit pull) stays fast.
     const isNewDeclaration = (model) => {
         const added = reader.addedOf(model.module.file);
+        const { tokens } = model.module.scan.ctx;
+        let low = 0;
+        let high = tokens.length;
+        while (low < high) {
+            const mid = (low + high) >> 1;
+            if (tokens[mid].start < model.decl.start) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
         const lines = new Set();
-        for (const token of model.module.scan.ctx.tokens) {
-            if (token.start >= model.decl.start && token.end <= model.decl.end && !(token.type === 'punct' && [')', ']', '}', ',', ';'].includes(token.value))) {
+        for (let i = low; i < tokens.length && tokens[i].start < model.decl.end; i++) {
+            const token = tokens[i];
+            if (token.end <= model.decl.end && !(token.type === 'punct' && [')', ']', '}', ',', ';'].includes(token.value))) {
                 lines.add(model.module.lineAt(token.start));
             }
         }
         return lines.size > 0 && [...lines].every(line => added(line));
     };
+    // The status of code that makes a table or a column outside of its lines (a helper, the prefix
+    // of a table creator): its lines as they are
+    const sourceStatus = (source) => reader.statusOf(source.module.file)(...linesOf(source.module, source.start, source.end));
 
     const tables = [];
     const seenNames = new Map();
@@ -1913,7 +2244,8 @@ module.exports.parse = function (basePath, options = {}) {
             if (!column.notNull) {
                 out.nullable = true;
             }
-            const status = statusIn(column.module, column.start, column.end);
+            // Its lines, and the code of the helpers that make it (a changed helper changes it)
+            const status = changedStatus(statusIn(column.module, column.start, column.end), column.sources.map(sourceStatus));
             if (status) {
                 out.git = status;
             }
@@ -1975,13 +2307,14 @@ module.exports.parse = function (basePath, options = {}) {
 
         table.source = { file: model.module.rel, line: model.module.lineAt(model.decl.nameStart) };
         const declarationStatus = reader.statusOf(model.module.file)(first, last);
-        const git = tableStatus(declarationStatus === 'modified' && newDeclaration ? 'untracked' : declarationStatus, table.columns.map(c => c.git));
+        // A changed name (the prefix of its table creator changed in another file) changes the table
+        const git = tableStatus(declarationStatus === 'modified' && newDeclaration ? 'untracked' : declarationStatus, [...table.columns.map(c => c.git), ...model.nameSources.map(sourceStatus)]);
         if (git) {
             table.git = git;
         }
         if (options.details) {
             const indexes = model.indexes
-                .filter(index => !(index.type === 'unique' && index.items.length === 1 && index.items[0].key))
+                .filter(index => !(index.type === 'unique' && !index.partial && index.items.length === 1 && index.items[0].key))
                 .map(index => ({ columns: index.items.map(item => (item.key ? nameOf(item.key) : item.expression)), type: index.type, ...(index.name ? { name: index.name } : {}) }));
             if (indexes.length > 0) {
                 table.indexes = indexes;

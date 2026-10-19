@@ -113,7 +113,7 @@ suite('DrawMeDatabase extension: a Drizzle project', () => {
         const at = (...parts) => path.join(workspace(), ...parts);
         assert.deepEqual(api.getSources(workspace(), 'drizzle'), {
             folders: [{ path: at('src', 'db', 'schema'), recursive: false }],
-            files: [at('src', 'db', 'schema', 'posts.ts'), at('src', 'db', 'schema', 'users.ts'), at('src', 'db', 'columns.ts'), at('package.json'), at('drizzle.config.ts')],
+            files: [at('src', 'db', 'schema', 'posts.ts'), at('src', 'db', 'schema', 'users.ts'), at('src', 'db', 'columns.ts'), at('package.json'), at('drizzle.config.ts'), at('tsconfig.json')],
             extensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'],
         });
         // The details for the tools: the length, the referential actions, the indexes

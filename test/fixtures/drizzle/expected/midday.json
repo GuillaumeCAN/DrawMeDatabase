@@ -9474,5 +9474,7 @@
       ]
     }
   ],
-  "warnings": []
+  "warnings": [
+    "src/schema.ts:2954: auth.users: an object in the extra config is ignored by drizzle-kit, skipped."
+  ]
 }

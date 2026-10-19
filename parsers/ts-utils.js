@@ -516,26 +516,145 @@ function blockReturns(block) {
     return returns;
 }
 
-// Whether the block has `return` statements nested in its inner blocks (if, loops), not counting
-// the nested functions
-function hasNestedReturn(block) {
-    const { ctx, from, to } = block;
-    for (let j = from; j < to; j++) {
-        if (isName(ctx.tokens[j], 'return')) {
-            let depth = 0;
-            for (let k = from; k < j; k++) {
-                if (isPunct(ctx.tokens[k], '{')) {
-                    depth++;
-                } else if (isPunct(ctx.tokens[k], '}')) {
-                    depth--;
-                }
-            }
-            if (depth > 0) {
-                return true;
-            }
+// The names a destructuring pattern at i ('{' or '[') declares, its index after: { names, next }
+function patternNames(ctx, i, end) {
+    const { tokens } = ctx;
+    const close = Math.min(after(ctx, i) - 1, end);
+    const names = [];
+    for (const [a, b] of splitList(ctx, i + 1, close)) {
+        let j = a;
+        if (isPunct(tokens[j], '...')) {
+            j++;
+        }
+        // { key: local }, { key: { nested } }, [a, [b]]
+        if (isPunct(tokens[i], '{') && isPunct(tokens[j + 1], ':')) {
+            j += 2;
+        }
+        if (isPunct(tokens[j], '{') || isPunct(tokens[j], '[')) {
+            names.push(...patternNames(ctx, j, b).names);
+        } else if (isName(tokens[j])) {
+            names.push(tokens[j].value);
         }
     }
-    return false;
+    return { names, next: Math.min(close + 1, end) };
+}
+
+// The declarations at the top level of a Block (const, let, var, function), in the order of the
+// code: [{ name, init }], init: the node of the value, or null when it cannot be read (a
+// destructuring, a declaration without a value). Kept on the block.
+function blockDeclarations(block) {
+    if (block.declarations) {
+        return block.declarations;
+    }
+    const { ctx, from, to } = block;
+    const { tokens } = ctx;
+    const declarations = [];
+    let j = from;
+    while (j < to) {
+        const token = tokens[j];
+        const previous = tokens[j - 1];
+        const statementStart = j === from || !(isPunct(previous, '.') || isPunct(previous, '?.'));
+        if (statementStart && (isName(token, 'const') || isName(token, 'let') || isName(token, 'var')) && tokens[j + 1] && (isName(tokens[j + 1]) || isPunct(tokens[j + 1], '{') || isPunct(tokens[j + 1], '['))) {
+            j++;
+            for (;;) {
+                let names;
+                // A destructuring declares names whose values are not read
+                let simple = false;
+                if (isPunct(tokens[j], '{') || isPunct(tokens[j], '[')) {
+                    const pattern = patternNames(ctx, j, to);
+                    names = pattern.names;
+                    j = pattern.next;
+                } else if (isName(tokens[j])) {
+                    names = [tokens[j].value];
+                    simple = true;
+                    j++;
+                } else {
+                    break;
+                }
+                if (isPunct(tokens[j], '!')) {
+                    j++;
+                }
+                if (isPunct(tokens[j], ':')) {
+                    j = skipType(ctx, j + 1, to);
+                }
+                let init = null;
+                if (isPunct(tokens[j], '=')) {
+                    const parsed = parseExpression(ctx, j + 1, to);
+                    init = parsed.node;
+                    j = Math.max(parsed.next, j + 1);
+                }
+                for (const name of names) {
+                    declarations.push({ name, init: simple ? init : null });
+                }
+                if (!isPunct(tokens[j], ',')) {
+                    break;
+                }
+                j++;
+            }
+            continue;
+        }
+        if (statementStart && (isName(token, 'function') || (isName(token, 'async') && isName(tokens[j + 1], 'function')))) {
+            const nameAt = isName(token, 'async') ? j + 2 : j + 1;
+            const nameToken = tokens[isPunct(tokens[nameAt], '*') ? nameAt + 1 : nameAt];
+            const parsed = parseExpression(ctx, j, to);
+            if (isName(nameToken) && parsed.node.type === 'Function') {
+                declarations.push({ name: nameToken.value, init: parsed.node });
+            }
+            j = Math.max(parsed.next, j + 1);
+            continue;
+        }
+        if (isPunct(token, '(') || isPunct(token, '[') || isPunct(token, '{')) {
+            j = after(ctx, j);
+            continue;
+        }
+        j++;
+    }
+    block.declarations = declarations;
+    return declarations;
+}
+
+// Words before the `(...)` of a statement whose `{` opens a block of statements
+const BLOCK_STATEMENTS = new Set(['if', 'for', 'while', 'switch', 'catch', 'with']);
+
+// Whether the block has `return` statements nested in its inner blocks (if, loops, switch, try),
+// not counting the nested functions (`function f() { return 1 }`, `() => { return 1 }`), objects
+// and classes, whose braces are skipped
+function hasNestedReturn(block) {
+    const { ctx, from, to } = block;
+    const { tokens } = ctx;
+    // Whether tokens a..b hold a return; nested: they are the statements of an inner block
+    const scan = (a, b, nested) => {
+        let group = null;
+        for (let j = a; j < b; j++) {
+            const token = tokens[j];
+            if (nested && isName(token, 'return')) {
+                return true;
+            }
+            if (isPunct(token, '(') || isPunct(token, '[')) {
+                const close = Math.min(after(ctx, j) - 1, b);
+                group = { open: j, close };
+                j = close;
+            } else if (isPunct(token, '{')) {
+                const close = Math.min(after(ctx, j) - 1, b);
+                const previous = tokens[j - 1];
+                let before = group && group.close === j - 1 ? tokens[group.open - 1] : null;
+                if (isName(before, 'await')) {
+                    // for await (...)
+                    before = tokens[group.open - 2];
+                }
+                const statements = j === a
+                    || (previous && previous.type === 'punct' && [';', '{', '}', ':'].includes(previous.value))
+                    || (isName(previous) && ['else', 'try', 'finally', 'do', 'catch'].includes(previous.value))
+                    || (isName(before) && BLOCK_STATEMENTS.has(before.value));
+                if (statements && scan(j + 1, close, true)) {
+                    return true;
+                }
+                j = close;
+            }
+        }
+        return false;
+    };
+    return scan(from, to, false);
 }
 
 // Reads an object literal at i = '{': { type: 'Object', properties }
@@ -898,14 +1017,17 @@ function parseExpression(ctx, i, end = ctx.tokens.length, depth = 0) {
 //   imports: Map(local name → { source, imported: name | '*' | 'default' }),
 //   exports: Map(exported name → { local } | { source, imported }),
 //   stars: [source] (export * from), declarations: Map(name → declaration), defaultExport: node,
-//   assignments: [{ target, value }] (module.exports = ...), order: [declaration] in code order }
+//   assignments: [{ target, value }] (module.exports = ...), order: [declaration] in code order,
+//   commonExports: Map(name → declaration) of CommonJS (exports.x = ..., module.exports.x = ...,
+//   the keys of module.exports = { ... }), the last one of a name }
 // A declaration: { kind: 'variable' | 'function' | 'enum', name, init (variable), params and body
 // (function), members (enum: [{ name, init }]), start, end, nameStart, exported }. Type-only
-// imports and exports are left out.
+// imports and exports are left out. `const { a } = require('x')` and `const x = require('x')` are
+// imports of a and x (a namespace).
 function scanModule(text) {
     const tokens = tokenize(text);
     const ctx = context(tokens);
-    const module = { imports: new Map(), exports: new Map(), stars: [], declarations: new Map(), defaultExport: null, assignments: [], order: [], ctx };
+    const module = { imports: new Map(), exports: new Map(), stars: [], declarations: new Map(), defaultExport: null, assignments: [], order: [], commonExports: new Map(), ctx };
     const declare = (declaration) => {
         if (!module.declarations.has(declaration.name)) {
             module.declarations.set(declaration.name, declaration);
@@ -951,6 +1073,22 @@ function scanModule(text) {
         }).filter(Boolean);
         return { specifiers, next: close + 1 };
     };
+    // The source of `require('source')` at node, else null
+    const requireOf = (node) => (node && node.type === 'Call' && node.callee.type === 'Identifier' && node.callee.name === 'require' && node.args.length === 1 && node.args[0].type === 'String' ? node.args[0].value : null);
+    // `const { a, b: c } = require('source')` at i = '{': the imports of a CommonJS module
+    const readRequired = (i, source) => {
+        const close = Math.min(after(ctx, i) - 1, n);
+        for (const [a] of splitList(ctx, i + 1, close)) {
+            // A rest element or a computed key is not read, nor a nested pattern
+            if (!isName(tokens[a])) {
+                continue;
+            }
+            const local = !isPunct(tokens[a + 1], ':') ? tokens[a].value : isName(tokens[a + 2]) ? tokens[a + 2].value : null;
+            if (local) {
+                module.imports.set(local, { source, imported: tokens[a].value });
+            }
+        }
+    };
     // Variable declarators from i (after const/let/var)
     const readDeclarators = (i, statementStart, exported) => {
         let j = i;
@@ -959,8 +1097,9 @@ function scanModule(text) {
             if (!nameToken) {
                 return j;
             }
+            const open = j;
             if (isPunct(nameToken, '{') || isPunct(nameToken, '[')) {
-                // A destructuring: not read
+                // A destructuring: not read, except the imports of `require()`
                 j = after(ctx, j);
             } else if (isName(nameToken)) {
                 j++;
@@ -979,7 +1118,13 @@ function scanModule(text) {
                 init = parsed.node;
                 j = parsed.next;
             }
-            if (isName(nameToken)) {
+            // CommonJS: `const { a } = require('x')` and `const x = require('x')` are imports
+            const required = requireOf(init);
+            if (required !== null && isPunct(nameToken, '{')) {
+                readRequired(open, required);
+            } else if (required !== null && isName(nameToken)) {
+                module.imports.set(nameToken.value, { source: required, imported: '*' });
+            } else if (isName(nameToken)) {
                 declare({ kind: 'variable', name: nameToken.value, init, start: statementStart, end: tokens[j - 1] ? tokens[j - 1].end : nameToken.end, nameStart: nameToken.start, exported });
             }
             if (isPunct(tokens[j], ',')) {
@@ -1157,11 +1302,26 @@ function scanModule(text) {
             i = readEnum(i, start, false);
             continue;
         }
-        // module.exports = ..., exports.x = ...
+        // module.exports = ..., exports.x = ..., module.exports.x = ...
         if (isName(token, 'module') && isPunct(tokens[i + 1], '.') && isName(tokens[i + 2], 'exports') && isPunct(tokens[i + 3], '=')) {
             const parsed = parseExpression(ctx, i + 4, n);
             module.assignments.push({ target: 'module.exports', value: parsed.node });
+            if (parsed.node.type === 'Object') {
+                for (const property of parsed.node.properties) {
+                    if (property.kind === 'init' && !property.computed) {
+                        module.commonExports.set(property.key, { kind: 'variable', name: property.key, init: property.value, start: property.start, end: property.end, nameStart: property.keyStart, exported: true });
+                    }
+                }
+            }
             i = Math.max(parsed.next, i + 4);
+            continue;
+        }
+        const exportsAt = isName(token, 'exports') ? i + 1 : isName(token, 'module') && isPunct(tokens[i + 1], '.') && isName(tokens[i + 2], 'exports') ? i + 3 : -1;
+        if (exportsAt !== -1 && isPunct(tokens[exportsAt], '.') && isName(tokens[exportsAt + 1]) && isPunct(tokens[exportsAt + 2], '=')) {
+            const parsed = parseExpression(ctx, exportsAt + 3, n);
+            const nameToken = tokens[exportsAt + 1];
+            module.commonExports.set(nameToken.value, { kind: 'variable', name: nameToken.value, init: parsed.node, start, end: parsed.node.end, nameStart: nameToken.start, exported: true });
+            i = Math.max(parsed.next, exportsAt + 3);
             continue;
         }
         if (isName(token) && STATEMENT_WORDS.has(token.value)) {
@@ -1206,6 +1366,7 @@ module.exports = {
     parseExpression,
     scanModule,
     blockReturns,
+    blockDeclarations,
     hasNestedReturn,
     createLineLocator,
 };

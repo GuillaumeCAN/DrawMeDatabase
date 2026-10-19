@@ -438,7 +438,7 @@ test('the sources of Prisma: the schema file (or folder), package.json and the c
     ]);
 });
 
-test('the sources of Drizzle: the schema files and what they import, the folders of drizzle.config.ts, package.json and the config file', () => {
+test('the sources of Drizzle: the schema files and what they import, the folders of drizzle.config.ts, package.json, the config file and tsconfig.json', () => {
     const app = project('drizzle-sources', {
         'drizzle.config.ts': "export default { schema: './src/db/schema/*.ts' };\n",
         'src/db/schema/users.ts': `import { timestamps } from '../columns';\n${DRIZZLE_SCHEMA}`,
@@ -446,7 +446,7 @@ test('the sources of Drizzle: the schema files and what they import, the folders
     });
     const sources = registry.getSources('drizzle', app);
     assert.deepEqual(sources.folders, [{ path: path.join(app, 'src', 'db', 'schema'), recursive: false }]);
-    assert.deepEqual(sources.files, [path.join(app, 'src', 'db', 'schema', 'users.ts'), path.join(app, 'src', 'db', 'columns.ts'), path.join(app, 'package.json'), path.join(app, 'drizzle.config.ts')]);
+    assert.deepEqual(sources.files, [path.join(app, 'src', 'db', 'schema', 'users.ts'), path.join(app, 'src', 'db', 'columns.ts'), path.join(app, 'package.json'), path.join(app, 'drizzle.config.ts'), path.join(app, 'tsconfig.json')]);
     assert.equal(covers(sources, path.join(app, 'src', 'db', 'schema', 'posts.ts')), true);
     assert.equal(covers(sources, path.join(app, 'src', 'db', 'schema', 'notes.md')), false);
     assert.equal(covers(sources, path.join(app, 'src', 'db', 'seed.ts')), false);
@@ -477,6 +477,26 @@ test('getSources() cleans the sources of a parser: absolute paths, recursive or 
         extensions: ['.x', '.y'],
     });
     assert.deepEqual(custom.getSources('none', base), { folders: [], files: [], extensions: [] });
+});
+
+test('a folder with a pattern: getSources() keeps it, covers() and watchPatterns() follow its glob (*, ?, **, [...], {a,b}), not every file of the folder', () => {
+    const base = path.join(tmpRoot, 'app');
+    const at = (...segments) => path.join(base, ...segments);
+    const custom = createRegistry([fake('x', 1, {
+        sources: () => ({ folders: [{ path: 'src', recursive: true, pattern: '**/schema.ts' }, { path: 'db', pattern: '{columns,columns.*}' }, { path: 'lib', pattern: '' }], files: [], extensions: ['.ts', '.js'] }),
+    })]);
+    const sources = custom.getSources('x', base);
+    assert.deepEqual(sources.folders, [{ path: at('src'), recursive: true, pattern: '**/schema.ts' }, { path: at('db'), recursive: false, pattern: '{columns,columns.*}' }, { path: at('lib'), recursive: false }]);
+    assert.equal(covers(sources, at('src', 'schema.ts')), true);
+    assert.equal(covers(sources, at('src', 'a', 'b', 'schema.ts')), true);
+    assert.equal(covers(sources, at('src', 'a', 'page.ts')), false);
+    assert.equal(covers(sources, at('db', 'columns.js')), true);
+    assert.equal(covers(sources, at('db', 'columns2.ts')), false);
+    assert.equal(covers(sources, at('db', 'columns.md')), false, 'the extensions still apply');
+    assert.equal(covers(sources, at('lib', 'any.ts')), true, 'an empty pattern is no pattern');
+    assert.deepEqual(watchPatterns(sources).slice(0, 2), [{ base: at('src'), pattern: '**/schema.ts' }, { base: at('db'), pattern: '{columns,columns.*}' }]);
+    assert.deepEqual(['a1.ts', 'b.ts', 'c1.ts', 'ab'].map(name => registry.globRegExp('[ab]?.ts').test(name)), [true, false, false, false]);
+    assert.deepEqual(['x.ts', 'x/y.ts'].map(name => registry.globRegExp('[!y]*.ts').test(name)), [true, false]);
 });
 
 test('covers(): the files of the folders with the extensions, the sub-folders of the recursive ones, the listed files', () => {
