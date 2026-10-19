@@ -165,6 +165,10 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - French: the diagram, the messages, and the commands and settings in VS Code (`DrawMeDatabase.language`: `auto`, `en` or `fr`)
 - API version 2: `registerTool()`, `setLicenseStatus()`, `registerTableInfoProvider()`, `getDisplaySettings()` and `onDidChangeDisplaySettings`, and the page scripts `i18n.js`, `appearance.js` and `sidepanel.js` for the panels of other extensions (`docs/api.md`)
 
+### Fixed
+- A column note or a git label holding two '~' (such as the comparisons of DrawMeDatabase Pro, `~ default: a~b`) no longer makes Mermaid reject the whole diagram, and a table name holding '~x~' is no longer drawn as '<x>': the first '~' is written as is, the next ones as the look-alike '∼'
+- A ':' in a table name, a relation name or a column note (the comparisons of DrawMeDatabase Pro) is drawn as ':' instead of '&#58;', and a '#' as the fullwidth '＃' instead of '&#35;'
+
 ## [v1.7.0] - 2026-10-18
 
 ### Added
