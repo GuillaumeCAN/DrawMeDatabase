@@ -1,91 +1,277 @@
-# On a version tag (v1.2.3): build and test the .vsix (ci.yml), attach it to a GitHub Release,
-# then publish it to Open VSX. The VS Code Marketplace is updated by hand with the same .vsix.
+# Releases the version of package.json. Runs on every push to main and stops there ("nothing to
+# publish") when that version already has its v<version> tag. Otherwise: checks the CHANGELOG
+# section, builds and tests the .vsix of that commit (ci.yml), creates the tag and the GitHub
+# Release at that commit, then publishes the same .vsix to Open VSX and the VS Code Marketplace.
+# Also runs on a v* tag pushed by hand, and by hand (Run workflow) on main or on a v* tag.
 # One-time setup and the release checklist: docs/publishing.md
 
 name: Release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
+  workflow_dispatch:
 
-permissions:
-  contents: read
+# Each job asks for what it needs
+permissions: {}
 
+# One release at a time, never cancelled. GitHub keeps at most one run waiting in the group: a
+# newer run replaces a waiting one (shown as cancelled), and releases the same version, if it is
+# still unreleased, from its newer commit.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
-  check:
-    name: Check version and changelog
+  decide:
+    name: Version, tag and changelog
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
+      release: ${{ steps.version.outputs.release }}
+      tag: ${{ steps.version.outputs.tag }}
       notes: ${{ steps.changelog.outputs.notes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Tag matches package.json
+      # release=true when the version of package.json is to be released from this commit. On main,
+      # a version that already has its tag means "nothing to publish", except in a re-run (Re-run
+      # all jobs) of the run of the tagged commit: the later jobs are idempotent.
+      - name: Version and tag
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match the version of package.json ($version): expected v$version"
+          tag="v$version"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=package.json::Version \"$version\" is not MAJOR.MINOR.PATCH, as the registries need"
             exit 1
           fi
 
-      # Release notes: the "## [vX.Y.Z] - date" section of CHANGELOG.md, up to the next one
+          case "$GITHUB_REF" in
+            refs/heads/main) ;;
+            refs/tags/*)
+              if [ "$GITHUB_REF_NAME" != "$tag" ]; then
+                echo "::error::Tag $GITHUB_REF_NAME does not match the version of package.json ($version): expected $tag"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Release runs on main or on a v* tag, not on $GITHUB_REF"
+              exit 1
+              ;;
+          esac
+
+          # Tags of the repository, listed with the read-only token of this job (needed for a
+          # private repository). The header is passed through the environment, not the command line.
+          basic=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          remote_tags=$(GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader" \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic" \
+            git ls-remote --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git")
+
+          # Commit of the tag: the peeled line (^{}) of an annotated tag, else the tag itself
+          tag_commit=$(printf '%s\n' "$remote_tags" | awk -v ref="refs/tags/$tag" '
+            $2 == ref { sha = $1 }
+            $2 == ref "^{}" { peeled = $1 }
+            END { print (peeled != "" ? peeled : sha) }
+          ')
+
+          if [ "$GITHUB_REF" = refs/heads/main ] && [ -n "$tag_commit" ]; then
+            if [ "$tag_commit" = "$GITHUB_SHA" ] && [ "$GITHUB_RUN_ATTEMPT" -gt 1 ]; then
+              echo "::notice::Re-run of the release of $tag: what already exists is kept, the rest is done again"
+            else
+              echo "::notice title=Nothing to publish::$tag is already released (tag at ${tag_commit:0:7}). To release this commit, raise the version in package.json and add its section to CHANGELOG.md."
+              echo "Nothing to publish: $tag is already released." >> "$GITHUB_STEP_SUMMARY"
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          elif [ "$GITHUB_REF" = refs/heads/main ]; then
+            # A version lower than the latest release, on main, is a mistake (package.json reverted?)
+            latest=$(printf '%s\n' "$remote_tags" | awk '{ print $2 }' \
+              | sed -n 's|^refs/tags/v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$|\1|p' \
+              | sort -V | tail -n 1)
+            if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$version" | sort -V | tail -n 1)" != "$version" ]; then
+              echo "::error file=package.json::Version $version is lower than the latest release v$latest: raise it"
+              exit 1
+            fi
+          fi
+
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # The "## [vX.Y.Z] - YYYY-MM-DD" section of CHANGELOG.md, up to the next one: the release notes.
+      # A section dated "Unreleased" is refused, so a work-in-progress version is never published.
       - name: Changelog section
         id: changelog
+        if: steps.version.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          notes=$(awk -v header="## [$GITHUB_REF_NAME]" '
+          header="## [$TAG]"
+          line=$(awk -v header="$header" 'index($0, header) == 1 { print NR; exit }' CHANGELOG.md)
+          if [ -z "$line" ]; then
+            echo "::error file=CHANGELOG.md::CHANGELOG.md has no \"$header - YYYY-MM-DD\" section: add it, it becomes the release notes"
+            exit 1
+          fi
+          heading=$(sed -n "${line}p" CHANGELOG.md | tr -d '\r')
+          date=$(printf '%s\n' "${heading#"$header"}" | sed -E 's/^[[:space:]]*-?[[:space:]]*//; s/[[:space:]]+$//')
+          if printf '%s\n' "$date" | grep -qi 'unreleased'; then
+            echo "::error file=CHANGELOG.md,line=$line::The section of $TAG is dated \"$date\": write the release date instead ($header - YYYY-MM-DD) to release $TAG"
+            exit 1
+          fi
+          if ! printf '%s\n' "$date" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            echo "::error file=CHANGELOG.md,line=$line::The heading \"$heading\" has no date: write it as $header - YYYY-MM-DD"
+            exit 1
+          fi
+
+          notes=$(awk -v header="$header" '
             index($0, header) == 1 { found = 1; next }
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md)
           if [ -z "$(echo "$notes" | tr -d '[:space:]')" ]; then
-            echo "::error::CHANGELOG.md has no \"## [$GITHUB_REF_NAME]\" section"
+            echo "::error file=CHANGELOG.md,line=$line::The section of $TAG is empty: describe the changes, they become the release notes"
             exit 1
           fi
           delimiter="NOTES_$(openssl rand -hex 16)"
           { echo "notes<<$delimiter"; echo "$notes"; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
+          echo "Release $TAG of $GITHUB_SHA ($date)." >> "$GITHUB_STEP_SUMMARY"
 
+  # Lint, unit and integration tests, .vsix, on the commit of this run
   build:
-    needs: check
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    permissions:
+      contents: read
     uses: ./.github/workflows/ci.yml
 
   github-release:
-    name: GitHub Release
-    needs: [check, build]
+    name: Tag and GitHub Release
+    needs: [decide, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
-      contents: write
+      contents: write # creates the tag and the release
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ needs.build.outputs.vsix }}
           path: dist
 
-      - name: Create the release with the .vsix
+      # The tag and the release are created together, at the commit of this run. A tag created with
+      # the GITHUB_TOKEN starts no workflow: the registries are published by the next jobs, in this
+      # run. Idempotent: a release that already exists (re-run, tag pushed by hand) is kept, and
+      # only gets the .vsix if it does not have it.
+      - name: Create the tag and the release with the .vsix
         env:
           GH_TOKEN: ${{ github.token }}
-          NOTES: ${{ needs.check.outputs.notes }}
-          VSIX: dist/${{ needs.build.outputs.vsix }}
+          TAG: ${{ needs.decide.outputs.tag }}
+          NOTES: ${{ needs.decide.outputs.notes }}
+          VSIX_NAME: ${{ needs.build.outputs.vsix }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "$VSIX" \
-            --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "$GITHUB_REF_NAME" --notes "$NOTES"
+          vsix="dist/$VSIX_NAME"
+          # TAG is vX.Y.Z, checked by the decide job
+          state=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName,isDraft \
+            --jq ".[] | select(.tagName == \"$TAG\") | if .isDraft then \"draft\" else \"published\" end")
+          case "$state" in
+            "")
+              gh release create "$TAG" "$vsix" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+                --title "$TAG" --notes "$NOTES"
+              ;;
+            draft)
+              echo "::error::A draft release $TAG exists: publish it or delete it, then re-run this job"
+              exit 1
+              ;;
+            *)
+              assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+              if grep -qxF "$VSIX_NAME" <<< "$assets"; then
+                echo "::notice::The release $TAG already exists with $VSIX_NAME: kept as it is"
+              else
+                gh release upload "$TAG" "$vsix" --repo "$GITHUB_REPOSITORY"
+                echo "::notice::The release $TAG already existed: $VSIX_NAME added to it"
+              fi
+              ;;
+          esac
 
   open-vsx:
     name: Publish to Open VSX
-    needs: [build, github-release]
+    needs: [decide, build, github-release]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
     environment:
       name: open-vsx
       url: https://open-vsx.org/extension/GuillaumeCancalon/draw-me-database
+    steps:
+      # Before the one-time setup, a warning and no publication: the release stays green
+      - name: Token
+        id: token
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          TAG: ${{ needs.decide.outputs.tag }}
+        run: |
+          if [ -n "$OVSX_PAT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=Open VSX not published::The OVSX_PAT secret is not set (docs/publishing.md). Once it is, publish $TAG with Actions, Release, Run workflow, Use workflow from: Tags, $TAG."
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.token.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.token.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      # Only for the ovsx CLI, at the version of package-lock.json; no install script runs
+      # in the job that holds the token
+      - run: npm ci --ignore-scripts
+        if: steps.token.outputs.ready == 'true'
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.token.outputs.ready == 'true'
+        with:
+          name: ${{ needs.build.outputs.vsix }}
+          path: dist
+
+      # ovsx reads the token from OVSX_PAT (same as -p). --skip-duplicate: a version that is
+      # already published is not an error.
+      - name: Publish
+        if: steps.token.outputs.ready == 'true'
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSIX: dist/${{ needs.build.outputs.vsix }}
+        run: npx ovsx publish "$VSIX" --skip-duplicate
+
+  # VS Code Marketplace, signed in with Microsoft Entra ID as a user-assigned managed identity that
+  # GitHub signs in to through OIDC: no secret, no personal access token (Azure DevOps PATs can no
+  # longer publish after December 1, 2026). Runs once the repository variables AZURE_CLIENT_ID and
+  # AZURE_TENANT_ID are set (docs/publishing.md); until then, the next job says so.
+  marketplace:
+    name: Publish to the VS Code Marketplace
+    needs: [build, github-release]
+    # Repository variables: this condition is evaluated before the job enters its environment
+    if: vars.AZURE_CLIENT_ID != '' && vars.AZURE_TENANT_ID != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The subject of the identity's federated credential: repo:<owner>/<repo>:environment:marketplace
+    environment:
+      name: marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=GuillaumeCancalon.draw-me-database
+    permissions:
+      contents: read
+      id-token: write # OIDC token exchanged by azure/login
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -95,8 +281,7 @@ jobs:
         with:
           node-version: 22
 
-      # Only for the ovsx CLI, at the version of package-lock.json; no install script runs
-      # in the job that holds the token
+      # Only for the vsce CLI, at the version of package-lock.json
       - run: npm ci --ignore-scripts
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -104,56 +289,32 @@ jobs:
           name: ${{ needs.build.outputs.vsix }}
           path: dist
 
-      # ovsx reads the token from OVSX_PAT (same as -p). --skip-duplicate: a re-run does not
-      # fail on a version that is already published.
+      # Right before publishing: the GitHub OIDC token behind the Azure CLI session expires within
+      # minutes. No subscription is needed: the identity only signs in to its tenant.
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }} # the managed identity, not an app registration
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      # --azure-credential: vsce gets a Microsoft Entra ID token for Azure DevOps from the Azure CLI
+      # session. --skip-duplicate: a version that is already published is not an error.
       - name: Publish
         env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
           VSIX: dist/${{ needs.build.outputs.vsix }}
-        run: |
-          if [ -z "$OVSX_PAT" ]; then
-            echo "::error::The OVSX_PAT secret is not set (see docs/publishing.md), then re-run this job"
-            exit 1
-          fi
-          npx ovsx publish "$VSIX" --skip-duplicate
+        run: npx vsce publish --packagePath "$VSIX" --azure-credential --skip-duplicate
 
-  # VS Code Marketplace: not automated. Personal access tokens can no longer publish after
-  # December 1, 2026 (global Azure DevOps PATs are retired), so the default is to upload the
-  # .vsix of the GitHub Release on https://marketplace.visualstudio.com/manage (docs/publishing.md).
-  # Automated alternative, pending a decision and a test with this publisher: Microsoft Entra ID
-  # with a user-assigned managed identity that GitHub signs in to through OIDC (no secret).
-  # Uncomment once the identity is set up (see "Marketplace: Entra ID option" in docs/publishing.md).
-  #
-  # marketplace:
-  #   name: Publish to the VS Code Marketplace
-  #   needs: [build, github-release]
-  #   runs-on: ubuntu-24.04
-  #   timeout-minutes: 10
-  #   # Must match the environment of the identity's federated credential
-  #   environment:
-  #     name: marketplace
-  #     url: https://marketplace.visualstudio.com/items?itemName=GuillaumeCancalon.draw-me-database
-  #   permissions:
-  #     contents: read
-  #     id-token: write # OIDC token exchanged by azure/login
-  #   steps:
-  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-  #       with:
-  #         persist-credentials: false
-  #     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-  #       with:
-  #         node-version: 22
-  #     - run: npm ci --ignore-scripts
-  #     - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-  #       with:
-  #         name: ${{ needs.build.outputs.vsix }}
-  #         path: dist
-  #     - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
-  #       with:
-  #         client-id: ${{ vars.AZURE_CLIENT_ID }} # the managed identity, not an app registration
-  #         tenant-id: ${{ vars.AZURE_TENANT_ID }}
-  #         allow-no-subscriptions: true
-  #     - name: Publish
-  #       env:
-  #         VSIX: dist/${{ needs.build.outputs.vsix }}
-  #       run: npx vsce publish --packagePath "$VSIX" --azure-credential --skip-duplicate
+  marketplace-not-set-up:
+    name: VS Code Marketplace not set up
+    needs: [decide, build, github-release]
+    if: vars.AZURE_CLIENT_ID == '' || vars.AZURE_TENANT_ID == ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Upload by hand
+        env:
+          TAG: ${{ needs.decide.outputs.tag }}
+          VSIX_NAME: ${{ needs.build.outputs.vsix }}
+        run: |
+          echo "::warning title=VS Code Marketplace not published::The repository variables AZURE_CLIENT_ID and AZURE_TENANT_ID are not set (docs/publishing.md). Upload $VSIX_NAME of the release $TAG on https://marketplace.visualstudio.com/manage, or set up the Marketplace and publish $TAG with Actions, Release, Run workflow, Use workflow from: Tags, $TAG."

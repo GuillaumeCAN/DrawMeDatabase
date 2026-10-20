@@ -19,8 +19,10 @@ permissions:
   contents: read
 
 concurrency:
-  # "ci-" prefix: release.yml calls this workflow on the same ref, a shared group would deadlock
-  group: ci-${{ github.ref }}
+  # "ci-" prefix: release.yml calls this workflow on the same ref, a shared group would deadlock.
+  # github.workflow is the caller's name ("Release") when release.yml calls it: the build of a
+  # release neither waits behind nor gets replaced by the CI run of the same push to main.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
