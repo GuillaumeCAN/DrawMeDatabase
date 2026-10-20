@@ -11,7 +11,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { tokenize, context, parseExpression, scanModule, blockReturns, blockDeclarations, hasNestedReturn, createLineLocator, cook } = require('../../parsers/ts-utils');
+const { tokenize, context, parseExpression, scanModule, blockReturns, blockDeclarations, blockChanges, hasNestedReturn, createLineLocator, cook } = require('../../parsers/ts-utils');
 
 // A node without its offsets, for the comparisons
 const strip = (node) => JSON.parse(JSON.stringify(node, (key, value) => (['start', 'end', 'keyStart', 'ctx', 'parenthesized'].includes(key) ? undefined : value)));
@@ -72,6 +72,11 @@ test('expressions: arrow functions (typed parameters, return types, destructurin
     assert.deepEqual(expression('(): AnyPgColumn => users.id'), { type: 'Arrow', params: [], body: { type: 'Member', object: { type: 'Identifier', name: 'users' }, property: 'id' } });
     assert.deepEqual(expression('(name: string, length = 8, { a, b: c }: Opts, ...rest) => name').params, [{ name: 'name' }, { name: 'length', default: { type: 'Number', value: 8, raw: '8', bigint: false } }, { names: [{ key: 'a', local: 'a' }, { key: 'b', local: 'c' }] }, { rest: 'rest' }]);
     assert.deepEqual(expression('t => [t.a]').params, [{ name: 't' }]);
+    const number = (value) => ({ type: 'Number', value, raw: String(value), bigint: false });
+    assert.deepEqual(expression("({ name, length = 64, scale: s = 2 }: { name: string } = {}, { a }?: A) => name").params, [
+        { names: [{ key: 'name', local: 'name' }, { key: 'length', local: 'length', default: number(64) }, { key: 'scale', local: 's', default: number(2) }], default: { type: 'Object', properties: [] } },
+        { names: [{ key: 'a', local: 'a' }] },
+    ], 'the default values of a destructured parameter, and of the whole parameter');
     const block = parseExpression(context(tokenize('(t) => { if (x) { return 1; } return { a: t }; }')), 0).node;
     assert.equal(block.body.type, 'Block');
     assert.deepEqual(blockReturns(block.body).map(strip), [{ type: 'Object', properties: [{ kind: 'init', key: 'a', computed: false, value: { type: 'Identifier', name: 't' } }] }]);
@@ -147,6 +152,44 @@ test('blocks: the declarations at the top level of a function block (const, let,
         ['x', 'Number'], ['y', 'Identifier'], ['b', null], ['d', null], ['rest', null], ['e', null], ['f2', null], ['g', 'Function'], ['h', 'Arrow'], ['later', null],
     ]);
     assert.equal(blockDeclarations(node.body), blockDeclarations(node.body), 'read once');
+});
+
+test('blocks: the changes of the locals before the return, at the top level (assigned, a property, push, unshift, Object.assign); the others cannot be read', () => {
+    const changesOf = (text) => {
+        const node = parseExpression(context(tokenize(text)), 0).node;
+        return Object.fromEntries([...blockChanges(node.body)].map(([name, entry]) => [name, entry.unreadable ? 'unreadable' : entry.changes.map(change => {
+            const parts = [change.type, change.key, ...(change.value ? [change.value.type] : []), ...(change.items || change.sources || []).map(item => item.type)];
+            return parts.filter(Boolean).join(' ');
+        })]));
+    };
+    assert.deepEqual(changesOf("() => {\n  let a = 1;\n  const o = { x: 1 }\n  const l = [1];\n  a = 'two';\n  o.y = f(1);\n  o['z'] = 2\n  l.push(3, ...m);\n  l.unshift(0);\n  Object.assign(o, p, { q: 1 });\n  l.map(x => x); f(l); const copy = { ...o };\n  return [a, o, l];\n  o.dead = 1;\n}"), {
+        a: ['assign String'],
+        o: ['property y Call', 'property z Number', 'merge Identifier Object'],
+        l: ['push Number Spread', 'unshift Number'],
+    });
+    const unreadable = [
+        '() => { const o = {}; if (c) o.x = 1; return o; }',
+        '() => { const o = {}; if (c) { o.x = 1; } return o; }',
+        '() => { const l = []; for (const x of y) l.push(x); return l; }',
+        '() => { const l = []; y.forEach((x) => l.push(x)); return l; }',
+        '() => { const l = []; c && l.push(1); return l; }',
+        "() => { let a = 'x'; a += 'y'; return a; }",
+        '() => { let a = 1; a++; return a; }',
+        '() => { const o = { a: 1 }; o.b = o.a; return o; }',
+        '() => { const l = [1]; l.push(...l); return l; }',
+        '() => { const l = [2, 1]; l.sort(); return l; }',
+        '() => { const o = { a: { b: 1 } }; o.a.b = 2; return o; }',
+        '() => { const o = { a: 1 }; delete o.a; return o; }',
+        '() => { const o = {}; o[key] = 1; return o; }',
+        '() => { const o = {}; return o; function f() { o.x = 1; } }',
+        '() => { const o = {}; const r = Object.assign(o, p); return r; }',
+    ];
+    for (const text of unreadable) {
+        assert.deepEqual(Object.values(changesOf(text)), ['unreadable'], text);
+    }
+    assert.deepEqual(changesOf('() => { const o = { a: 1 }; const p = o.a; other.x = 1; return { ...o, b: o.a }; }'), {}, 'uses that change nothing');
+    const node = parseExpression(context(tokenize('() => { const o = {}; o.a = 1; return o; }')), 0).node;
+    assert.equal(blockChanges(node.body), blockChanges(node.body), 'read once');
 });
 
 test('blocks: the returns nested in inner blocks (if, loops, switch, try), not in nested functions, objects or classes', () => {

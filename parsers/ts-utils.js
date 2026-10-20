@@ -472,13 +472,32 @@ function readParams(ctx, from, to) {
         }
         if (isPunct(tokens[j], '{')) {
             const close = Math.min(after(ctx, j) - 1, b);
+            // { key }, { key: local }, and their default values ({ key = 1 }, { key: local = 1 })
             const names = splitList(ctx, j + 1, close).map(([c, d]) => {
-                if (isName(tokens[c]) && isPunct(tokens[c + 1], ':') && isName(tokens[c + 2])) {
-                    return { key: tokens[c].value, local: tokens[c + 2].value };
+                const renamed = isName(tokens[c]) && isPunct(tokens[c + 1], ':') && isName(tokens[c + 2]);
+                if (!renamed && !(isName(tokens[c]) && c < d)) {
+                    return null;
                 }
-                return isName(tokens[c]) && c < d ? { key: tokens[c].value, local: tokens[c].value } : null;
+                const name = { key: tokens[c].value, local: tokens[renamed ? c + 2 : c].value };
+                const equals = renamed ? c + 3 : c + 1;
+                if (equals < d && isPunct(tokens[equals], '=')) {
+                    name.default = parseExpression(ctx, equals + 1, d).node;
+                }
+                return name;
             }).filter(Boolean);
-            return { names };
+            const param = { names };
+            // The default value of the whole parameter: ({ size = 1 }: Options = {})
+            let k = close + 1;
+            if (isPunct(tokens[k], '?')) {
+                k++;
+            }
+            if (isPunct(tokens[k], ':')) {
+                k = skipType(ctx, k + 1, b);
+            }
+            if (k < b && isPunct(tokens[k], '=')) {
+                param.default = parseExpression(ctx, k + 1, b).node;
+            }
+            return param;
         }
         return {};
     });
@@ -540,8 +559,9 @@ function patternNames(ctx, i, end) {
 }
 
 // The declarations at the top level of a Block (const, let, var, function), in the order of the
-// code: [{ name, init }], init: the node of the value, or null when it cannot be read (a
-// destructuring, a declaration without a value). Kept on the block.
+// code: [{ name, init, at }], init: the node of the value, or null when it cannot be read (a
+// destructuring, a declaration without a value); at: the index of the token of the name (not for
+// a destructuring). Kept on the block.
 function blockDeclarations(block) {
     if (block.declarations) {
         return block.declarations;
@@ -560,6 +580,7 @@ function blockDeclarations(block) {
                 let names;
                 // A destructuring declares names whose values are not read
                 let simple = false;
+                const at = j;
                 if (isPunct(tokens[j], '{') || isPunct(tokens[j], '[')) {
                     const pattern = patternNames(ctx, j, to);
                     names = pattern.names;
@@ -584,7 +605,7 @@ function blockDeclarations(block) {
                     j = Math.max(parsed.next, j + 1);
                 }
                 for (const name of names) {
-                    declarations.push({ name, init: simple ? init : null });
+                    declarations.push(simple ? { name, init, at } : { name, init: null });
                 }
                 if (!isPunct(tokens[j], ',')) {
                     break;
@@ -595,10 +616,10 @@ function blockDeclarations(block) {
         }
         if (statementStart && (isName(token, 'function') || (isName(token, 'async') && isName(tokens[j + 1], 'function')))) {
             const nameAt = isName(token, 'async') ? j + 2 : j + 1;
-            const nameToken = tokens[isPunct(tokens[nameAt], '*') ? nameAt + 1 : nameAt];
+            const nameIndex = isPunct(tokens[nameAt], '*') ? nameAt + 1 : nameAt;
             const parsed = parseExpression(ctx, j, to);
-            if (isName(nameToken) && parsed.node.type === 'Function') {
-                declarations.push({ name: nameToken.value, init: parsed.node });
+            if (isName(tokens[nameIndex]) && parsed.node.type === 'Function') {
+                declarations.push({ name: tokens[nameIndex].value, init: parsed.node, at: nameIndex });
             }
             j = Math.max(parsed.next, j + 1);
             continue;
@@ -615,6 +636,209 @@ function blockDeclarations(block) {
 
 // Words before the `(...)` of a statement whose `{` opens a block of statements
 const BLOCK_STATEMENTS = new Set(['if', 'for', 'while', 'switch', 'catch', 'with']);
+
+// The methods of an array that change it, besides push and unshift
+const ARRAY_CHANGES = new Set(['pop', 'shift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin']);
+// The assignment operators, and ++/--
+const ASSIGNMENTS = new Set(['=', '+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '&=', '|=', '^=', '??=', '&&=', '||=', '++', '--']);
+// Tokens after which a token on a new line starts a statement
+const ENDS_EXPRESSION = new Set(['name', 'number', 'string', 'template', 'regex']);
+
+// The changes made to the locals of a Block (blockDeclarations) by its statements before its
+// top-level `return`: Map(name → { changes } | { unreadable: true }), only for the locals that are
+// changed. A change is a statement of the top level of the block, run each time, with its start
+// and end: { type: 'assign', value } (`name = value`), { type: 'property', key, value }
+// (`name.key = value`, `name['key'] = value`), { type: 'push' | 'unshift', items }
+// (`name.push(a, ...b)`), { type: 'merge', sources } (`Object.assign(name, a, b)`). A local changed
+// in a way that cannot be read is unreadable: another operator, a change nested in an inner block,
+// a condition, a loop or a function, a change that uses the local itself, another method that
+// changes an array. params: the names of the parameters of the function of the block, changed the
+// same way. Kept on the block.
+function blockChanges(block, params = []) {
+    if (block.changes) {
+        return block.changes;
+    }
+    const { ctx, from, to } = block;
+    const { tokens } = ctx;
+    const changes = new Map();
+    block.changes = changes;
+    const declared = new Map();
+    for (const declaration of blockDeclarations(block)) {
+        if (declaration.at !== undefined && !declared.has(declaration.name)) {
+            declared.set(declaration.name, declaration.at);
+        }
+    }
+    for (const name of params) {
+        if (!declared.has(name)) {
+            declared.set(name, -1);
+        }
+    }
+    if (declared.size === 0) {
+        return changes;
+    }
+    const unreadable = (name) => changes.set(name, { unreadable: true });
+    const add = (name, change) => {
+        const entry = changes.get(name) || { changes: [] };
+        if (!entry.unreadable) {
+            entry.changes.push(change);
+            changes.set(name, entry);
+        }
+    };
+    // A use of a local at i (not a property `x.name`, not its declaration)
+    const isLocal = (i) => isName(tokens[i]) && declared.has(tokens[i].value) && declared.get(tokens[i].value) !== i
+        && !isPunct(tokens[i - 1], '.') && !isPunct(tokens[i - 1], '?.');
+    // Whether the local at i is changed there: assigned, a property of it assigned, a method that
+    // changes an array called on it, or given to Object.assign() first
+    const changesAt = (i) => {
+        if (isPunct(tokens[i - 1], '++') || isPunct(tokens[i - 1], '--') || isName(tokens[i - 1], 'delete')) {
+            return true;
+        }
+        if (isPunct(tokens[i - 1], '(') && isName(tokens[i - 2], 'assign') && isPunct(tokens[i - 3], '.') && isName(tokens[i - 4], 'Object')) {
+            return true;
+        }
+        let j = i + 1;
+        // (cols as any).x = 1
+        if (isName(tokens[j], 'as') || isName(tokens[j], 'satisfies')) {
+            j = skipType(ctx, j + 1, to);
+            if (isPunct(tokens[j], ')') && isPunct(tokens[i - 1], '(')) {
+                j++;
+            }
+        }
+        let member = null;
+        for (;;) {
+            if (isPunct(tokens[j], '!')) {
+                j++;
+            } else if ((isPunct(tokens[j], '.') || isPunct(tokens[j], '?.')) && isName(tokens[j + 1])) {
+                member = tokens[j + 1].value;
+                j += 2;
+            } else if (isPunct(tokens[j], '[') && !tokens[j].newline) {
+                member = null;
+                j = after(ctx, j);
+            } else {
+                break;
+            }
+        }
+        const next = tokens[j];
+        if (next && next.type === 'punct' && ASSIGNMENTS.has(next.value)) {
+            return true;
+        }
+        return j > i + 1 && isPunct(next, '(') && (member === 'push' || member === 'unshift' || ARRAY_CHANGES.has(member));
+    };
+    // Whether the top-level token at i starts a statement; lastGroup: the last bracket group
+    // skipped before it ({ open, close })
+    const startsStatement = (i, lastGroup) => {
+        if (i === from) {
+            return true;
+        }
+        const previous = tokens[i - 1];
+        if (isPunct(previous, ';') || isPunct(previous, '}')) {
+            return true;
+        }
+        if (isPunct(previous, ')') && lastGroup && lastGroup.close === i - 1) {
+            // if (...) name.push(x): a condition
+            const before = tokens[lastGroup.open - 1];
+            return !(isName(before) && BLOCK_STATEMENTS.has(before.value)) && Boolean(tokens[i].newline);
+        }
+        if (isName(previous) && ['else', 'do', 'return', 'throw', 'case', 'default', 'typeof', 'void', 'await', 'yield', 'in', 'of', 'instanceof', 'new'].includes(previous.value)) {
+            return false;
+        }
+        return Boolean(tokens[i].newline) && (ENDS_EXPRESSION.has(previous.type) || isPunct(previous, ']') || isPunct(previous, ')'));
+    };
+    // Whether tokens a..b use the local `name`, except at `except`
+    const uses = (a, b, name, except) => {
+        for (let k = a; k < b; k++) {
+            if (k !== except && isName(tokens[k], name) && !isPunct(tokens[k - 1], '.') && !isPunct(tokens[k - 1], '?.')) {
+                return true;
+            }
+        }
+        return false;
+    };
+    // The change of the statement at i (a top-level statement that starts with a local or with
+    // Object.assign), or null when it changes nothing
+    const statementChange = (i) => {
+        const parsed = parseExpression(ctx, i, to);
+        const node = parsed.node;
+        const ends = parsed.next >= to || isPunct(tokens[parsed.next], ';') || Boolean(tokens[parsed.next].newline);
+        const isLocalNode = (n) => Boolean(n) && n.type === 'Identifier' && declared.has(n.name);
+        let name = null;
+        let change = null;
+        if (node.type === 'Assignment') {
+            const target = node.target;
+            const object = target.type === 'Member' || target.type === 'Index' ? target.object : target;
+            if (!isLocalNode(object)) {
+                return null;
+            }
+            name = object.name;
+            const key = target.type === 'Member' ? target.property : target.type === 'Index' && target.index.type === 'String' ? target.index.value : null;
+            if (node.operator === '=' && target.type === 'Identifier') {
+                change = { type: 'assign', value: node.value, start: node.start, end: node.end };
+            } else if (node.operator === '=' && key !== null && !target.optional) {
+                change = { type: 'property', key, value: node.value, start: node.start, end: node.end };
+            }
+        } else if (node.type === 'Call' && node.callee.type === 'Member') {
+            const callee = node.callee;
+            if (isLocalNode(callee.object) && (callee.property === 'push' || callee.property === 'unshift' || ARRAY_CHANGES.has(callee.property))) {
+                name = callee.object.name;
+                if (!ARRAY_CHANGES.has(callee.property) && !callee.optional) {
+                    change = { type: callee.property, items: node.args, start: node.start, end: node.end };
+                }
+            } else if (callee.object.type === 'Identifier' && callee.object.name === 'Object' && callee.property === 'assign' && isLocalNode(node.args[0])) {
+                name = node.args[0].name;
+                if (node.args.slice(1).every(arg => arg.type !== 'Spread')) {
+                    change = { type: 'merge', sources: node.args.slice(1), start: node.start, end: node.end };
+                }
+            }
+        }
+        if (!name) {
+            return null;
+        }
+        // A change that uses the local itself (`name = name + 'x'`, `list.push(...list)`)
+        if (!change || !ends || uses(i, parsed.next, name, isName(tokens[i], 'Object') ? i + 4 : i)) {
+            return { name, unreadable: true };
+        }
+        return { name, change, next: parsed.next };
+    };
+    // The statements of the top level before the return; top: the tokens of the top level
+    const top = new Uint8Array(to);
+    const handled = new Set();
+    let returnAt = to;
+    let lastGroup = null;
+    for (let j = from; j < to;) {
+        const token = tokens[j];
+        top[j] = 1;
+        if (isPunct(token, '(') || isPunct(token, '[') || isPunct(token, '{')) {
+            const close = Math.min(after(ctx, j) - 1, to);
+            lastGroup = { open: j, close };
+            j = close + 1;
+            continue;
+        }
+        if (isName(token, 'return') && returnAt === to) {
+            returnAt = j;
+        }
+        const assign = isName(token, 'Object') && isPunct(tokens[j + 1], '.') && isName(tokens[j + 2], 'assign');
+        const found = j < returnAt && (isLocal(j) || assign) && startsStatement(j, lastGroup) ? statementChange(j) : null;
+        if (found) {
+            handled.add(assign ? j + 4 : j);
+            if (found.unreadable) {
+                unreadable(found.name);
+            } else {
+                add(found.name, found.change);
+            }
+            j = Math.max(found.next || j + 1, j + 1);
+            lastGroup = null;
+            continue;
+        }
+        j++;
+    }
+    // Any other change cannot be read: nested in an inner block or a function, in a condition, in
+    // an expression. The dead code after the return is left out, not the functions declared there.
+    for (let j = from; j < to; j++) {
+        if (isLocal(j) && !handled.has(j) && !(top[j] && j > returnAt) && changesAt(j)) {
+            unreadable(tokens[j].value);
+        }
+    }
+    return changes;
+}
 
 // Whether the block has `return` statements nested in its inner blocks (if, loops, switch, try),
 // not counting the nested functions (`function f() { return 1 }`, `() => { return 1 }`), objects
@@ -1367,6 +1591,7 @@ module.exports = {
     scanModule,
     blockReturns,
     blockDeclarations,
+    blockChanges,
     hasNestedReturn,
     createLineLocator,
 };

@@ -236,6 +236,8 @@ describe('drizzle parser: where the schema is', () => {
         assert.deepEqual(read('db/**/*.ts'), ['a', 'b', 'c', 'd']);
         assert.deepEqual(read('./db/{a,nested/c}.ts'), ['a', 'c'], 'braces expanded first, as glob does');
         assert.deepEqual(read('./db/nested/*'), ['c', 'd'], 'a folder matched by the glob: its files, as drizzle-kit reads it');
+        assert.deepEqual(read('./db/**'), ['a', 'b', 'c', 'd'], 'a final **: the folder and its sub-folders, as glob matches them for drizzle-kit');
+        assert.deepEqual(read('./db/nested/**'), ['c', 'd']);
         assert.deepEqual(read(['./db/b.ts', './db/nested/c.ts']), ['b', 'c']);
         assert.deepEqual(read(['./db/b.ts', './db/b.ts', './db/*.ts']), ['a', 'b'], 'each file once');
         const missing = parser.parse(project({ ...files, 'drizzle.config.ts': "export default { schema: ['./db/a.ts', './db/missing/*.ts'] };\n" }), { git: false });
@@ -291,6 +293,10 @@ describe('drizzle parser: where the schema is', () => {
         ]);
         const glob = project({ 'drizzle.config.ts': "export default { schema: 'db/**/*.ts' };\n", 'db/a/b.ts': SCHEMA });
         assert.deepEqual(registry.getSources('drizzle', glob).folders, [{ path: path.join(glob, 'db'), recursive: true, pattern: '**/*.ts' }, { path: path.join(glob, 'db'), recursive: true, pattern: '**/*.ts/*' }], 'a ** glob: the files it matches in the sub-folders, and the files of the folders it matches');
+        const all = project({ 'drizzle.config.ts': "export default { schema: './db/**' };\n", 'db/a/b.ts': SCHEMA });
+        const allSources = registry.getSources('drizzle', all);
+        assert.deepEqual(allSources.folders, [{ path: path.join(all, 'db'), recursive: true }], 'a final **: the folder and its sub-folders');
+        assert.equal(registry.covers(allSources, path.join(all, 'db', 'new', 'deep', 'c.ts')), true, 'a new file in a new sub-folder');
         const none = project({ 'package.json': PACKAGE });
         assert.deepEqual(registry.getSources('drizzle', none), {
             folders: ['src/db/schema', 'src/schema', 'db/schema', 'schema'].map(folder => ({ path: path.join(none, folder), recursive: false })),
@@ -555,6 +561,38 @@ describe('drizzle parser: tables and columns', () => {
         assert.deepEqual(result.warnings, ['src/db/audit.ts:18: t.odd: column not understood, skipped.']);
     });
 
+    it('the default values of a destructured parameter of a helper, and of the whole parameter, are used when the argument has no such property', () => {
+        const body = "const str = ({ name, length = 64 }: { name: string; length?: number }) => varchar(name, { length });\nconst money = ({ name, precision = 12, scale: s = 2 }) => numeric(name, { precision, scale: s });\nconst audit = ({ prefix = 'a', len = 32 }: { prefix?: string; len?: number } = {}) => ({ by: varchar(`${prefix}_by`, { length: len }) });\nconst base = { name: 'spread' };\nexport const items = pgTable('items', {\n  title: str({ name: 'title' }),\n  code: str({ name: 'code', length: 8 }),\n  unset: str({ name: 'unset', length: undefined }),\n  spread: str({ ...base }),\n  price: money({ name: 'price', scale: 4 }),\n  ...audit(),\n});\nexport const logs = pgTable('logs', { ...audit({ prefix: 'b' }) });\n";
+        const result = parseSchema(`import { numeric } from 'drizzle-orm/pg-core';\n${body}`, { details: true });
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.map(c => `${c.name}:${c.type}(${[c.length, c.precision, c.scale].filter(v => v !== undefined).join(',')})`)]), [
+            ['items', ['title:varchar(64)', 'code:varchar(8)', 'unset:varchar(64)', 'spread:varchar(64)', 'price:numeric(12,4)', 'a_by:varchar(32)']],
+            ['logs', ['b_by:varchar(32)']],
+        ]);
+        assert.deepEqual(result.warnings, []);
+    });
+
+    it('the locals of a helper changed by its statements before the return (assigned again, a property set, Object.assign(), push()) are read as they are then; a change that cannot be read is told', () => {
+        const files = { 'src/db/helpers.ts': "import { text, integer } from 'drizzle-orm/pg-core';\nconst base = () => ({ id: integer('id') });\nexport function renamed() {\n  let name = 'first';\n  name = 'second';\n  return { col: text(name) };\n}\nexport function built(prefix: string) {\n  const cols: Record<string, any> = { one: text(`${prefix}_one`) };\n  cols.two = text(`${prefix}_two`);\n  cols['three'] = text('three');\n  cols.one = text('one_again');\n  return cols;\n}\nexport function assigned() {\n  const cols = base()\n  Object.assign(cols, { four: text('four') });\n  return cols;\n  cols.dead = text('dead');\n}\nexport function later() {\n  let name;\n  name = 'later';\n  return { later: text(name) };\n}\nexport function conditional(flag: boolean) {\n  const cols = { five: text('five') };\n  if (flag) cols.six = text('six');\n  return cols;\n}\nexport function looped() {\n  const cols = { seven: text('seven') };\n  for (const key of ['a', 'b']) {\n    cols[key] = text(key);\n  }\n  return cols;\n}\nexport function concatenated() {\n  let name = 'eight';\n  name += '_x';\n  return { eight: text(name) };\n}\nexport function itself() {\n  const cols = { nine: text('nine') };\n  cols.ten = cols.nine;\n  return cols;\n}\nexport function inCallback() {\n  const cols = { eleven: text('eleven') };\n  ['x'].forEach((key) => { cols[key] = text(key); });\n  return cols;\n}\n" };
+        const result = parseSchema("import { renamed, built, assigned, later, conditional, looped, concatenated, itself, inCallback } from './helpers';\nexport const t = pgTable('t', {\n  ...renamed(),\n  ...built('x'),\n  ...assigned(),\n  ...later(),\n});\nexport const u = pgTable('u', {\n  ...conditional(true),\n  ...looped(),\n  ...concatenated(),\n  ...itself(),\n  ...inCallback(),\n});\n", { columnSources: true }, files);
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.map(c => `${c.name}@${c.source.line}`)]), [
+            ['t', ['second@6', 'one_again@12', 'x_two@10', 'three@11', 'id@2', 'four@17', 'later@24']],
+            ['u', ['eight@41']],
+        ]);
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:10: u: ...conditional(true) cannot be read, its columns are skipped.',
+            'src/db/schema.ts:11: u: ...looped() cannot be read, its columns are skipped.',
+            'src/db/schema.ts:13: u: ...itself() cannot be read, its columns are skipped.',
+            'src/db/schema.ts:14: u: ...inCallback() cannot be read, its columns are skipped.',
+            'src/db/helpers.ts:41: u.eight: the column name is computed, the key is used.',
+        ]);
+    });
+
+    it('a parameter of a helper changed by its statements (an object of columns, a list of indexes given to it) is read as it is then; a change through a cast is told', () => {
+        const result = parseSchema("function withAudit(cols: any) {\n  cols.createdBy = text('created_by');\n  Object.assign(cols, { updatedBy: text('updated_by') });\n  return cols;\n}\nfunction cast() {\n  const cols = { a: text('a') };\n  (cols as any).b = text('b');\n  return cols;\n}\nconst extras = (t: any, list: any[]) => {\n  list.push(index('p_b').on(t.b));\n  return list;\n};\nexport const t = pgTable('t', { ...withAudit({ id: integer('id') }), ...cast() }, (t) => extras(t, [index('p_a').on(t.id)]));\n", { details: true, columnSources: true });
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.map(c => `${c.name}@${c.source.line}`), t.indexes.map(i => i.name)]), [['t', ['id@16', 'created_by@3', 'updated_by@4'], ['p_a', 'p_b']]]);
+        assert.deepEqual(result.warnings, ['src/db/schema.ts:16: t: ...cast() cannot be read, its columns are skipped.']);
+    });
+
     it('a CommonJS schema (.js): require() of drizzle-orm and of helpers, exports.x = ..., module.exports.x = ..., module.exports = { ... }', () => {
         const dir = project({
             'package.json': PACKAGE,
@@ -652,6 +690,31 @@ describe('drizzle parser: relations', () => {
             'src/db/schema.ts:20: projects: an array nested twice in the extra config is ignored by drizzle-kit, skipped.',
             'src/db/schema.ts:21: projects: an object in the extra config is ignored by drizzle-kit, skipped.',
             'src/db/schema.ts:22: projects: ...remoteIndexes(t) cannot be read, its keys and indexes are skipped.',
+        ]);
+    });
+
+    it('the extra config: a local array or object changed by push(), unshift() or a property before the return; in a condition or a loop it is told', () => {
+        const result = parseSchema("const more = (t) => [index('more').on(t.b)];\nconst flag = true;\nexport const a = pgTable('a', { a: integer(), b: integer() }, (t) => {\n  const list = [index('a_a').on(t.a)];\n  list.push(index('a_b').on(t.b), ...more(t));\n  list.unshift(uniqueIndex('a_first').on(t.a, t.b));\n  return list;\n});\nexport const b = pgTable('b', { a: integer(), b: integer() }, (t) => {\n  const keys: Record<string, any> = { a: index('b_a').on(t.a) };\n  keys.b = index('b_b').on(t.b);\n  return keys;\n});\nexport const c = pgTable('c', { a: integer(), b: integer() }, (t) => {\n  const list = [index('c_a').on(t.a)];\n  if (flag) {\n    list.push(index('c_b').on(t.b));\n  }\n  return list;\n});\nexport const d = pgTable('d', { a: integer() }, (t) => {\n  const list = [];\n  for (const column of [t.a]) list.push(index().on(column));\n  return list;\n});\n", { details: true });
+        assert.deepEqual(result.tables.map(t => [t.table, (t.indexes || []).map(i => i.name)]), [['a', ['a_first', 'a_a', 'a_b', 'more']], ['b', ['b_a', 'b_b']], ['c', []], ['d', []]]);
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:15: c: the extra config cannot be read, its keys and indexes are skipped.',
+            'src/db/schema.ts:22: d: the extra config cannot be read, its keys and indexes are skipped.',
+        ]);
+    });
+
+    it('the extra config: a helper or a local that spreads itself (it never ends when run) is told, without a stack overflow; at most 1000 keys and indexes are read', () => {
+        const levels = Array.from({ length: 30 }, (_, i) => `const d${i} = (t) => [...d${i + 1}(t), ...d${i + 1}(t)];\n`).join('');
+        const body = `const x = (t: any): any => [...x(t), ...x(t)];\nconst y = (t: any): any => [...z(t), index('y').on(t.a)];\nconst z = (t: any): any => [...y(t), ...y(t)];\nconst o = (t: any): any => ({ ...o(t), ...o(t), i: index('o').on(t.a) });\n${levels}const d30 = (t) => [index().on(t.a)];\nexport const a = pgTable('a', { a: integer() }, (t) => [...x(t)]);\nexport const b = pgTable('b', { a: integer() }, (t) => [...y(t)]);\nexport const c = pgTable('c', { a: integer() }, (t) => o(t));\nexport const d = pgTable('d', { a: integer() }, (t) => { const l: any[] = [...l, ...l]; return l; });\nexport const e = pgTable('e', { a: integer() }, (t) => [...d0(t)]);\n`;
+        const started = Date.now();
+        const result = parseSchema(body, { details: true });
+        assert.ok(Date.now() - started < 2000, `${Date.now() - started} ms`);
+        assert.deepEqual(result.tables.map(t => [t.table, (t.indexes || []).length]), [['a', 0], ['b', 1], ['c', 1], ['d', 0], ['e', 1001]]);
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:2: a: ...x(t) spreads itself without end, its keys and indexes are skipped.',
+            'src/db/schema.ts:4: b: ...y(t) spreads itself without end, its keys and indexes are skipped.',
+            'src/db/schema.ts:5: c: ...o(t) spreads itself without end, its keys and indexes are skipped.',
+            'src/db/schema.ts:40: d: ...l spreads itself without end, its keys and indexes are skipped.',
+            'src/db/schema.ts:41: e: the extra config gives more than 1000 keys and indexes, the others are skipped.',
         ]);
     });
 
@@ -906,6 +969,26 @@ export const posts = pgTable(
         assert.deepEqual(statuses(parser.parse(dir)), [['corp_posts', 'modified', 'id=committed', 'title=modified'], ['tags', 'committed', 'id=committed']]);
         const typed = new Map([[path.join(dir, 'src', 'db', 'columns.ts'), helper.replace('length: 50', 'length: 120')]]);
         assert.deepEqual(statuses(parser.parse(dir, { overrides: typed })), [['corp_posts', 'unsaved', 'id=committed', 'title=unsaved'], ['tags', 'committed', 'id=committed']]);
+    });
+
+    it('a table whose extra config comes from a helper (of another file, or of the file) that changed: modified, as its keys and indexes change', () => {
+        const extras = "import { index, foreignKey } from 'drizzle-orm/pg-core';\nimport { orgs } from './orgs';\nexport const tenantScoped = (t: any) => [\n  index().on(t.orgId),\n];\n";
+        const schema = `${PG}import { tenantScoped } from './extras';\nexport { orgs } from './orgs';\nconst named = (t: any) => [index('named').on(t.id)];\nexport const projects = pgTable('projects', {\n  id: serial('id').primaryKey(),\n  orgId: integer('org_id').notNull(),\n}, (t) => [...tenantScoped(t)]);\nexport const tasks = pgTable('tasks', {\n  id: serial('id').primaryKey(),\n}, (t) => named(t));\n`;
+        const dir = project({ 'package.json': PACKAGE, 'src/db/orgs.ts': `${PG}export const orgs = pgTable('orgs', { id: serial('id').primaryKey() });\n`, 'src/db/extras.ts': extras, 'src/db/schema.ts': schema });
+        git(dir, 'init', '-q');
+        commitAll(dir);
+        const committed = [['orgs', 'committed', 'id=committed'], ['projects', 'committed', 'id=committed', 'org_id=committed'], ['tasks', 'committed', 'id=committed']];
+        assert.deepEqual(statuses(parser.parse(dir)), committed);
+        const withKey = extras.replace('  index().on(t.orgId),\n', "  index().on(t.orgId),\n  foreignKey({ columns: [t.orgId], foreignColumns: [orgs.id] }).onDelete('cascade'),\n");
+        fs.writeFileSync(path.join(dir, 'src', 'db', 'extras.ts'), withKey);
+        const result = parser.parse(dir);
+        assert.deepEqual(statuses(result), [committed[0], ['projects', 'modified', 'id=committed', 'org_id=committed'], committed[2]]);
+        assert.deepEqual(result.tables[1].relations, [{ foreignKey: 'org_id', references: 'id', on: 'orgs', type: 'many-to-one' }]);
+        const typed = new Map([[path.join(dir, 'src', 'db', 'extras.ts'), extras]]);
+        assert.deepEqual(statuses(parser.parse(dir, { overrides: typed }))[1], ['projects', 'unsaved', 'id=committed', 'org_id=committed'], 'an unsaved helper');
+        commitAll(dir);
+        fs.writeFileSync(path.join(dir, 'src', 'db', 'schema.ts'), schema.replace("index('named')", "index('renamed')"));
+        assert.deepEqual(statuses(parser.parse(dir)), [committed[0], committed[1], ['tasks', 'modified', 'id=committed']], 'a helper of the same file');
     });
 });
 

@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
 const { createStatusReader, tableStatus, changedStatus } = require('./git');
-const { scanModule, blockReturns, blockDeclarations, hasNestedReturn, createLineLocator, cook } = require('./ts-utils');
+const { scanModule, blockReturns, blockDeclarations, blockChanges, hasNestedReturn, createLineLocator, cook } = require('./ts-utils');
 
 // Packages of a project that uses Drizzle ORM
 const PACKAGES = ['drizzle-orm', 'drizzle-kit'];
@@ -72,6 +72,9 @@ const DEFAULT_SCHEMAS = new Map([['pg', 'public']]);
 const DETAIL_KEYS = ['length', 'precision', 'scale', 'unsigned', 'default', 'defaultRaw', 'onUpdateCurrent', 'values', 'unique', 'autoIncrement', 'nativeType'];
 // Depth of the helpers inlined, of the aliases followed and of the values computed
 const MAX_DEPTH = 32;
+// The keys and indexes an extra config may give, its spreads read (a helper that spreads another
+// one twice, and so on, gives twice as many at each level)
+const MAX_EXTRA_ITEMS = 1000;
 // Files read at most for one schema (imports followed)
 const MAX_FILES = 2000;
 
@@ -550,6 +553,10 @@ function expandSchemaPath(basePath, entry) {
         if (segment === '**') {
             if (index + 1 < rest.length) {
                 walk(dir, index + 1);
+            } else {
+                // A final `**` matches the folder and each of its sub-folders, whose files
+                // drizzle-kit reads (and the files in them, the same ones)
+                matches.push(dir);
             }
             for (const item of entries) {
                 if (item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules') {
@@ -572,7 +579,9 @@ function expandSchemaPath(basePath, entry) {
         }
     };
     walk(path.resolve(base), 0);
-    return { matches: [...new Set(matches)].sort(), base: path.resolve(base), recursive: rest.length > 1, pattern: rest.length > 1 ? rest.join('/') : null };
+    // A glob of one segment watches the files of its folder, `**` the files of its sub-folders too
+    const recursive = rest.length > 1 || rest[0] === '**';
+    return { matches: [...new Set(matches)].sort(), base: path.resolve(base), recursive, pattern: rest.length > 1 ? rest.join('/') : null };
 }
 
 // The schema files of matched paths, as drizzle-kit lists them: a file, or the files directly in a
@@ -1083,37 +1092,123 @@ function createProgram(basePath, overrides, resolver) {
         const returns = blockReturns(node.body);
         return returns.length === 1 && !hasNestedReturn(node.body) ? returns[0] : null;
     };
+    // A local changed by the statements of its block before the return (`name = 'b'`, `cols.b =
+    // text('b')`, `list.push(index().on(t.b))`, `Object.assign(cols, more)`): its value at the
+    // return, as an expression ({ ...cols, b: text('b') }, [...list, index().on(t.b)]), or null
+    // when it cannot be read. Made once per local.
+    const changedValue = (local, entry) => {
+        if (entry.node !== undefined) {
+            return entry.node;
+        }
+        let node = entry.unreadable ? null : local.init;
+        for (const change of entry.unreadable ? [] : entry.changes) {
+            if (change.type === 'assign') {
+                node = change.value;
+                continue;
+            }
+            const isObject = change.type === 'property' || change.type === 'merge';
+            if (!node || (node.type === (isObject ? 'Array' : 'Object'))) {
+                // A property of an array, an item of an object, or of nothing
+                node = null;
+                break;
+            }
+            const literal = node.type === (isObject ? 'Object' : 'Array');
+            const range = { start: Math.min(node.start, change.start), end: Math.max(node.end, change.end) };
+            if (isObject) {
+                const before = literal ? node.properties : [{ kind: 'spread', value: node, start: node.start, end: node.end }];
+                const added = change.type === 'property' ? [{ kind: 'init', key: change.key, computed: false, value: change.value, start: change.start, end: change.end }]
+                    : change.sources.map(source => ({ kind: 'spread', value: source, start: source.start, end: source.end }));
+                node = { type: 'Object', properties: [...before, ...added], ...range };
+            } else {
+                const before = literal ? node.elements : [{ type: 'Spread', argument: node, start: node.start, end: node.end }];
+                node = { type: 'Array', elements: change.type === 'push' ? [...before, ...change.items] : [...change.items, ...before], ...range };
+            }
+        }
+        entry.node = node;
+        return node;
+    };
     // Binds into `env` the local variables and functions of the block of a function value (`const
-    // col = (n) => text(n)` before its `return`), which resolve in that same environment; the names
-    // of a destructuring, or of a declaration without a value, are locals that cannot be read.
-    // Returns env.
-    const bindLocals = (value, env) => {
+    // col = (n) => text(n)` before its `return`), which resolve in that same environment, with the
+    // changes of their block; the names of a destructuring, of a declaration without a value, or of
+    // a local changed in a way that cannot be read, are locals that cannot be read. params: the
+    // parameters bound in env are changed too (`cols.extra = text()` on an argument): their argument
+    // is then bound under a name of its own. Returns env.
+    const bindLocals = (value, env, params = false) => {
         if (value.node.body && value.node.body.type === 'Block') {
+            const names = value.node.params.filter(param => param.name).map(param => param.name);
+            const changes = blockChanges(value.node.body, names);
+            for (const name of params ? names : []) {
+                const entry = changes.get(name);
+                if (entry && env.has(name)) {
+                    const argument = `\0${name}`;
+                    const first = entry.changes && entry.changes[0];
+                    env.set(argument, env.get(name));
+                    const node = changedValue({ name, init: { type: 'Identifier', name: argument, start: first ? first.start : 0, end: first ? first.start : 0 } }, entry);
+                    env.set(name, node ? { module: value.module, node, env } : { kind: 'local', name });
+                }
+            }
             for (const local of blockDeclarations(value.node.body)) {
                 if (!env.has(local.name)) {
-                    env.set(local.name, local.init ? { module: value.module, node: local.init, env } : { kind: 'local', name: local.name });
+                    const node = changes.has(local.name) ? changedValue(local, changes.get(local.name)) : local.init;
+                    env.set(local.name, node ? { module: value.module, node, env } : { kind: 'local', name: local.name });
                 }
             }
         }
         return env;
+    };
+    // Whether an object value has the property `key`, as a default value of a destructuring sees
+    // it: true, false (a property set to undefined is missing too), or null when it cannot be known
+    // (not an object literal, a spread or a key that cannot be read)
+    const hasProperty = (object, key, depth = 0) => {
+        if (!object || object.kind !== 'node' || object.node.type !== 'Object' || depth > MAX_DEPTH) {
+            return null;
+        }
+        const properties = object.node.properties;
+        for (let i = properties.length - 1; i >= 0; i--) {
+            const property = properties[i];
+            const ref = property.value ? { module: object.module, node: property.value, env: object.env } : null;
+            if (property.computed || property.kind === 'unknown') {
+                return null;
+            }
+            if (property.kind === 'spread') {
+                const found = hasProperty(resolve(ref, depth + 1), key, depth + 1);
+                if (found !== false) {
+                    return found;
+                }
+            } else if (property.key === key) {
+                const item = property.kind === 'init' ? constant(ref, depth + 1) : null;
+                return !(item && item.value === undefined);
+            }
+        }
+        return false;
     };
     // The environment of a call of a function value: its parameters bound to the arguments, and
     // the locals of its block
     const bind = (value, args) => {
         const env = new Map();
         value.node.params.forEach((param, i) => {
-            const arg = args[i];
-            if (param.name && arg && arg.node && arg.node.type !== 'Spread') {
+            let arg = args[i] && args[i].node && args[i].node.type !== 'Spread' ? args[i] : null;
+            if (param.names && !arg && param.default) {
+                // ({ size = 1 } = {}) called without its argument
+                arg = { module: value.module, node: param.default, env };
+            }
+            if (param.name && arg) {
                 env.set(param.name, arg);
             } else if (param.name && param.default) {
                 env.set(param.name, { module: value.module, node: param.default, env: value.env });
             } else if (param.name) {
                 // A missing argument is undefined
                 env.set(param.name, { module: value.module, node: { type: 'Literal', value: undefined, start: 0, end: 0 }, env: null });
-            } else if (param.names && arg && arg.node && arg.node.type !== 'Spread') {
-                // A destructured parameter ({ name, length }): the properties of the argument
-                for (const { key, local } of param.names) {
-                    env.set(local, { module: arg.module, node: { type: 'Member', object: arg.node, property: key, start: arg.node.start, end: arg.node.end }, env: arg.env });
+            } else if (param.names && arg) {
+                // A destructured parameter ({ name, length = 64 }): the properties of the argument,
+                // or their default value when the argument has no such property
+                const object = param.names.some(name => name.default) ? resolve(arg) : null;
+                for (const { key, local, default: fallback } of param.names) {
+                    if (fallback && hasProperty(object, key) === false) {
+                        env.set(local, { module: value.module, node: fallback, env });
+                    } else {
+                        env.set(local, { module: arg.module, node: { type: 'Member', object: arg.node, property: key, start: arg.node.start, end: arg.node.end }, env: arg.env });
+                    }
                 }
             } else if (param.names || param.rest) {
                 // Without its argument, or a rest parameter: names that cannot be read
@@ -1122,7 +1217,7 @@ function createProgram(basePath, overrides, resolver) {
                 }
             }
         });
-        bindLocals(value, env);
+        bindLocals(value, env, true);
         // The free names of a nested function still resolve where it is declared
         if (value.env) {
             for (const [name, bound] of value.env) {
@@ -1368,7 +1463,8 @@ module.exports.parse = function (basePath, options = {}) {
         const { fn, args } = call;
         // nameSources: the code outside of the declaration that names the table (the prefix of a
         // table creator, the pgSchema() of its schema, a wrapper, a constant), for its git status
-        const model = { decl, module, dialect: fn.dialect, columns: [], indexes: [], primaryKeys: [], uniques: [], foreignKeys: [], nameSources: [], valid: true };
+        // extraSources: the code outside of the declaration that makes its extra config (a helper)
+        const model = { decl, module, dialect: fn.dialect, columns: [], indexes: [], primaryKeys: [], uniques: [], foreignKeys: [], nameSources: [], extraSources: [], valid: true };
         const addNameSource = (source) => {
             if (source && source.module && !(source.module === module && source.start >= decl.start && source.end <= decl.end)) {
                 model.nameSources.push({ module: source.module, start: source.start, end: source.end });
@@ -1864,8 +1960,9 @@ module.exports.parse = function (basePath, options = {}) {
 
     // The value of an expression, the calls of the functions of the project inlined (a helper that
     // returns the indexes of a table): their returned expression, with their parameters bound to
-    // the arguments; { kind: 'opaque' } for a function of the project that cannot be read
-    const evaluate = (ref, depth = 0) => {
+    // the arguments; { kind: 'opaque' } for a function of the project that cannot be read. track:
+    // called with each function inlined.
+    const evaluate = (ref, depth = 0, track = null) => {
         const value = ref.kind ? ref : resolve(ref, depth + 1);
         if (depth > MAX_DEPTH || value.kind !== 'node' || value.node.type !== 'Call') {
             return value;
@@ -1874,12 +1971,15 @@ module.exports.parse = function (basePath, options = {}) {
         if (callee.kind !== 'node' || (callee.node.type !== 'Arrow' && callee.node.type !== 'Function')) {
             return value;
         }
+        if (track) {
+            track(callee);
+        }
         const body = functionBody(callee.node);
         if (!body) {
             return { kind: 'opaque' };
         }
         const args = value.node.args.map(arg => ({ module: value.module, node: arg, env: value.env }));
-        return evaluate({ module: callee.module, node: body, env: bind(callee, args) }, depth + 1);
+        return evaluate({ module: callee.module, node: body, env: bind(callee, args) }, depth + 1, track);
     };
 
     // The extra config of a table (third argument): primary keys, unique constraints and indexes,
@@ -1888,8 +1988,29 @@ module.exports.parse = function (basePath, options = {}) {
     // the spreads and the helpers of the project are followed. Policies and checks are skipped; an
     // item that cannot be read is told.
     const readExtras = (ref, model) => {
-        const told = (itemRef, text) => warnings.push(`${at(itemRef.module, itemRef.node.start)}: ${model.table}: ${text}`);
-        const fn = evaluate(ref);
+        // Each warning once (a helper spread twice that cannot be read is told once)
+        const toldOnce = new Set();
+        const told = (itemRef, text) => {
+            const warning = `${at(itemRef.module, itemRef.node.start)}: ${model.table}: ${text}`;
+            if (!toldOnce.has(warning)) {
+                toldOnce.add(warning);
+                warnings.push(warning);
+            }
+        };
+        // The code outside of the declaration that the extra config is made of (a helper of
+        // another file, its locals), for the git status of the table
+        const track = (value) => {
+            if (value && value.kind === 'node' && value.module && value.node.end > value.node.start
+                && !(value.module === model.module && value.node.start >= model.decl.start && value.node.end <= model.decl.end)) {
+                model.extraSources.push({ module: value.module, start: value.node.start, end: value.node.end });
+            }
+        };
+        const evaluated = (itemRef) => {
+            const value = evaluate(itemRef, 0, track);
+            track(value);
+            return value;
+        };
+        const fn = evaluated(ref);
         const env = new Map();
         if (fn.kind === 'node' && (fn.node.type === 'Arrow' || fn.node.type === 'Function')) {
             const param = fn.node.params[0];
@@ -1906,24 +2027,45 @@ module.exports.parse = function (basePath, options = {}) {
             }
         }
         const body = fn.kind === 'node' ? functionBody(fn.node) : null;
-        const list = body ? evaluate({ module: fn.module, node: body, env }) : null;
+        const list = body ? evaluated({ module: fn.module, node: body, env }) : null;
         if (!list || list.kind !== 'node' || (list.node.type !== 'Array' && list.node.type !== 'Object')) {
             told(ref, 'the extra config cannot be read, its keys and indexes are skipped.');
             return;
         }
+        // The arrays and objects being expanded: a spread of one of them (a helper that spreads
+        // itself, `const l = [...l]`) never ends when run, it is told instead of being read again
+        const expanding = new Set();
+        let count = 0;
+        // The spread of an array or object `spread` (written at itemRef) read by `expand`, or the
+        // reason it is not: unread 'self', 'many' (more items than an extra config holds), or true
+        const expandSpread = (spread, itemRef, type, depth, expand) => {
+            if (spread.kind === 'node' && expanding.has(spread.node)) {
+                return [{ ...itemRef, unread: 'self' }];
+            }
+            if (spread.kind !== 'node' || spread.node.type !== type || depth >= MAX_DEPTH) {
+                return [{ ...itemRef, unread: true }];
+            }
+            if (count > MAX_EXTRA_ITEMS) {
+                return [{ ...itemRef, unread: 'many' }];
+            }
+            expanding.add(spread.node);
+            const items = expand(spread, depth + 1);
+            expanding.delete(spread.node);
+            return items;
+        };
         // The items of an array, its spreads read (`unread`: a spread that cannot be read), in the
         // order of the code
         const arrayItems = (array, depth) => {
             const items = [];
             for (const element of array.node.elements) {
                 const itemRef = { module: array.module, node: element.type === 'Spread' ? element.argument : element, env: array.env };
-                const spread = element.type === 'Spread' ? evaluate(itemRef) : null;
-                if (!spread) {
-                    items.push(itemRef);
-                } else if (spread.kind === 'node' && spread.node.type === 'Array' && depth < MAX_DEPTH) {
-                    items.push(...arrayItems(spread, depth + 1));
+                if (element.type === 'Spread') {
+                    for (const item of expandSpread(evaluated(itemRef), itemRef, 'Array', depth, arrayItems)) {
+                        items.push(item);
+                    }
                 } else {
-                    items.push({ ...itemRef, unread: true });
+                    count++;
+                    items.push(itemRef);
                 }
             }
             return items;
@@ -1933,39 +2075,50 @@ module.exports.parse = function (basePath, options = {}) {
             const values = [];
             for (const property of object.node.properties) {
                 const itemRef = property.value ? { module: object.module, node: property.value, env: object.env } : null;
-                const spread = itemRef && property.kind === 'spread' ? evaluate(itemRef) : null;
                 if (itemRef && property.kind === 'init') {
+                    count++;
                     values.push(itemRef);
-                } else if (spread && spread.kind === 'node' && spread.node.type === 'Object' && depth < MAX_DEPTH) {
-                    values.push(...objectValues(spread, depth + 1));
-                } else if (spread) {
-                    values.push({ ...itemRef, unread: true });
+                } else if (itemRef && property.kind === 'spread') {
+                    for (const value of expandSpread(evaluated(itemRef), itemRef, 'Object', depth, objectValues)) {
+                        values.push(value);
+                    }
                 }
             }
             return values;
         };
+        const listItems = (value) => {
+            expanding.add(value.node);
+            const items = value.node.type === 'Array' ? arrayItems(value, 0) : objectValues(value, 0);
+            expanding.delete(value.node);
+            return items;
+        };
         // An item, unless it is a spread that cannot be read; nested: in a nested array
         const readItem = (itemRef, nested) => {
-            if (itemRef.unread) {
-                told(itemRef, `...${sourceText(itemRef.module, itemRef.node)} cannot be read, its keys and indexes are skipped.`);
+            if (itemRef.unread === 'many') {
+                told(ref, `the extra config gives more than ${MAX_EXTRA_ITEMS} keys and indexes, the others are skipped.`);
                 return;
             }
-            const item = evaluate(itemRef);
+            if (itemRef.unread) {
+                const spread = `...${sourceText(itemRef.module, itemRef.node)}`;
+                told(itemRef, itemRef.unread === 'self' ? `${spread} spreads itself without end, its keys and indexes are skipped.` : `${spread} cannot be read, its keys and indexes are skipped.`);
+                return;
+            }
+            const item = evaluated(itemRef);
             if (list.node.type === 'Array' && item.kind === 'node' && item.node.type === 'Array') {
                 // A nested array, flattened once by drizzle-orm
                 if (nested) {
                     told(itemRef, 'an array nested twice in the extra config is ignored by drizzle-kit, skipped.');
                 } else {
-                    arrayItems(item, 0).forEach(innerRef => readItem(innerRef, true));
+                    listItems(item).forEach(innerRef => readItem(innerRef, true));
                 }
                 return;
             }
-            readExtra(item, itemRef, model);
+            readExtra(item, itemRef, model, evaluated);
         };
-        (list.node.type === 'Array' ? arrayItems(list, 0) : objectValues(list, 0)).forEach(itemRef => readItem(itemRef, false));
+        listItems(list).forEach(itemRef => readItem(itemRef, false));
     };
-    // An item of the extra config (`value`, written at itemRef)
-    const readExtra = (value, itemRef, model) => {
+    // An item of the extra config (`value`, written at itemRef), its helpers inlined by `evaluated`
+    const readExtra = (value, itemRef, model, evaluated) => {
         const location = at(itemRef.module, itemRef.node.start);
         const notRead = () => warnings.push(`${location}: ${model.table}: ${sourceText(itemRef.module, itemRef.node)} in the extra config cannot be read, skipped.`);
         if (value.kind === 'node' && value.node.type === 'Object') {
@@ -1998,7 +2151,7 @@ module.exports.parse = function (basePath, options = {}) {
             }
             const callee = resolve(refOf(node.callee));
             if (callee.kind === 'node' && (callee.node.type === 'Arrow' || callee.node.type === 'Function')) {
-                current = evaluate(refOf(node));
+                current = evaluated(refOf(node));
             } else {
                 root = { callee, args: node.args.map(refOf) };
             }
@@ -2307,8 +2460,14 @@ module.exports.parse = function (basePath, options = {}) {
 
         table.source = { file: model.module.rel, line: model.module.lineAt(model.decl.nameStart) };
         const declarationStatus = reader.statusOf(model.module.file)(first, last);
-        // A changed name (the prefix of its table creator changed in another file) changes the table
-        const git = tableStatus(declarationStatus === 'modified' && newDeclaration ? 'untracked' : declarationStatus, [...table.columns.map(c => c.git), ...model.nameSources.map(sourceStatus)]);
+        // A changed name (the prefix of its table creator changed in another file), or a changed
+        // helper of its extra config (a key, an index), changes the table
+        const sourceKeys = new Set();
+        const outside = [...model.nameSources, ...model.extraSources].filter(source => {
+            const key = `${source.module.file}\0${source.start}\0${source.end}`;
+            return !sourceKeys.has(key) && sourceKeys.add(key);
+        });
+        const git = tableStatus(declarationStatus === 'modified' && newDeclaration ? 'untracked' : declarationStatus, [...table.columns.map(c => c.git), ...outside.map(sourceStatus)]);
         if (git) {
             table.git = git;
         }
