@@ -1,4 +1,5 @@
-# Lint, unit tests, integration test in VS Code, then the .vsix as an artifact.
+# Lint, unit tests, integration test in VS Code, then the .vsix as an artifact. The integration
+# test also runs on the oldest VS Code allowed by engines.vscode, in a job of its own.
 # Also called by release.yml, which publishes the .vsix built here.
 
 name: CI
@@ -67,3 +68,32 @@ jobs:
           archive: false
           overwrite: true
           if-no-files-found: error
+
+  # The webview runs in the Chromium of the user's VS Code: check that the bundled Mermaid still
+  # draws there on the oldest version allowed by engines.vscode (a Mermaid update may need a newer
+  # Chromium, then engines.vscode is raised or the incompatibility fixed)
+  oldest-vscode:
+    name: Integration test on the oldest supported VS Code
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # "^1.96.0" -> 1.96.0, read by .vscode-test.mjs
+      - name: Oldest version of engines.vscode
+        run: |
+          version=$(node -p "require('./package.json').engines.vscode.match(/\d+\.\d+\.\d+/)[0]")
+          echo "VSCODE_TEST_VERSION=$version" >> "$GITHUB_ENV"
+          echo "::notice::Integration test on VS Code $version"
+
+      - name: Integration test in VS Code ${{ env.VSCODE_TEST_VERSION }}
+        run: xvfb-run -a npm test --ignore-scripts

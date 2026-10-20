@@ -123,3 +123,5 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - **Automatic refresh**: the open diagram is drawn again when a migration or an entity is saved, created or deleted, and when `DrawMeDatabase.frameworkPath` changes. It does not bring the panel to the front, and keeps the previous diagram while the code cannot be read. The new `DrawMeDatabase.autoRefresh` setting turns it off
 - The JSON output has the `source` (file and line) of each table, described with the rest of the format in `docs/pivot-format.md`
 
+### Changed
+- VS Code 1.96 is still the oldest supported version (`engines.vscode` stays `^1.96.0`): CI now runs the integration test, which draws the diagram in the real webview with the ELK and Dagre layouts, on VS Code 1.96.0 as well as on the latest version. Locally: `VSCODE_TEST_VERSION=1.96.0 npm test`
