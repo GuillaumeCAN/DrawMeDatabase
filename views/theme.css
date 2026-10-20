@@ -1252,16 +1252,20 @@ pre {
     color: var(--vscode-descriptionForeground);
 }
 
-/* Pro features that are not available: greyed, with their badge, still clickable */
+/* Pro features that are not available, and tools that do not apply to the project: greyed, with
+   their badge or their reason, still clickable */
 .panel-action.missing .panel-action-icon,
 .panel-action.missing .panel-action-text,
 .panel-action.locked .panel-action-icon,
-.panel-action.locked .panel-action-text {
+.panel-action.locked .panel-action-text,
+.panel-action.unavailable .panel-action-icon,
+.panel-action.unavailable .panel-action-text {
     opacity: 0.5;
 }
 
 .panel-action.missing .panel-action-icon,
-.panel-action.locked .panel-action-icon {
+.panel-action.locked .panel-action-icon,
+.panel-action.unavailable .panel-action-icon {
     color: var(--vscode-descriptionForeground);
 }
 

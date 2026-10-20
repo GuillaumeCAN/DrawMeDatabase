@@ -1,0 +1,591 @@
+{
+  "tables": [
+    {
+      "table": "teams",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigserial",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 8
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 9
+          },
+          "length": 100
+        },
+        {
+          "name": "slug",
+          "type": "varchar",
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 10
+          },
+          "length": 100,
+          "unique": true
+        },
+        {
+          "name": "owner_id",
+          "type": "integer",
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "parent_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 12
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "src/db/columns.helpers.ts",
+            "line": 5
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/db/columns.helpers.ts",
+            "line": 6
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "owner_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "parent_id",
+          "references": "id",
+          "on": "teams",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/teams.ts",
+        "line": 7
+      }
+    },
+    {
+      "table": "memberships",
+      "columns": [
+        {
+          "name": "team_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 21
+          },
+          "default": "member"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "team_id",
+          "references": "id",
+          "on": "teams",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "restrict"
+        },
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/teams.ts",
+        "line": 18
+      },
+      "indexes": [
+        {
+          "columns": [
+            "team_id",
+            "role"
+          ],
+          "type": "unique",
+          "name": "memberships_role_unique"
+        }
+      ]
+    },
+    {
+      "table": "favorites",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 31
+          }
+        },
+        {
+          "name": "team_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/teams.ts",
+            "line": 32
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "team_id",
+          "references": "id",
+          "on": "teams",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/teams.ts",
+        "line": 30
+      }
+    },
+    {
+      "table": "acme_tenant",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/tenants.ts",
+            "line": 7
+          }
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "src/db/schema/tenants.ts",
+            "line": 8
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/db/schema/tenants.ts",
+        "line": 6
+      }
+    },
+    {
+      "table": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 25
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "public_id",
+          "type": "uuid",
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 26
+          },
+          "defaultRaw": "gen_random_uuid()",
+          "unique": true
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 27
+          },
+          "length": 320
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 28
+          }
+        },
+        {
+          "name": "role",
+          "type": "role",
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 29
+          },
+          "default": "member",
+          "values": [
+            "member",
+            "admin",
+            "owner"
+          ]
+        },
+        {
+          "name": "plan_name",
+          "type": "plan",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 30
+          },
+          "default": "pro",
+          "values": [
+            "free",
+            "pro"
+          ]
+        },
+        {
+          "name": "balance",
+          "type": "numeric",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 31
+          },
+          "precision": 12,
+          "scale": 2,
+          "default": "0.00"
+        },
+        {
+          "name": "score",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 32
+          },
+          "default": -1
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 33
+          },
+          "default": true
+        },
+        {
+          "name": "tags",
+          "type": "text[]",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 34
+          },
+          "defaultRaw": "'{}'::text[]"
+        },
+        {
+          "name": "matrix",
+          "type": "integer[][]",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 35
+          }
+        },
+        {
+          "name": "settings",
+          "type": "jsonb",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 36
+          },
+          "default": "{\"theme\":\"light\"}"
+        },
+        {
+          "name": "team_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 37
+          }
+        },
+        {
+          "name": "invited_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 38
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "src/db/columns.helpers.ts",
+            "line": 5
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/db/columns.helpers.ts",
+            "line": 6
+          }
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/db/columns.helpers.ts",
+            "line": 10
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "team_id",
+          "references": "id",
+          "on": "teams",
+          "type": "many-to-one",
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        },
+        {
+          "foreignKey": "invited_by",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/users.ts",
+        "line": 22
+      },
+      "indexes": [
+        {
+          "columns": [
+            "lower(email)"
+          ],
+          "type": "unique",
+          "name": "users_email_idx"
+        },
+        {
+          "columns": [
+            "team_id",
+            "created_at"
+          ],
+          "type": "index"
+        }
+      ]
+    },
+    {
+      "table": "sessions",
+      "columns": [
+        {
+          "name": "token",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 51
+          },
+          "length": 64
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 53
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/users.ts",
+        "line": 50
+      },
+      "indexes": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "type": "index",
+          "name": "sessions_user_idx"
+        }
+      ]
+    },
+    {
+      "table": "auth.accounts",
+      "columns": [
+        {
+          "name": "provider",
+          "type": "auth.provider",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 60
+          },
+          "values": [
+            "github",
+            "google"
+          ]
+        },
+        {
+          "name": "provider_account_id",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 61
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 62
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/users.ts",
+        "line": 59
+      }
+    },
+    {
+      "table": "archive",
+      "columns": [
+        {
+          "name": "id",
+          "type": "serial",
+          "primary": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 72
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "draft_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/db/schema/users.ts",
+            "line": 73
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "draft_id",
+          "references": "id",
+          "on": "drafts",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/db/schema/users.ts",
+        "line": 71
+      }
+    }
+  ],
+  "warnings": [
+    "src/db/schema/teams.ts:40: view activeTeams skipped: views are not drawn.",
+    "src/db/schema/users.ts:66: table drafts is not exported: drizzle-kit does not create it, skipped."
+  ]
+}

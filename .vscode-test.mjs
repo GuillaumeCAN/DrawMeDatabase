@@ -8,15 +8,44 @@ const useX11 = process.platform === 'linux' && Boolean(process.env.DISPLAY);
 // oldest version allowed by engines.vscode)
 const version = process.env.VSCODE_TEST_VERSION || 'stable';
 
-export default defineConfig({
+const common = {
 	version,
-	files: 'test/integration/**/*.test.js',
-	// Workspace with a tiny Laravel app in a subfolder (see its .vscode/settings.json)
-	workspaceFolder: 'test/fixtures/integration/workspace',
 	launchArgs: ['--disable-extensions', ...(useX11 ? ['--ozone-platform=x11'] : [])],
 	env: useX11 ? { WAYLAND_DISPLAY: undefined } : {},
 	mocha: {
 		ui: 'tdd',
 		timeout: 20000,
 	},
-});
+};
+
+// One VS Code per workspace (`vscode-test --label prisma` runs one of them)
+export default defineConfig([
+	{
+		...common,
+		label: 'laravel',
+		files: 'test/integration/extension.test.js',
+		// Workspace with a tiny Laravel app in a subfolder (see its .vscode/settings.json)
+		workspaceFolder: 'test/fixtures/integration/workspace',
+	},
+	{
+		...common,
+		label: 'prisma',
+		files: 'test/integration/prisma.test.js',
+		// Workspace with a Prisma project at its root, its schema in several files
+		workspaceFolder: 'test/fixtures/integration/prisma-workspace',
+	},
+	{
+		...common,
+		label: 'drizzle',
+		files: 'test/integration/drizzle.test.js',
+		// Workspace with a Drizzle project at its root, its schema files set by drizzle.config.ts
+		workspaceFolder: 'test/fixtures/integration/drizzle-workspace',
+	},
+	{
+		...common,
+		label: 'sql',
+		files: 'test/integration/sql.test.js',
+		// Workspace with the SQL migrations of a Supabase project at its root
+		workspaceFolder: 'test/fixtures/integration/sql-workspace',
+	},
+]);

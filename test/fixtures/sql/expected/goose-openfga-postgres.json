@@ -1,0 +1,79 @@
+{
+  "tables": [
+    {
+      "table": "tuple",
+      "columns": [
+        {"name":"store","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":3}},
+        {"name":"object_type","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":4}},
+        {"name":"object_id","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":5}},
+        {"name":"relation","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":6}},
+        {"name":"_user","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":7}},
+        {"name":"user_type","type":"text","source":{"file":"001_initialize_schema.sql","line":8}},
+        {"name":"ulid","type":"text","source":{"file":"001_initialize_schema.sql","line":9},"unique":true},
+        {"name":"inserted_at","type":"timestamptz","source":{"file":"001_initialize_schema.sql","line":10}},
+        {"name":"condition_name","type":"text","nullable":true,"source":{"file":"005_add_conditions_to_tuples.sql","line":2}},
+        {"name":"condition_context","type":"bytea","nullable":true,"source":{"file":"005_add_conditions_to_tuples.sql","line":2}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":2},
+      "indexes": [
+        {"columns":["store","object_type","object_id","relation","_user"],"type":"index","name":"idx_tuple_partial_user"},
+        {"columns":["store","object_type","object_id","relation","_user"],"type":"index","name":"idx_tuple_partial_userset"},
+        {"columns":["store","_user","relation","object_type","object_id"],"type":"index","name":"idx_user_lookup"}
+      ]
+    },
+    {
+      "table": "authorization_model",
+      "columns": [
+        {"name":"store","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":19}},
+        {"name":"authorization_model_id","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":20}},
+        {"name":"type","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":21}},
+        {"name":"type_definition","type":"bytea","nullable":true,"source":{"file":"001_initialize_schema.sql","line":22}},
+        {"name":"schema_version","type":"text","source":{"file":"002_add_authorization_model_version.sql","line":2},"default":"1.0"},
+        {"name":"serialized_protobuf","type":"bytea","nullable":true,"source":{"file":"004_add_authorization_model_serialized_protobuf.sql","line":2}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":18}
+    },
+    {
+      "table": "store",
+      "columns": [
+        {"name":"id","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":27}},
+        {"name":"name","type":"text","source":{"file":"001_initialize_schema.sql","line":28}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"001_initialize_schema.sql","line":29}},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"001_initialize_schema.sql","line":30}},
+        {"name":"deleted_at","type":"timestamptz","nullable":true,"source":{"file":"001_initialize_schema.sql","line":31}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":26}
+    },
+    {
+      "table": "assertion",
+      "columns": [
+        {"name":"store","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":35}},
+        {"name":"authorization_model_id","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":36}},
+        {"name":"assertions","type":"bytea","nullable":true,"source":{"file":"001_initialize_schema.sql","line":37}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":34}
+    },
+    {
+      "table": "changelog",
+      "columns": [
+        {"name":"store","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":42}},
+        {"name":"object_type","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":43}},
+        {"name":"object_id","type":"text","source":{"file":"001_initialize_schema.sql","line":44}},
+        {"name":"relation","type":"text","source":{"file":"001_initialize_schema.sql","line":45}},
+        {"name":"_user","type":"text","source":{"file":"001_initialize_schema.sql","line":46}},
+        {"name":"operation","type":"integer","source":{"file":"001_initialize_schema.sql","line":47}},
+        {"name":"ulid","type":"text","primary":true,"source":{"file":"001_initialize_schema.sql","line":48}},
+        {"name":"inserted_at","type":"timestamptz","source":{"file":"001_initialize_schema.sql","line":49}},
+        {"name":"condition_name","type":"text","nullable":true,"source":{"file":"005_add_conditions_to_tuples.sql","line":3}},
+        {"name":"condition_context","type":"bytea","nullable":true,"source":{"file":"005_add_conditions_to_tuples.sql","line":3}}
+      ],
+      "relations": [],
+      "source": {"file":"001_initialize_schema.sql","line":41}
+    }
+  ],
+  "warnings": []
+}

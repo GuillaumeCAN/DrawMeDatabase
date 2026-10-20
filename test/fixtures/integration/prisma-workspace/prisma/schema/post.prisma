@@ -1,0 +1,15 @@
+model Post {
+  id       Int    @id @default(autoincrement())
+  title    String @db.VarChar(200)
+  authorId Int    @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  tags     Tag[]
+
+  @@map("posts")
+}
+
+model Tag {
+  id    Int    @id
+  name  String @unique
+  posts Post[]
+}

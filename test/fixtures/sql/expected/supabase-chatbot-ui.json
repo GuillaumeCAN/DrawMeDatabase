@@ -1,0 +1,618 @@
+{
+  "tables": [
+    {
+      "table": "profiles",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":10},"unique":true},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":13},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":14}},
+        {"name":"bio","type":"text","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":17}},
+        {"name":"has_onboarded","type":"boolean","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":18},"default":false},
+        {"name":"image_url","type":"text","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":19}},
+        {"name":"image_path","type":"text","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":20}},
+        {"name":"profile_context","type":"text","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":21}},
+        {"name":"display_name","type":"text","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":22}},
+        {"name":"use_azure_openai","type":"boolean","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":23}},
+        {"name":"username","type":"text","source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":24},"unique":true},
+        {"name":"anthropic_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":27}},
+        {"name":"azure_openai_35_turbo_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":28}},
+        {"name":"azure_openai_45_turbo_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":29}},
+        {"name":"azure_openai_45_vision_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":30}},
+        {"name":"azure_openai_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":31}},
+        {"name":"azure_openai_endpoint","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":32}},
+        {"name":"google_gemini_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":33}},
+        {"name":"mistral_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":34}},
+        {"name":"openai_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":35}},
+        {"name":"openai_organization_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":36}},
+        {"name":"perplexity_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240108234541_add_profiles.sql","line":37}},
+        {"name":"openrouter_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240115135033_add_openrouter.sql","line":2}},
+        {"name":"azure_openai_embeddings_id","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240118224049_add_azure_embeddings.sql","line":2}},
+        {"name":"groq_api_key","type":"text","nullable":true,"source":{"file":"supabase/migrations/20240302004845_add_groq.sql","line":1}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"one-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234541_add_profiles.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"idx_profiles_user_id"}
+      ]
+    },
+    {
+      "table": "workspaces",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":10}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":13},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":14}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":17},"default":"private"},
+        {"name":"default_context_length","type":"integer","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":20}},
+        {"name":"default_model","type":"text","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":21}},
+        {"name":"default_prompt","type":"text","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":22}},
+        {"name":"default_temperature","type":"real","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":23}},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":24}},
+        {"name":"embeddings_provider","type":"text","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":25}},
+        {"name":"include_profile_context","type":"boolean","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":26}},
+        {"name":"include_workspace_instructions","type":"boolean","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":27}},
+        {"name":"instructions","type":"text","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":28}},
+        {"name":"is_home","type":"boolean","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":29},"default":false},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":30}},
+        {"name":"image_path","type":"text","source":{"file":"supabase/migrations/20240129232644_add_workspace_images.sql","line":4},"default":""}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234542_add_workspaces.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"idx_workspaces_user_id"},
+        {"columns":["user_id"],"type":"unique","name":"idx_unique_home_workspace_per_user"}
+      ]
+    },
+    {
+      "table": "folders",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":10}},
+        {"name":"workspace_id","type":"uuid","source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":11}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":14},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":15}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":18}},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":19}},
+        {"name":"type","type":"text","source":{"file":"supabase/migrations/20240108234543_add_folders.sql","line":20}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234543_add_folders.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"folders_user_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"folders_workspace_id_idx"}
+      ]
+    },
+    {
+      "table": "files",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":10}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":13}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":16},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":17}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":20},"default":"private"},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":23}},
+        {"name":"file_path","type":"text","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":24}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":25}},
+        {"name":"size","type":"int","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":26}},
+        {"name":"tokens","type":"int","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":27}},
+        {"name":"type","type":"text","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":28}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234544_add_files.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"files_user_id_idx"}
+      ]
+    },
+    {
+      "table": "file_workspaces",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":126}},
+        {"name":"file_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":127}},
+        {"name":"workspace_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":128}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":133},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234544_add_files.sql","line":134}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"file_id","references":"id","on":"files","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234544_add_files.sql","line":124},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"file_workspaces_user_id_idx"},
+        {"columns":["file_id"],"type":"index","name":"file_workspaces_file_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"file_workspaces_workspace_id_idx"}
+      ]
+    },
+    {
+      "table": "file_items",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":5},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"file_id","type":"uuid","source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":8}},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":9}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":12},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":13}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":16},"default":"private"},
+        {"name":"content","type":"text","source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":19}},
+        {"name":"local_embedding","type":"vector","nullable":true,"source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":20}},
+        {"name":"openai_embedding","type":"vector","nullable":true,"source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":21}},
+        {"name":"tokens","type":"int","source":{"file":"supabase/migrations/20240108234545_add_file_items.sql","line":22}}
+      ],
+      "relations": [
+        {"foreignKey":"file_id","references":"id","on":"files","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234545_add_file_items.sql","line":3},
+      "indexes": [
+        {"columns":["file_id"],"type":"index","name":"file_items_file_id_idx"},
+        {"columns":["openai_embedding"],"type":"index","name":"file_items_embedding_idx"},
+        {"columns":["local_embedding"],"type":"index","name":"file_items_local_embedding_idx"}
+      ]
+    },
+    {
+      "table": "presets",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":10}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":13}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":16},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":17}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":20},"default":"private"},
+        {"name":"context_length","type":"int","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":23}},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":24}},
+        {"name":"embeddings_provider","type":"text","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":25}},
+        {"name":"include_profile_context","type":"boolean","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":26}},
+        {"name":"include_workspace_instructions","type":"boolean","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":27}},
+        {"name":"model","type":"text","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":28}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":29}},
+        {"name":"prompt","type":"text","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":30}},
+        {"name":"temperature","type":"real","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":31}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234546_add_presets.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"presets_user_id_idx"}
+      ]
+    },
+    {
+      "table": "preset_workspaces",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":65}},
+        {"name":"preset_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":66}},
+        {"name":"workspace_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":67}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":72},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234546_add_presets.sql","line":73}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"preset_id","references":"id","on":"presets","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234546_add_presets.sql","line":63},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"preset_workspaces_user_id_idx"},
+        {"columns":["preset_id"],"type":"index","name":"preset_workspaces_preset_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"preset_workspaces_workspace_id_idx"}
+      ]
+    },
+    {
+      "table": "assistants",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":10}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":13}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":16},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":17}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":20},"default":"private"},
+        {"name":"context_length","type":"int","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":23}},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":24}},
+        {"name":"embeddings_provider","type":"text","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":25}},
+        {"name":"include_profile_context","type":"boolean","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":26}},
+        {"name":"include_workspace_instructions","type":"boolean","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":27}},
+        {"name":"model","type":"text","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":28}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":29}},
+        {"name":"image_path","type":"text","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":30}},
+        {"name":"prompt","type":"text","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":31}},
+        {"name":"temperature","type":"real","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":32}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234547_add_assistants.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"assistants_user_id_idx"}
+      ]
+    },
+    {
+      "table": "assistant_workspaces",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":130}},
+        {"name":"assistant_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":131}},
+        {"name":"workspace_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":132}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":137},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234547_add_assistants.sql","line":138}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"assistant_id","references":"id","on":"assistants","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234547_add_assistants.sql","line":128},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"assistant_workspaces_user_id_idx"},
+        {"columns":["assistant_id"],"type":"index","name":"assistant_workspaces_assistant_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"assistant_workspaces_workspace_id_idx"}
+      ]
+    },
+    {
+      "table": "chats",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":10}},
+        {"name":"workspace_id","type":"uuid","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":11}},
+        {"name":"assistant_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":14}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":15}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":18},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":19}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":22},"default":"private"},
+        {"name":"context_length","type":"int","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":25}},
+        {"name":"embeddings_provider","type":"text","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":26}},
+        {"name":"include_profile_context","type":"boolean","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":27}},
+        {"name":"include_workspace_instructions","type":"boolean","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":28}},
+        {"name":"model","type":"text","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":29}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":30}},
+        {"name":"prompt","type":"text","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":31}},
+        {"name":"temperature","type":"real","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":32}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"assistant_id","references":"id","on":"assistants","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234548_add_chats.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"idx_chats_user_id"},
+        {"columns":["workspace_id"],"type":"index","name":"idx_chats_workspace_id"}
+      ]
+    },
+    {
+      "table": "chat_files",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":67}},
+        {"name":"chat_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":68}},
+        {"name":"file_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":69}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":74},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234548_add_chats.sql","line":75}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"chat_id","references":"id","on":"chats","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"file_id","references":"id","on":"files","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234548_add_chats.sql","line":65},
+      "indexes": [
+        {"columns":["chat_id"],"type":"index","name":"idx_chat_files_chat_id"}
+      ]
+    },
+    {
+      "table": "messages",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"chat_id","type":"uuid","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":10}},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":11}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":14},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":15}},
+        {"name":"content","type":"text","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":18}},
+        {"name":"image_paths","type":"text[]","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":19}},
+        {"name":"model","type":"text","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":20}},
+        {"name":"role","type":"text","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":21}},
+        {"name":"sequence_number","type":"int","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":22}},
+        {"name":"assistant_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240212063532_add_at_assistants.sql","line":1},"default":null}
+      ],
+      "relations": [
+        {"foreignKey":"chat_id","references":"id","on":"chats","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"assistant_id","references":"id","on":"assistants","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234549_add_messages.sql","line":5},
+      "indexes": [
+        {"columns":["chat_id"],"type":"index","name":"idx_messages_chat_id"}
+      ]
+    },
+    {
+      "table": "message_file_items",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":144}},
+        {"name":"message_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":145}},
+        {"name":"file_item_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":146}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":151},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234549_add_messages.sql","line":152}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"message_id","references":"id","on":"messages","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"file_item_id","references":"id","on":"file_items","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234549_add_messages.sql","line":142},
+      "indexes": [
+        {"columns":["message_id"],"type":"index","name":"idx_message_file_items_message_id"}
+      ]
+    },
+    {
+      "table": "prompts",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":10}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":13}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":16},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":17}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":20},"default":"private"},
+        {"name":"content","type":"text","source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":23}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":24}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234550_add_prompts.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"prompts_user_id_idx"}
+      ]
+    },
+    {
+      "table": "prompt_workspaces",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":58}},
+        {"name":"prompt_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":59}},
+        {"name":"workspace_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":60}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":65},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234550_add_prompts.sql","line":66}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"prompt_id","references":"id","on":"prompts","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234550_add_prompts.sql","line":56},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"prompt_workspaces_user_id_idx"},
+        {"columns":["prompt_id"],"type":"index","name":"prompt_workspaces_prompt_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"prompt_workspaces_workspace_id_idx"}
+      ]
+    },
+    {
+      "table": "collections",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":10}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":13}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":16},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":17}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":20},"default":"private"},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":23}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":24}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234551_add_collections.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"collections_user_id_idx"}
+      ]
+    },
+    {
+      "table": "collection_workspaces",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":58}},
+        {"name":"collection_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":59}},
+        {"name":"workspace_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":60}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":65},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":66}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"collection_id","references":"id","on":"collections","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234551_add_collections.sql","line":56},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"collection_workspaces_user_id_idx"},
+        {"columns":["collection_id"],"type":"index","name":"collection_workspaces_collection_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"collection_workspaces_workspace_id_idx"}
+      ]
+    },
+    {
+      "table": "collection_files",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":97}},
+        {"name":"collection_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":98}},
+        {"name":"file_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":99}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":104},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240108234551_add_collections.sql","line":105}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"collection_id","references":"id","on":"collections","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"file_id","references":"id","on":"files","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240108234551_add_collections.sql","line":95},
+      "indexes": [
+        {"columns":["collection_id"],"type":"index","name":"idx_collection_files_collection_id"},
+        {"columns":["file_id"],"type":"index","name":"idx_collection_files_file_id"}
+      ]
+    },
+    {
+      "table": "assistant_files",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":7}},
+        {"name":"assistant_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":8}},
+        {"name":"file_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":9}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":14},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":15}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"assistant_id","references":"id","on":"assistants","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"file_id","references":"id","on":"files","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"assistant_files_user_id_idx"},
+        {"columns":["assistant_id"],"type":"index","name":"assistant_files_assistant_id_idx"},
+        {"columns":["file_id"],"type":"index","name":"assistant_files_file_id_idx"}
+      ]
+    },
+    {
+      "table": "assistant_collections",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":46}},
+        {"name":"assistant_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":47}},
+        {"name":"collection_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":48}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":53},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":54}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"assistant_id","references":"id","on":"assistants","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"collection_id","references":"id","on":"collections","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240115171510_add_assistant_files.sql","line":44},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"assistant_collections_user_id_idx"},
+        {"columns":["assistant_id"],"type":"index","name":"assistant_collections_assistant_id_idx"},
+        {"columns":["collection_id"],"type":"index","name":"assistant_collections_collection_id_idx"}
+      ]
+    },
+    {
+      "table": "tools",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":10}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":13}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":16},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":17}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":20},"default":"private"},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":23}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":24}},
+        {"name":"schema","type":"jsonb","source":{"file":"supabase/migrations/20240124234424_tool_improvements.sql","line":4},"default":"{}"},
+        {"name":"url","type":"text","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":26}},
+        {"name":"custom_headers","type":"jsonb","source":{"file":"supabase/migrations/20240124234424_tool_improvements.sql","line":2},"default":"{}"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240115171524_add_tools.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"tools_user_id_idx"}
+      ]
+    },
+    {
+      "table": "tool_workspaces",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":60}},
+        {"name":"tool_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":61}},
+        {"name":"workspace_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":62}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":67},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240115171524_add_tools.sql","line":68}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"tool_id","references":"id","on":"tools","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240115171524_add_tools.sql","line":58},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"tool_workspaces_user_id_idx"},
+        {"columns":["tool_id"],"type":"index","name":"tool_workspaces_tool_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"tool_workspaces_workspace_id_idx"}
+      ]
+    },
+    {
+      "table": "assistant_tools",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240115172125_add_assistant_tools.sql","line":7}},
+        {"name":"assistant_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115172125_add_assistant_tools.sql","line":8}},
+        {"name":"tool_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240115172125_add_assistant_tools.sql","line":9}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240115172125_add_assistant_tools.sql","line":14},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240115172125_add_assistant_tools.sql","line":15}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"assistant_id","references":"id","on":"assistants","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"tool_id","references":"id","on":"tools","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240115172125_add_assistant_tools.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"assistant_tools_user_id_idx"},
+        {"columns":["assistant_id"],"type":"index","name":"assistant_tools_assistant_id_idx"},
+        {"columns":["tool_id"],"type":"index","name":"assistant_tools_tool_id_idx"}
+      ]
+    },
+    {
+      "table": "models",
+      "columns": [
+        {"name":"id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":10}},
+        {"name":"folder_id","type":"uuid","nullable":true,"source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":13}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":16},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":17}},
+        {"name":"sharing","type":"text","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":20},"default":"private"},
+        {"name":"api_key","type":"text","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":23}},
+        {"name":"base_url","type":"text","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":24}},
+        {"name":"description","type":"text","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":25}},
+        {"name":"model_id","type":"text","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":26}},
+        {"name":"name","type":"text","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":27}},
+        {"name":"context_length","type":"int","source":{"file":"supabase/migrations/20240213085646_add_context_length_to_custom_models.sql","line":1},"default":4096}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"folder_id","references":"id","on":"folders","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":5},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"models_user_id_idx"}
+      ]
+    },
+    {
+      "table": "model_workspaces",
+      "columns": [
+        {"name":"user_id","type":"uuid","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":61}},
+        {"name":"model_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":62}},
+        {"name":"workspace_id","type":"uuid","primary":true,"source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":63}},
+        {"name":"created_at","type":"timestamptz","source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":68},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamptz","nullable":true,"source":{"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":69}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"auth.users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"model_id","references":"id","on":"models","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"workspace_id","references":"id","on":"workspaces","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"supabase/migrations/20240125194719_add_custom_models.sql","line":59},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"model_workspaces_user_id_idx"},
+        {"columns":["model_id"],"type":"index","name":"model_workspaces_model_id_idx"},
+        {"columns":["workspace_id"],"type":"index","name":"model_workspaces_workspace_id_idx"}
+      ]
+    }
+  ],
+  "warnings": []
+}

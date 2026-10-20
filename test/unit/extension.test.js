@@ -5,8 +5,9 @@
 // Please see the LICENSE file that should have been included as part of this package.
 //
 
-// extension.js with a mocked 'vscode' module (and stubbed framework parsers): the command flow,
-// the messages shown to the user and the webview panel, without VS Code.
+// extension.js with a mocked 'vscode' module (and stubbed framework parsers: their real detection
+// and sources, a stubbed parse()): the command flow, the messages shown to the user and the
+// webview panel, without VS Code.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -42,6 +43,7 @@ const DEFAULT_SETTINGS = {
     pro: false,
 };
 const EXTENSION = path.join(ROOT, 'extension.js');
+const REGISTRY = path.join(ROOT, 'parsers', 'registry.js');
 const PRO_ID = 'GuillaumeCancalon.draw-me-database-pro';
 const WEBVIEW_ROOT = 'https://webview.test/';
 
@@ -332,7 +334,7 @@ function createVscode(state) {
     };
 }
 
-// 'vscode' and the framework parsers, as extension.js requires them
+// 'vscode' as extension.js requires it, and the framework parsers as the registry requires them
 let mocks;
 const originalLoad = Module._load;
 
@@ -341,7 +343,7 @@ test.before(() => {
         if (mocks && request === 'vscode') {
             return mocks.vscode;
         }
-        if (mocks && parent && parent.filename === EXTENSION && Object.prototype.hasOwnProperty.call(mocks.parsers, request)) {
+        if (mocks && parent && parent.filename === REGISTRY && Object.prototype.hasOwnProperty.call(mocks.parsers, request)) {
             return mocks.parsers[request];
         }
         return originalLoad.call(this, request, parent, ...rest);
@@ -352,8 +354,9 @@ test.after(() => {
     Module._load = originalLoad;
 });
 
-// Activates a fresh copy of extension.js. parse(basePath) is the stubbed parser of both frameworks,
-// initial overrides the initial state (e.g. gitExtension, read when the extension activates).
+// Activates a fresh copy of extension.js. parse(basePath) is the stubbed parse() of both frameworks
+// (their detect() and sources() are the real ones), initial overrides the initial state (e.g.
+// gitExtension, read when the extension activates).
 function activate(parse = () => ({ tables: TABLES, warnings: [] }), initial = {}) {
     const state = {
         answer: undefined,
@@ -390,14 +393,18 @@ function activate(parse = () => ({ tables: TABLES, warnings: [] }), initial = {}
         context: {},
         ...initial,
     };
-    const parser = {
+    const stub = (real) => ({
+        ...real,
         parse: (basePath, options) => {
             state.parsed.push(basePath);
             state.parseOptions.push(options);
             return parse(basePath, options);
         },
+    });
+    mocks = {
+        vscode: createVscode(state),
+        parsers: { './laravel': stub(require('../../parsers/laravel')), './symfony': stub(require('../../parsers/symfony')), './prisma': stub(require('../../parsers/prisma')) },
     };
-    mocks = { vscode: createVscode(state), parsers: { './parsers/laravel': parser, './parsers/symfony': parser } };
 
     delete require.cache[EXTENSION];
     const extension = require(EXTENSION);
@@ -433,6 +440,8 @@ const TABLES = [
 // Workspaces on disk, for the real framework detection
 let tmpRoot;
 const LARAVEL = { artisan: '', 'composer.json': JSON.stringify({ require: { 'laravel/framework': '^12.0' } }) };
+const SYMFONY = { 'bin/console': '', 'composer.json': JSON.stringify({ require: { 'symfony/framework-bundle': '^7.4' } }) };
+const PRISMA = { 'package.json': JSON.stringify({ devDependencies: { prisma: '^7.10.1' } }), 'prisma/schema/schema.prisma': 'datasource db {\n  provider = "postgresql"\n}\n' };
 
 function folder(name, files = {}) {
     const dir = path.join(tmpRoot, name);
@@ -721,6 +730,34 @@ test('a click on a table opens its source file beside the diagram, inside the pr
     assert.equal(ext.state.opened.length, 1);
 });
 
+test('a click opens a Prisma schema set outside of the framework folder (a source of the parser), never another file outside of it', async () => {
+    const schemaFile = '../../packages/db/prisma/schema.prisma';
+    const ext = activate(() => ({
+        tables: [
+            { table: 'User', columns: [{ name: 'email', type: 'String', source: { file: schemaFile, line: 7 } }], relations: [], source: { file: schemaFile, line: 5 } },
+            { table: 'Seed', columns: [], relations: [], source: { file: '../../packages/db/seed.ts', line: 1 } },
+        ],
+        warnings: [],
+    }));
+    const root = folder('prisma-outside', {
+        'apps/web/package.json': JSON.stringify({ dependencies: { '@prisma/client': '^6.19.1' } }),
+        'apps/web/prisma.config.ts': `export default { schema: '${schemaFile}' }\n`,
+        'packages/db/prisma/schema.prisma': 'model User {\n  id Int @id\n}\n',
+        'packages/db/seed.ts': '',
+    });
+    ext.openFolders(root);
+    ext.setFrameworkPath(root, 'apps/web');
+    ext.run();
+    assert.equal(ext.context.api.getSchema().framework, 'prisma');
+    const open = ext.state.commands.get('DMDB.openTable');
+    open('User');
+    open('User', 'email');
+    open('Seed');
+    await flush();
+    const target = path.join(root, 'packages', 'db', 'prisma', 'schema.prisma');
+    assert.deepEqual(ext.state.opened.map(item => [item.path, item.options.selection.startLine]), [[target, 4], [target, 6]]);
+});
+
 const settle = (ms = 600) => new Promise(resolve => setTimeout(resolve, ms));
 
 test('auto-refresh: a change of the migrations redraws the open diagram, quietly', async () => {
@@ -808,6 +845,158 @@ test('live diagram: an unsaved edit of a migration is drawn, with the git status
     ext.context.subscriptions.forEach(item => item.dispose());
 });
 
+test('live diagram of a Symfony project: the unsaved entities of src/Entity and of its sub-folders', async () => {
+    const ext = activate();
+    const dir = folder('live-symfony', SYMFONY);
+    ext.openFolders(dir);
+    ext.run();
+    ext.state.panels[0].postFromPage({ type: 'ready' });
+    assert.equal(ext.state.watchers.length, 1);
+    assert.equal(ext.state.watchers[0].pattern.base.fsPath, path.join(dir, 'src', 'Entity'));
+    assert.equal(ext.state.watchers[0].pattern.pattern, '**/*.php');
+
+    const entity = path.join(dir, 'src', 'Entity', 'Blog', 'Post.php');
+    const typed = editor(entity, '<?php // typing');
+    const repository = editor(path.join(dir, 'src', 'Repository', 'PostRepository.php'), '<?php // not an entity');
+    ext.state.documents = [typed, repository, editor(path.join(dir, 'src', 'Entity', 'notes.md'), 'not PHP')];
+    ext.vscode.editDocument(typed);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2);
+    assert.deepEqual([...ext.state.parseOptions[1].overrides], [[path.resolve(entity), '<?php // typing']], 'only the watched entities');
+
+    ext.vscode.editDocument(repository);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2, 'a file outside of src/Entity is not followed');
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('live diagram of a Prisma project: the unsaved .prisma files of its schema folder, package.json and prisma.config.ts', async () => {
+    const ext = activate();
+    const dir = folder('live-prisma', PRISMA);
+    ext.openFolders(dir);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.equal(ext.context.api.getSchema().framework, 'prisma');
+    assert.equal(panel.sent('schema').at(-1).project.frameworkLabel, 'Prisma');
+    assert.ok(ext.state.output.includes(`Framework: prisma (${dir})`));
+    assert.deepEqual(ext.state.watchers.map(watcher => [watcher.pattern.base.fsPath, watcher.pattern.pattern]), [
+        [path.join(dir, 'prisma', 'schema'), '**/*.prisma'],
+        [dir, 'package.json'],
+        [dir, 'prisma.config.ts'],
+    ]);
+
+    const model = path.join(dir, 'prisma', 'schema', 'models', 'post.prisma');
+    const typed = editor(model, 'model Post {\n  id Int @id\n}\n');
+    const config = editor(path.join(dir, 'prisma.config.ts'), 'export default {}\n');
+    const seed = editor(path.join(dir, 'prisma', 'seed.ts'), '// not the schema');
+    ext.state.documents = [typed, config, seed];
+    ext.vscode.editDocument(typed);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2);
+    assert.deepEqual([...ext.state.parseOptions[1].overrides], [[path.resolve(model), 'model Post {\n  id Int @id\n}\n'], [path.resolve(config.uri.fsPath), 'export default {}\n']], 'the schema files and the config file');
+
+    ext.vscode.editDocument(seed);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2, 'a file outside of the sources is not followed');
+    // The API gives the same sources
+    assert.equal(ext.context.api.getSources(dir, 'prisma').folders[0].path, path.join(dir, 'prisma', 'schema'));
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('live diagram of a Prisma project: an unsaved package.json that moves the schema moves the sources, and the new schema file is followed', async () => {
+    const ext = activate();
+    const pkg = (extra = {}) => JSON.stringify({ ...extra, devDependencies: { prisma: '6.19.1' } });
+    const dir = folder('live-prisma-moved', {
+        'package.json': pkg(),
+        'prisma/schema.prisma': 'model User {\n  id Int @id\n}\n',
+        'alt/schema.prisma': 'model Alt {\n  id Int @id\n}\n',
+    });
+    ext.openFolders(dir);
+    ext.run();
+    ext.state.panels[0].postFromPage({ type: 'ready' });
+    const watched = () => ext.state.watchers.filter(watcher => !watcher.disposed).map(watcher => path.join(watcher.pattern.base.fsPath, watcher.pattern.pattern));
+    assert.deepEqual(watched(), [path.join(dir, 'prisma', 'schema.prisma'), path.join(dir, 'package.json'), path.join(dir, 'prisma.config.ts')]);
+
+    // The unsaved package.json moves the schema to alt/schema.prisma, already being edited too
+    const packageEditor = editor(path.join(dir, 'package.json'), pkg({ prisma: { schema: 'alt/schema.prisma' } }));
+    const alt = editor(path.join(dir, 'alt', 'schema.prisma'), 'model Alt {\n  id Int @id\n}\n\nmodel AltLive {\n  id Int @id\n}\n');
+    ext.state.documents = [packageEditor, alt];
+    ext.vscode.editDocument(packageEditor);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 2);
+    assert.deepEqual([...ext.state.parseOptions[1].overrides.keys()], [path.join(dir, 'package.json'), path.join(dir, 'alt', 'schema.prisma')], 'the unsaved schema it moves to is read');
+    assert.deepEqual(watched(), [path.join(dir, 'alt', 'schema.prisma'), path.join(dir, 'package.json'), path.join(dir, 'prisma.config.ts')]);
+
+    // Typing in the new schema file refreshes the diagram
+    ext.vscode.editDocument(alt);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 3);
+    assert.deepEqual([...ext.state.parseOptions[2].overrides.keys()], [path.join(dir, 'package.json'), path.join(dir, 'alt', 'schema.prisma')]);
+
+    // package.json reverted: the schema and the sources are back, the editor of alt/ is no source any more
+    packageEditor.isDirty = false;
+    ext.vscode.editDocument(packageEditor);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 4);
+    assert.deepEqual([...ext.state.parseOptions[3].overrides.keys()], []);
+    assert.deepEqual(watched(), [path.join(dir, 'prisma', 'schema.prisma'), path.join(dir, 'package.json'), path.join(dir, 'prisma.config.ts')]);
+    ext.vscode.editDocument(alt);
+    await settle(400);
+    assert.equal(ext.state.parsed.length, 4, 'alt/schema.prisma is not followed any more');
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('DrawMeDatabase.framework chooses the parser of a project that matches several of them', async () => {
+    const ext = activate();
+    const dir = folder('framework-setting', {
+        artisan: '',
+        'bin/console': '',
+        'composer.json': JSON.stringify({ require: { 'laravel/framework': '^12.0', 'symfony/framework-bundle': '^7.4' } }),
+    });
+    ext.openFolders(dir);
+
+    // Detected: Laravel wins the tie, and the output names the setting
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.equal(ext.context.api.getSchema().framework, 'laravel');
+    assert.ok(ext.state.output.includes(`Framework: laravel (${dir})`));
+    assert.ok(ext.state.output.includes('Frameworks found: laravel (100), symfony (100). DrawMeDatabase.framework chooses another one.'));
+    assert.equal(ext.state.watchers.at(-1).pattern.pattern, '*.php');
+
+    // Set for the folder: the change reads the project again with the parser of Symfony, whose
+    // entities are watched instead of the migrations
+    ext.state.settings[path.resolve(dir)] = { 'DrawMeDatabase.framework': 'symfony' };
+    ext.vscode.changeConfiguration('DrawMeDatabase.framework');
+    await settle();
+    assert.equal(ext.state.parsed.length, 2);
+    assert.equal(ext.context.api.getSchema().framework, 'symfony');
+    assert.ok(ext.state.output.includes(`Framework: symfony, set by DrawMeDatabase.framework (${dir})`));
+    assert.equal(panel.sent('schema').at(-1).project.frameworkLabel, 'Symfony');
+    const live = ext.state.watchers.filter(watcher => !watcher.disposed);
+    assert.deepEqual(live.map(watcher => [watcher.pattern.base.fsPath, watcher.pattern.pattern]), [[path.join(dir, 'src', 'Entity'), '**/*.php']]);
+
+    // A value that names no parser: detected, and the output says so
+    ext.state.settings[path.resolve(dir)] = { 'DrawMeDatabase.framework': 'rails' };
+    ext.run();
+    assert.equal(ext.context.api.getSchema().framework, 'laravel');
+    assert.ok(ext.state.output.includes('DrawMeDatabase.framework: "rails" is not a supported framework, the framework is detected.'));
+    ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('DrawMeDatabase.framework set for a folder the parser cannot read: its error is shown', () => {
+    const ext = activate(() => {
+        throw new ParserError('No src/Entity folder found.');
+    });
+    const dir = folder('framework-forced', LARAVEL);
+    ext.openFolders(dir);
+    ext.state.settings[path.resolve(dir)] = { 'DrawMeDatabase.framework': 'symfony' };
+    assert.equal(ext.run(), undefined);
+    assert.deepEqual(ext.state.errors, [{ text: 'No src/Entity folder found.', items: [] }]);
+    assert.deepEqual(ext.state.parsed, [dir]);
+});
+
 test('a commit or a checkout (built-in Git extension) refreshes the git status of the diagram', async () => {
     const onState = emitter();
     const onRepository = emitter();
@@ -877,14 +1066,14 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     const api = ext.context.api;
     const dir = folder('api', LARAVEL);
     ext.openFolders(dir);
-    assert.equal(api.apiVersion, 2);
+    assert.equal(api.apiVersion, 4);
     assert.equal(api.getSchema(), null);
 
     const seen = [];
     const subscription = api.onDidChangeSchema(schema => seen.push(schema));
     ext.run();
     const schema = api.getSchema();
-    assert.deepEqual(schema, { tables: SOURCED, framework: 'laravel', basePath: dir, project: { name: 'api', folder: Uri.file(dir).toString() } });
+    assert.deepEqual(schema, { tables: SOURCED, framework: 'laravel', dialect: null, basePath: dir, project: { name: 'api', folder: Uri.file(dir).toString() } });
     assert.deepEqual(seen, [schema]);
     schema.tables.length = 0;
     assert.equal(api.getSchema().tables.length, 2, 'a copy: other extensions cannot change it');
@@ -897,9 +1086,116 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     assert.deepEqual(ext.state.parseOptions.at(-1), { git: false });
     assert.throws(() => api.parseSchema(dir, 'rails'), ParserError);
     assert.equal(api.detectFramework(dir), 'laravel');
+    assert.equal(api.detectFramework(dir, { framework: 'symfony' }), 'symfony', 'an id wins over the detection');
+    assert.equal(api.detectFramework(folder('api-none')), 'Unknown');
+
+    // Version 3: the supported stacks, and what their parsers read
+    assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }, { id: 'drizzle', label: 'Drizzle' }, { id: 'sql', label: 'SQL' }]);
+    assert.deepEqual(api.getSources(dir, 'laravel'), { folders: [{ path: path.join(dir, 'database', 'migrations'), recursive: false }], files: [], extensions: ['.php'] });
+    assert.deepEqual(api.getSources(dir, 'symfony').folders, [{ path: path.join(dir, 'src', 'Entity'), recursive: true }]);
+    assert.throws(() => api.getSources(dir, 'rails'), error => error instanceof ParserError && error.message === 'Unknown framework: rails');
     assert.ok(api.viewScripts.includes('vendor/mermaid.min.js') && api.viewScripts.includes('mermaid/diagram.js'));
     assert.ok(!api.viewScripts.includes('app.js'));
     assert.equal(api.viewsUri.fsPath, path.join(ROOT, 'views'));
+});
+
+test('API version 4: the dialect of the schema on screen, and the migrations of a framework root', () => {
+    const ext = activate(() => ({ tables: SOURCED, warnings: [] }));
+    const api = ext.context.api;
+    const up = "<?php\nreturn new class extends Illuminate\\Database\\Migrations\\Migration {\n    public function up(): void {}\n};\n";
+    const dir = folder('api-v4', { ...LARAVEL, '.env': 'DB_CONNECTION=pgsql\n', 'database/migrations/2024_01_02_000000_create_posts_table.php': up, 'database/migrations/2024_01_01_000000_create_users_table.php': up });
+    ext.openFolders(dir);
+    const seen = [];
+    api.onDidChangeSchema(schema => seen.push(schema.dialect));
+    ext.run();
+    assert.equal(api.getSchema().dialect, 'postgresql');
+    assert.deepEqual(seen, ['postgresql']);
+    assert.deepEqual(api.getMigrations(dir, 'laravel'), { root: dir, framework: 'laravel', migrations: [
+        { id: '2024_01_01_000000_create_users_table.php', file: path.join(dir, 'database', 'migrations', '2024_01_01_000000_create_users_table.php'), time: Date.UTC(2024, 0, 1) / 1000 },
+        { id: '2024_01_02_000000_create_posts_table.php', file: path.join(dir, 'database', 'migrations', '2024_01_02_000000_create_posts_table.php'), time: Date.UTC(2024, 0, 2) / 1000 },
+    ] });
+    const sql = folder('api-v4-sql', { 'supabase/migrations/20240101000000_init.sql': 'create table a (id int);\n' });
+    assert.deepEqual(api.getMigrations(sql, 'sql').migrations.map(m => m.id), ['20240101000000_init.sql']);
+    assert.equal(api.getMigrations(folder('api-v4-dump', { 'schema.sql': 'create table a (id int);\n' }), 'sql'), null, 'a dump');
+    assert.equal(api.getMigrations(dir, 'symfony'), null, 'Symfony replays no migrations');
+    assert.equal(api.getMigrations(folder('api-v4-none'), 'prisma'), null);
+    assert.throws(() => api.getMigrations(dir, 'rails'), error => error instanceof ParserError && error.message === 'Unknown framework: rails');
+    // A copy: changing it changes nothing
+    api.getMigrations(dir, 'laravel').migrations.length = 0;
+    assert.equal(api.getMigrations(dir, 'laravel').migrations.length, 2);
+    // A project whose code tells no database
+    const other = folder('api-v4-other', LARAVEL);
+    ext.openFolders(other);
+    ext.run();
+    assert.equal(api.getSchema().dialect, null);
+});
+
+test('API version 4: a tool of other stacks (frameworks) or that tells it does not apply (unavailable) is greyed with its reason, and tells it instead of running', async () => {
+    const ext = activate();
+    const api = ext.context.api;
+    const laravel = folder('tools-laravel', LARAVEL);
+    const symfony = folder('tools-symfony', SYMFONY);
+    const toolsView = () => ext.state.treeViews.get('DMDB.tools');
+    const node = (id) => toolsView().items().find(item => item.id === `tool:${id}`);
+    const panelTools = () => ext.state.panels[0].sent('features').at(-1).tools;
+    const tool = (id) => panelTools().find(item => item.id === id);
+
+    // Before a schema is read: every tool applies
+    const models = api.registerTool({ id: 'pro.models', label: 'Eloquent models', command: 'DMDBPro.generateModel', pro: true, frameworks: ['laravel', 'laravel', 3] });
+    const designer = api.registerTool({ id: 'pro.designer', label: 'Design', command: 'DMDBPro.designTable', pro: true, frameworks: ['laravel', 'symfony'] });
+    const old = api.registerTool({ id: 'pro.migrationChanges', label: 'Migration', command: 'DMDBPro.migrationChanges', pro: true });
+    api.registerTool({ id: 'acme.any', label: 'Any', command: 'acme.any', frameworks: [] });
+    ext.openFolders(symfony);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(tool('pro.models'), { id: 'pro.models', label: 'Eloquent models', hint: '', icon: undefined, pro: true, state: 'unavailable', reason: 'This tool is not available for Symfony projects.' });
+    assert.equal(tool('pro.designer').state, 'available');
+    assert.equal(tool('pro.migrationChanges').state, 'available', 'registered without frameworks: as before version 4');
+    assert.equal(tool('acme.any').state, 'available', 'an empty list: every stack');
+    // The Tools view: greyed, its reason after its hint, the texts of DrawMeDatabase for the label
+    assert.deepEqual({ label: node('pro.models').label, description: node('pro.models').description, tooltip: node('pro.models').tooltip, contextValue: node('pro.models').contextValue, color: node('pro.models').iconPath.color.id },
+        { label: 'Generate Eloquent models', description: 'not for this project', tooltip: 'With their relationships (Laravel)\nThis tool is not available for Symfony projects.', contextValue: 'tool.unavailable', color: 'disabledForeground' });
+
+    // A click tells why, without running the command
+    ext.state.executed = [];
+    panel.postFromPage({ type: 'tool', id: 'pro.models' });
+    ext.state.commands.get('DMDB.runTool')('pro.models');
+    await flush();
+    assert.deepEqual(ext.state.executed, []);
+    assert.deepEqual(ext.state.infos.slice(-2).map(info => info.text), ['This tool is not available for Symfony projects.', 'This tool is not available for Symfony projects.']);
+
+    // The reason of the extension, as it writes it: not the translations of DrawMeDatabase
+    old.update({ unavailable: '  What a migration changes reads Laravel migrations: it is not available for Symfony projects.  ' });
+    assert.deepEqual(tool('pro.migrationChanges'), { id: 'pro.migrationChanges', label: 'Migration', hint: '', icon: undefined, pro: true, state: 'unavailable', reason: 'What a migration changes reads Laravel migrations: it is not available for Symfony projects.' });
+    assert.match(node('pro.migrationChanges').tooltip, /\nWhat a migration changes reads Laravel migrations: it is not available for Symfony projects\.$/);
+    ext.state.commands.get('DMDB.runTool')('pro.migrationChanges');
+    assert.equal(ext.state.infos.at(-1).text, 'What a migration changes reads Laravel migrations: it is not available for Symfony projects.');
+    // Before the lock of an ended trial
+    const pro = installPro(ext, { kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
+    await pro.connect();
+    assert.equal(tool('pro.migrationChanges').state, 'unavailable');
+    assert.equal(tool('pro.designer').state, 'locked');
+
+    // The stack of the schema on screen changes: the tools follow
+    ext.openFolders(laravel);
+    ext.run();
+    assert.equal(tool('pro.models').state, 'locked');
+    assert.equal(tool('pro.migrationChanges').state, 'unavailable', 'its own reason, whatever the stack');
+    old.update({ unavailable: null });
+    assert.equal(tool('pro.migrationChanges').state, 'locked');
+    pro.set({ kind: 'licensed', commands: {} });
+    ext.state.executed = [];
+    ext.state.commands.get('DMDB.runTool')('pro.models');
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.generateModel', args: [] }]);
+    // update({ frameworks })
+    designer.update({ frameworks: ['symfony'] });
+    assert.deepEqual(tool('pro.designer'), { id: 'pro.designer', label: 'Design', hint: '', icon: undefined, pro: true, state: 'unavailable', reason: 'This tool is not available for Laravel projects.' });
+    designer.update({ frameworks: undefined });
+    assert.equal(tool('pro.designer').state, 'available');
+    models.dispose();
+    assert.equal(tool('pro.models').state, 'missing');
 });
 
 test('API: exports of other extensions are listed in the page and saved like the others', async () => {
@@ -1036,6 +1332,7 @@ test('an empty schema shows a message and no panel', () => {
     assert.equal(ext.state.panels.length, 0);
     assert.equal(ext.state.infos.length, 1);
     assert.match(ext.state.infos[0].text, /^No tables found in ".*empty"\. Nothing to draw\.$/);
+    assert.ok(ext.state.output.includes('Files read: database/migrations/*.php'), 'the output tells what was read');
     assert.deepEqual(ext.state.errors, []);
     assert.deepEqual(ext.state.warnings, []);
 });
@@ -1150,10 +1447,45 @@ test('a folder without project suggests the setting only when it is empty', () =
     ext.setFrameworkPath(workspace, 'backend');
     assert.equal(ext.run(), undefined);
     assert.deepEqual(ext.state.errors.map(error => error.text), [
-        `No Laravel or Symfony project found in "${workspace}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`,
-        `No Laravel or Symfony project found in "${path.join(workspace, 'backend')}". Check the DrawMeDatabase.frameworkPath setting. Unable to draw the schema.`,
+        `No supported project (Laravel, Symfony, Prisma, Drizzle, SQL) found in "${workspace}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`,
+        `No supported project (Laravel, Symfony, Prisma, Drizzle, SQL) found in "${path.join(workspace, 'backend')}". Check the DrawMeDatabase.frameworkPath setting. Unable to draw the schema.`,
     ]);
     assert.deepEqual(ext.state.parsed, []);
+    assert.ok(ext.state.output.includes('Supported frameworks: Laravel, Symfony, Prisma, Drizzle, SQL.'), 'the output lists the supported frameworks');
+});
+
+test('a monorepo root with prisma in its package.json, the schema in a package: the framework folder is suggested', () => {
+    const root = folder('prisma-monorepo', {
+        'package.json': JSON.stringify({ workspaces: ['packages/*'], devDependencies: { prisma: '^6.19.1' } }),
+        'packages/db/package.json': JSON.stringify({ dependencies: { '@prisma/client': '^6.19.1' } }),
+        'packages/db/prisma/schema.prisma': 'model User {\n  id Int @id\n}\n',
+    });
+    const ext = activate();
+    ext.openFolders(root);
+    assert.equal(ext.run(), undefined);
+    assert.deepEqual(ext.state.errors.map(error => error.text), [`No supported project (Laravel, Symfony, Prisma, Drizzle, SQL) found in "${root}". If the project is in a subfolder, set DrawMeDatabase.frameworkPath. Unable to draw the schema.`]);
+    assert.equal(ext.state.context['drawMeDatabase.schemaState'], 'noProject', 'the Schema view offers to set the framework folder');
+    assert.deepEqual(ext.state.parsed, []);
+    // The framework folder of the package
+    ext.setFrameworkPath(root, 'packages/db');
+    assert.deepEqual(ext.run(), TABLES);
+    assert.deepEqual(ext.state.parsed, [path.join(root, 'packages', 'db')]);
+});
+
+test('a parser that could not read the folder while another one recognized it: its error is a warning in the output', () => {
+    const dir = folder('prisma-bad-composer', { artisan: '', 'composer.json': '{,}', ...PRISMA });
+    const ext = activate(() => ({ tables: TABLES, warnings: ['w'] }));
+    ext.openFolders(dir);
+    assert.deepEqual(ext.run(), TABLES);
+    assert.equal(ext.context.api.getSchema().framework, 'prisma');
+    const warnings = ext.state.output.filter(line => line.startsWith('Warning: '));
+    assert.equal(warnings.length, 2, JSON.stringify(ext.state.output));
+    // One warning for both parsers that read composer.json
+    assert.ok(warnings[0].startsWith(`Warning: composer.json in "${dir}" could not be read: `), warnings[0]);
+    assert.ok(warnings[0].endsWith(' (detection of Laravel, Symfony)'), warnings[0]);
+    assert.equal(warnings[1], 'Warning: w');
+    // Counted with the warnings of the parser
+    assert.deepEqual(ext.state.warnings.map(warning => warning.text), ['2 warnings while reading the schema. See the "DrawMeDatabase" output for details.']);
 });
 
 test('an invalid composer.json is reported as such', () => {

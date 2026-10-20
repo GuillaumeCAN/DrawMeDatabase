@@ -96,6 +96,28 @@ describe('sidebar: Schema view', () => {
         const posts = sidebar.schemaNodes({ ...SCHEMA, framework: 'symfony' }, fr)[1];
         assert.equal(posts.description, '3 colonnes');
         assert.match(posts.tooltip, /Ouvrir l'entité$/);
+        assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: 'prisma' }, t)[1].tooltip, /\nOpen the model$/);
+        assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: 'prisma' }, fr)[1].tooltip, /\nOuvrir le modèle$/);
+        // A framework without its own text: the file
+        assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: 'rails' }, t)[1].tooltip, /\nOpen the file$/);
+        assert.match(sidebar.schemaNodes({ ...SCHEMA, framework: undefined }, t)[1].tooltip, /\nOpen the file$/);
+    });
+
+    it('a table read from a SQL file (a Laravel schema dump) opens "the SQL file", in the tree and in the inspector', () => {
+        const dumped = (file) => ({ framework: 'laravel', tables: [{ table: 'articles', columns: [], relations: [], source: { file, line: 3 } }] });
+        assert.equal(sidebar.schemaNodes(dumped('database/schema/mysql-schema.sql'), t)[0].tooltip, 'articles\ndatabase/schema/mysql-schema.sql\nOpen the SQL file');
+        assert.match(sidebar.schemaNodes(dumped('database/schema/pgsql-schema.dump'), fr)[0].tooltip, /\nOuvrir le fichier SQL$/);
+        assert.match(sidebar.schemaNodes(dumped('database/migrations/0001_create_articles_table.php'), t)[0].tooltip, /\nOpen the migration$/);
+        // The button of the inspector says the same
+        const { openKey } = require('../../views/inspector');
+        assert.deepEqual([
+            openKey('laravel', 'database/schema/mysql-schema.sql', t),
+            openKey('laravel', 'database/migrations/0001_create_articles_table.php', t),
+            openKey('sql', 'supabase/migrations/1_init.sql', t),
+            openKey('prisma', 'prisma/schema.prisma', t),
+            openKey('rails', 'db/structure.rb', t),
+            openKey(undefined, undefined, t),
+        ], ['inspector.open.sql', 'inspector.open.laravel', 'inspector.open.sql', 'inspector.open.prisma', 'inspector.open', 'inspector.open']);
     });
 });
 
@@ -146,6 +168,30 @@ describe('sidebar: Tools, Exports and License views', () => {
         assert.equal(bad.icon, 'tools');
         assert.equal(sidebar.toolNodes(features, fr)[0].label, 'Canevas du schéma');
         assert.deepEqual(sidebar.toolNodes({}, t), []);
+    });
+
+    it('a tool that does not apply to the project: greyed, "not for this project", its reason as its extension gives it after the hint of DrawMeDatabase', () => {
+        const tools = [
+            { id: 'pro.models', label: 'Models', hint: 'theirs', pro: true, state: 'unavailable', reason: 'Eloquent models are for Laravel projects: they are not available for Prisma projects.' },
+            { id: 'acme.lint', label: 'Lint', hint: 'Lint the schema', icon: 'checks', pro: false, state: 'unavailable', reason: 'Needs a Laravel project' },
+            { id: 'acme.empty', label: 'Empty', pro: false, state: 'unavailable' },
+        ];
+        const [models, lint, empty] = sidebar.toolNodes({ tools }, t);
+        assert.deepEqual(models, {
+            id: 'tool:pro.models',
+            label: 'Generate Eloquent models',
+            description: 'not for this project',
+            tooltip: 'With their relationships (Laravel)\nEloquent models are for Laravel projects: they are not available for Prisma projects.',
+            icon: 'symbol-class',
+            muted: true,
+            decoration: { state: 'unavailable' },
+            contextValue: 'tool.unavailable',
+            command: { id: 'DMDB.runTool', args: ['pro.models'] },
+        });
+        assert.deepEqual({ tooltip: lint.tooltip, icon: lint.icon }, { tooltip: 'Lint the schema\nNeeds a Laravel project', icon: 'checklist' });
+        assert.equal(empty.tooltip, '');
+        assert.equal(sidebar.toolNodes({ tools }, fr)[0].description, 'pas pour ce projet');
+        assert.match(sidebar.toolNodes({ tools }, fr)[0].tooltip, /\nEloquent models are for Laravel projects/, 'never translated');
     });
 
     it('lists the exports of the diagram, then the ones of the extensions', () => {

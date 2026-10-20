@@ -1,0 +1,274 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 6
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "source": {
+            "file": "db/schema.ts",
+            "line": 7
+          },
+          "length": 80
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "source": {
+            "file": "db/schema.ts",
+            "line": 8
+          },
+          "unique": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "source": {
+            "file": "db/schema.ts",
+            "line": 9
+          },
+          "default": "user"
+        },
+        {
+          "name": "settings",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 10
+          },
+          "default": "{\"theme\":\"dark\"}"
+        },
+        {
+          "name": "avatar",
+          "type": "blob",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 11
+          }
+        },
+        {
+          "name": "score",
+          "type": "real",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 12
+          },
+          "default": 1.5
+        },
+        {
+          "name": "balance",
+          "type": "numeric",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "is_admin",
+          "type": "integer",
+          "source": {
+            "file": "db/schema.ts",
+            "line": 14
+          },
+          "default": false
+        },
+        {
+          "name": "created_at",
+          "type": "integer",
+          "source": {
+            "file": "db/schema.ts",
+            "line": 15
+          },
+          "defaultRaw": "(unixepoch())"
+        },
+        {
+          "name": "updated_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 16
+          },
+          "defaultRaw": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        {
+          "name": "manager_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 17
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "manager_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "db/schema.ts",
+        "line": 5
+      },
+      "indexes": [
+        {
+          "columns": [
+            "name"
+          ],
+          "type": "index",
+          "name": "users_name_idx"
+        }
+      ]
+    },
+    {
+      "table": "tags",
+      "columns": [
+        {
+          "name": "name",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 24
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "db/schema.ts",
+        "line": 23
+      }
+    },
+    {
+      "table": "post_tags",
+      "columns": [
+        {
+          "name": "post_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 28
+          }
+        },
+        {
+          "name": "tag",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 29
+          }
+        },
+        {
+          "name": "added_by",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 30
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "tag",
+          "references": "name",
+          "on": "tags",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        {
+          "foreignKey": "added_by",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "db/schema.ts",
+        "line": 27
+      },
+      "indexes": [
+        {
+          "columns": [
+            "tag",
+            "added_by"
+          ],
+          "type": "unique"
+        }
+      ]
+    },
+    {
+      "table": "app_settings",
+      "columns": [
+        {
+          "name": "key",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 39
+          }
+        },
+        {
+          "name": "value",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 40
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "db/schema.ts",
+            "line": 41
+          },
+          "unique": true
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "one-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "db/schema.ts",
+        "line": 38
+      }
+    }
+  ],
+  "warnings": []
+}

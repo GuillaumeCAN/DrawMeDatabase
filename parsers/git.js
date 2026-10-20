@@ -5,11 +5,11 @@
 // Please see the LICENSE file that should have been included as part of this package.
 //
 
-// Git status of the lines that declare tables and columns, shared by both parsers:
+// Git status of the lines that declare tables and columns, shared by the parsers:
 // 'committed', 'modified' (changed since HEAD), 'untracked' (not in HEAD: new, ignored or
 // staged-new) and 'unsaved' (changed in an editor and not saved yet, see `overrides`).
-// git runs a fixed number of times per folder (never with a shell), and its result can be cached
-// while only unsaved editors change.
+// git runs a fixed number of times for the sources of a parser (never with a shell), and its
+// result can be cached while only unsaved editors change.
 
 const fs = require('fs');
 const path = require('path');
@@ -117,11 +117,12 @@ function parseDiff(output) {
     return files;
 }
 
-// Reads into `state` the files under `relDir` of the repository at `root` that are not in HEAD
-// (untracked, ignored, staged-new) and the changed lines of the others, as paths from `root` prefixed
-// with `prefix`. A changed submodule is read the same way, against its own HEAD.
-function readRepository(root, relDir, prefix, hasHead, state) {
-    const entries = git(root, ['status', '--porcelain=v1', '-z', '-uall', '--ignored', '--ignore-submodules=none', '--', relDir]).split('\0');
+// Reads into `state` the files under the paths `relPaths` (folders or files, from `root`) of the
+// repository at `root` that are not in HEAD (untracked, ignored, staged-new) and the changed lines
+// of the others, as paths from `root` prefixed with `prefix`. A changed submodule is read the same
+// way, against its own HEAD.
+function readRepository(root, relPaths, prefix, hasHead, state) {
+    const entries = git(root, ['status', '--porcelain=v1', '-z', '-uall', '--ignored', '--ignore-submodules=none', '--', ...relPaths]).split('\0');
     for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
         if (entry.length < 4) {
@@ -132,7 +133,7 @@ function readRepository(root, relDir, prefix, hasHead, state) {
         if (xy === '??' || xy === '!!' || 'ARC'.includes(xy[0]) || xy[1] === 'A') {
             state.notInHead.add(prefix + file);
         } else if (xy.includes('M') && fs.existsSync(path.join(root, file, '.git'))) {
-            readRepository(path.join(root, file), '.', `${prefix}${file}/`, true, state);
+            readRepository(path.join(root, file), ['.'], `${prefix}${file}/`, true, state);
         }
         if (xy[0] === 'R' || xy[0] === 'C') {
             i++; // the original path follows
@@ -141,23 +142,30 @@ function readRepository(root, relDir, prefix, hasHead, state) {
 
     if (hasHead) {
         const diff = git(root, ['diff', 'HEAD', '--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '--text',
-            '--unified=0', '--src-prefix=a/', '--dst-prefix=b/', '--', relDir]);
+            '--unified=0', '--src-prefix=a/', '--dst-prefix=b/', '--', ...relPaths]);
         for (const [file, change] of parseDiff(diff)) {
             state.changes.set(prefix + file, change);
         }
     }
 }
 
-// Returns a function (filePath) → (firstLine, lastLine) → 'committed' | 'modified' | 'untracked'.
-// Throws when git is not usable for this folder.
-function readGitStatus(entityDir) {
-    const dir = fs.realpathSync(entityDir);
-    const root = git(dir, ['rev-parse', '--show-toplevel']).trim();
+// Returns a function (filePath) → (firstLine, lastLine) → 'committed' | 'modified' | 'untracked'
+// for the files under `paths` (a folder, or a list of folders and files that exist). The repository
+// is the one of the first path; the paths outside of it are left out. Throws when git is not usable
+// for these paths.
+function readGitStatus(paths) {
+    const real = (Array.isArray(paths) ? paths : [paths]).map(item => fs.realpathSync(item));
+    if (real.length === 0) {
+        throw new Error('no folder to read');
+    }
+    const first = fs.statSync(real[0]).isDirectory() ? real[0] : path.dirname(real[0]);
+    const root = git(first, ['rev-parse', '--show-toplevel']).trim();
     if (!root) {
         throw new Error('no work tree');
     }
-    const relDir = toPosix(path.relative(root, dir)) || '.';
-    if (relDir.startsWith('..')) {
+    const relPaths = [...new Set(real.map(item => toPosix(path.relative(root, item)) || '.'))]
+        .filter(relPath => !relPath.startsWith('..'));
+    if (relPaths.length === 0) {
         throw new Error('the entity folder is outside of the repository');
     }
 
@@ -170,14 +178,14 @@ function readGitStatus(entityDir) {
 
     const notInHead = new Set();
     const changes = new Map();
-    readRepository(root, relDir, '', hasHead, { notInHead, changes });
+    readRepository(root, relPaths, '', hasHead, { notInHead, changes });
 
     return (filePath) => {
         const rel = toPosix(path.relative(root, fs.realpathSync(filePath)));
         const change = changes.get(rel);
         const isNew = !hasHead || notInHead.has(rel) || Boolean(change && change.isNew);
 
-        return (first, last) => {
+        const status = (first, last) => {
             if (isNew) {
                 return 'untracked';
             }
@@ -194,6 +202,9 @@ function readGitStatus(entityDir) {
             }
             return 'committed';
         };
+        // Whether a line is not in HEAD: added since HEAD, or in a file that is not in HEAD
+        status.added = (line) => isNew || Boolean(change && change.lines.has(line));
+        return status;
     };
 }
 
@@ -268,28 +279,60 @@ function lineMapping(savedText, editorText) {
 // ---------------------------------------------------------------------------------------------
 // Status reader
 
-// Status of line ranges of the files of `dir`: reader.statusOf(filePath)(firstLine, lastLine)
-// returns 'unsaved', 'untracked', 'modified', 'committed', or null when there is no information
-// (git disabled or unavailable, and no unsaved change). Lines are those of the parsed text, which
-// is the editor text for the files of `overrides` (Map: absolute path → text).
+// The paths git reads for `sources`: a folder, a list of paths, or the { folders, files } of the
+// sources() of a parser (docs/parsers.md)
+function sourcePaths(sources) {
+    if (typeof sources === 'string') {
+        return [sources];
+    }
+    if (Array.isArray(sources)) {
+        return sources.filter(item => typeof item === 'string');
+    }
+    const folders = sources && Array.isArray(sources.folders) ? sources.folders : [];
+    const files = sources && Array.isArray(sources.files) ? sources.files : [];
+    return [...folders.map(folder => (typeof folder === 'string' ? folder : folder && folder.path)), ...files]
+        .filter(item => typeof item === 'string' && item !== '');
+}
+
+const exists = (filePath) => {
+    try {
+        fs.statSync(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+// Status of line ranges of the files of `sources` (a folder, or the sources() of a parser: git
+// reads its folders and files, the missing ones left out): reader.statusOf(filePath)(firstLine,
+// lastLine) returns 'unsaved', 'untracked', 'modified', 'committed', or null when there is no
+// information (git disabled or unavailable, and no unsaved change). Lines are those of the parsed
+// text, which is the editor text for the files of `overrides` (Map: absolute path → text).
+// reader.addedOf(filePath)(line) tells whether a line is not in HEAD: added since HEAD (or in a
+// file that is not in HEAD), or typed in an editor and not saved; false without git. A parser whose
+// declarations share a file (the models of a Prisma schema) uses it to tell a new declaration from
+// a modified one.
 // options: git (false: no git), overrides, cache (Map reused between parses: git runs again only
 // once the cache is cleared). reader.warning: why the git status is missing, if it should be told.
-function createStatusReader(dir, { git: useGit = true, overrides = null, cache = null } = {}) {
+function createStatusReader(sources, { git: useGit = true, overrides = null, cache = null } = {}) {
     let gitStatus = null;
     let warning = null;
-    if (useGit) {
-        const key = (() => {
+    const paths = sourcePaths(sources);
+    if (useGit && paths.length > 0) {
+        const key = paths.map(item => {
             try {
-                return fs.realpathSync(dir);
+                return fs.realpathSync(item);
             } catch {
-                return dir;
+                return item;
             }
-        })();
+        }).join('\0');
         if (cache && cache.has(key)) {
             ({ gitStatus, warning } = cache.get(key));
         } else {
+            // The missing folders and files (a config file the project does not have) are left out
+            const existing = paths.filter(exists);
             try {
-                gitStatus = readGitStatus(dir);
+                gitStatus = existing.length > 0 ? readGitStatus(existing) : null;
             } catch (error) {
                 // Outside a repository there is simply no git status: only real failures are told
                 const reason = gitErrorReason(error);
@@ -303,51 +346,69 @@ function createStatusReader(dir, { git: useGit = true, overrides = null, cache =
 
     const byFile = new Map();
     const fileStatus = (filePath) => {
+        const edited = overrides ? overrides.get(filePath) : undefined;
+        // The saved text is only compared with an editor's: otherwise, whether the file can be
+        // read is enough (a large SQL dump is not read twice)
         let saved = null;
+        let readable = false;
         try {
-            saved = fs.readFileSync(filePath, 'utf8');
+            if (edited !== undefined) {
+                saved = fs.readFileSync(filePath, 'utf8');
+                readable = true;
+            } else {
+                fs.accessSync(filePath, fs.constants.R_OK);
+                readable = fs.statSync(filePath).isFile();
+            }
         } catch {
             saved = null;
+            readable = false;
         }
-        const edited = overrides ? overrides.get(filePath) : undefined;
         let committed = null;
-        if (gitStatus && saved !== null) {
+        if (gitStatus && readable) {
             try {
                 committed = gitStatus(filePath);
             } catch {
                 committed = null;
             }
         }
+        // Whether a line of the saved file is not in HEAD (false without git)
+        const savedAdded = (line) => Boolean(committed && typeof committed.added === 'function' && line > 0 && committed.added(line));
         // A file that only exists in an editor
         if (edited !== undefined && saved === null) {
-            return () => 'unsaved';
+            return { status: () => 'unsaved', added: () => true };
         }
         if (edited === undefined || splitLines(edited).join('\n') === splitLines(saved).join('\n')) {
-            return (first, last) => (committed ? committed(first, last) : null);
+            return { status: (first, last) => (committed ? committed(first, last) : null), added: savedAdded };
         }
         const map = lineMapping(saved, edited);
-        return (first, last) => {
-            let previous = 0;
-            for (let line = first; line <= last; line++) {
-                const savedLine = map[line] || 0;
-                // A new or changed line, or saved lines removed inside the range
-                if (savedLine === 0 || (previous && savedLine !== previous + 1)) {
-                    return 'unsaved';
+        return {
+            status: (first, last) => {
+                let previous = 0;
+                for (let line = first; line <= last; line++) {
+                    const savedLine = map[line] || 0;
+                    // A new or changed line, or saved lines removed inside the range
+                    if (savedLine === 0 || (previous && savedLine !== previous + 1)) {
+                        return 'unsaved';
+                    }
+                    previous = savedLine;
                 }
-                previous = savedLine;
-            }
-            return committed ? committed(map[first], map[last]) : null;
+                return committed ? committed(map[first], map[last]) : null;
+            },
+            // A line typed in the editor is not in HEAD; the others are lines of the saved file
+            added: (line) => !map[line] || savedAdded(map[line]),
         };
+    };
+    const fileEntry = (filePath) => {
+        if (!byFile.has(filePath)) {
+            byFile.set(filePath, fileStatus(filePath));
+        }
+        return byFile.get(filePath);
     };
 
     return {
         warning,
-        statusOf(filePath) {
-            if (!byFile.has(filePath)) {
-                byFile.set(filePath, fileStatus(filePath));
-            }
-            return byFile.get(filePath);
-        },
+        statusOf: (filePath) => fileEntry(filePath).status,
+        addedOf: (filePath) => fileEntry(filePath).added,
     };
 }
 
@@ -369,4 +430,21 @@ function tableStatus(declaration, columns) {
     return declaration || (known.length > 0 ? 'committed' : null);
 }
 
-module.exports = { readGitStatus, gitErrorReason, parseDiff, lineMapping, createStatusReader, tableStatus };
+// Status of a declaration that later statements changed (the ALTER TABLE of a SQL migration): being
+// edited ('unsaved') when it or a change is, new ('untracked') as declared, else 'modified' when a
+// change is not committed
+function changedStatus(declaration, changes) {
+    const known = changes.filter(status => status);
+    if (declaration === 'unsaved' || known.includes('unsaved')) {
+        return 'unsaved';
+    }
+    if (declaration === 'untracked') {
+        return 'untracked';
+    }
+    if (declaration === 'modified' || known.some(status => status !== 'committed')) {
+        return 'modified';
+    }
+    return declaration || (known.length > 0 ? 'committed' : null);
+}
+
+module.exports = { readGitStatus, gitErrorReason, parseDiff, lineMapping, createStatusReader, sourcePaths, tableStatus, changedStatus };

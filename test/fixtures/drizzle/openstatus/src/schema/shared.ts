@@ -1,0 +1,250 @@
+import { z } from "zod";
+
+import {
+  selectMaintenanceSchema,
+  selectMaintenanceUpdateSchema,
+} from "./maintenances";
+import { selectMonitorGroupSchema } from "./monitor_groups";
+import { selectMonitorIncidentSchema } from "./monitor_incidents/validation";
+import { selectMonitorSchema } from "./monitors";
+import { selectPageComponentGroupSchema } from "./page_component_groups";
+import {
+  selectPageComponentSchema,
+  selectStatusReportUpdateToPageComponentSchema,
+} from "./page_components";
+import { selectPageSchema } from "./pages";
+import {
+  selectStatusReportSchema,
+  selectStatusReportUpdateSchema,
+} from "./status_reports";
+import { workspacePlanSchema } from "./workspaces";
+
+// TODO: create a 'public-status' schema with all the different types and validations
+
+// Base schema without transform so it can be extended
+const selectPublicMonitorBaseSchema = selectMonitorSchema.omit({
+  body: true,
+  headers: true,
+  method: true,
+  otelEndpoint: true,
+  otelHeaders: true,
+});
+
+export const selectPublicMonitorSchema =
+  selectPublicMonitorBaseSchema.transform((data) => ({
+    ...data,
+    name: data.externalName || data.name,
+  }));
+
+// author identity is workspace-internal; the public page never carries it
+const authorColumns = { createdBy: true, updatedBy: true } as const;
+
+export const selectStatusReportPageSchema = selectStatusReportSchema
+  .omit(authorColumns)
+  .extend({
+    statusReportUpdates: z
+      .array(
+        selectStatusReportUpdateSchema.omit(authorColumns).extend({
+          statusReportUpdateToPageComponents: z
+            .array(selectStatusReportUpdateToPageComponentSchema)
+            .prefault([]),
+        }),
+      )
+      .prefault([]),
+    statusReportsToPageComponents: z
+      .array(
+        z.object({
+          pageComponentId: z.number(),
+          statusReportId: z.number(),
+          pageComponent: selectPageComponentSchema,
+        }),
+      )
+      .prefault([]),
+  });
+
+export const selectMaintenancePageSchema = selectMaintenanceSchema
+  .omit(authorColumns)
+  .extend({
+    maintenanceUpdates: z
+      .array(selectMaintenanceUpdateSchema.omit(authorColumns))
+      .prefault([]),
+    maintenancesToPageComponents: z
+      .array(
+        z.object({
+          pageComponentId: z.number(),
+          maintenanceId: z.number(),
+          pageComponent: selectPageComponentSchema,
+        }),
+      )
+      .prefault([]),
+  });
+
+export const selectPageSchemaWithRelation = selectPageSchema.extend({
+  monitors: z.array(selectMonitorSchema),
+  statusReports: z.array(selectStatusReportPageSchema),
+});
+
+export const legacy_selectPublicPageSchemaWithRelation = selectPageSchema
+  .extend({
+    monitors: z.array(selectPublicMonitorSchema).prefault([]),
+    statusReports: z.array(selectStatusReportPageSchema).prefault([]),
+    incidents: z.array(selectMonitorIncidentSchema).prefault([]),
+    maintenances: z.array(selectMaintenancePageSchema).prefault([]),
+    workspacePlan: workspacePlanSchema
+      .nullable()
+      .prefault("free")
+      .transform((val) => val ?? "free"),
+  })
+  .omit({
+    // workspaceId: true,
+    id: true,
+  });
+
+const selectPublicMonitorWithStatusSchema = selectPublicMonitorBaseSchema
+  .extend({
+    status: z
+      .enum(["success", "degraded", "error", "info"])
+      .prefault("success"),
+    monitorGroupId: z.number().nullable().optional(),
+    order: z.number().default(0).optional(),
+    groupOrder: z.number().default(0).nullish(),
+    privateLocationCount: z.number().optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    name: data.externalName || data.name,
+  }));
+
+export const statusPageEventSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  from: z.date(),
+  to: z.date().nullable(),
+  status: z.enum(["success", "degraded", "error", "info"]).prefault("success"),
+  type: z.enum(["maintenance", "incident", "report"]),
+});
+
+// Page component with status - used for new tracker system
+const selectPublicPageComponentWithStatusSchema =
+  selectPageComponentSchema.extend({
+    status: z
+      .enum(["success", "degraded", "error", "info"])
+      .prefault("success"),
+    events: z.array(statusPageEventSchema).prefault([]),
+    // For monitor-type components - omit status since it's now at component level
+    monitor: selectPublicMonitorBaseSchema
+      .extend({
+        monitorIncidents: selectMonitorIncidentSchema.array().nullish(),
+      })
+      .nullish(),
+  });
+
+const trackersSchema = z
+  .array(
+    z.discriminatedUnion("type", [
+      z.object({
+        type: z.literal("component"),
+        component: selectPublicPageComponentWithStatusSchema,
+        order: z.number(),
+      }),
+      z.object({
+        type: z.literal("group"),
+        groupId: z.number(),
+        groupName: z.string(),
+        defaultOpen: z.boolean().default(false),
+        components: z.array(selectPublicPageComponentWithStatusSchema),
+        status: z
+          .enum(["success", "degraded", "error", "info"])
+          .prefault("success"),
+        order: z.number(),
+      }),
+    ]),
+  )
+  .prefault([]);
+
+export const selectPageComponentWithMonitorRelation = selectPageComponentSchema
+  .extend({
+    monitor: selectPublicMonitorBaseSchema
+      .extend({
+        monitorIncidents: selectMonitorIncidentSchema.array().nullish(),
+      })
+      .nullish(),
+    group: selectPageComponentGroupSchema.nullish(),
+  })
+  // the component owns the public-facing monitor name/description; externalName
+  // is cleared so downstream `externalName || name` transforms keep the override.
+  // description: NULL means never backfilled → fall back to the monitor's own;
+  // "" is a deliberately cleared field (the dashboard stores "") → stays blank.
+  .transform(({ monitor, ...component }) => ({
+    ...component,
+    monitor: monitor
+      ? {
+          ...monitor,
+          name: component.name,
+          description: component.description ?? monitor.description,
+          externalName: null,
+        }
+      : monitor,
+  }));
+
+export type PageComponentWithMonitorRelation = z.infer<
+  typeof selectPageComponentWithMonitorRelation
+>;
+
+export const selectPublicPageLightSchemaWithRelation = selectPageSchema
+  .extend({
+    monitors: z.array(selectPublicMonitorSchema).prefault([]),
+    statusReports: z.array(selectStatusReportPageSchema).prefault([]),
+    incidents: z.array(selectMonitorIncidentSchema).prefault([]),
+    maintenances: z.array(selectMaintenancePageSchema).prefault([]),
+    workspacePlan: workspacePlanSchema
+      .nullable()
+      .prefault("free")
+      .transform((val) => val ?? "free"),
+    // NEW: Include pageComponents for modern consumers
+    pageComponents: selectPageComponentWithMonitorRelation.array().prefault([]),
+    pageComponentGroups: selectPageComponentGroupSchema.array().prefault([]),
+    whiteLabel: z.boolean().prefault(false),
+  })
+  // `password` is access-control state, never client-facing — gates read it
+  // server-side from the DB. See status-page markdown/feed routes.
+  .omit({
+    id: true,
+    password: true,
+  });
+
+export const selectPublicPageSchemaWithRelation = selectPageSchema
+  .extend({
+    monitorGroups: selectMonitorGroupSchema.array().prefault([]),
+    // TODO: include status of the monitor
+    monitors: selectPublicMonitorWithStatusSchema.array(),
+    pageComponents: selectPageComponentWithMonitorRelation.array().prefault([]),
+    pageComponentGroups: selectPageComponentGroupSchema.array().prefault([]),
+    trackers: trackersSchema,
+    lastEvents: z.array(statusPageEventSchema),
+    openEvents: z.array(statusPageEventSchema),
+    statusReports: z.array(selectStatusReportPageSchema),
+    incidents: z.array(selectMonitorIncidentSchema),
+    maintenances: z.array(selectMaintenancePageSchema),
+    status: z
+      .enum(["success", "degraded", "error", "info"])
+      .prefault("success"),
+    workspacePlan: workspacePlanSchema
+      .nullable()
+      .prefault("free")
+      .transform((val) => val ?? "free"),
+    statusUpdateTypes: z.array(z.enum(["email", "slack", "rss", "json"])),
+    whiteLabel: z.boolean().prefault(false),
+  })
+  .omit({ password: true });
+
+export type StatusReportWithUpdates = z.infer<
+  typeof selectStatusReportPageSchema
+>;
+export type PublicMonitor = z.infer<typeof selectPublicMonitorSchema>;
+export type PublicPage = z.infer<
+  typeof legacy_selectPublicPageSchemaWithRelation
+>;
+export type PublicPageComponentWithStatus = z.infer<
+  typeof selectPublicPageComponentWithStatusSchema
+>;

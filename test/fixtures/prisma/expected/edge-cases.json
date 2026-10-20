@@ -1,0 +1,139 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":16},"autoIncrement":true},
+        {"name":"email","type":"String","source":{"file":"prisma/schema.prisma","line":17},"length":255,"unique":true,"nativeType":"VarChar(255)"},
+        {"name":"display_name","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":18}},
+        {"name":"role","type":"Role","source":{"file":"prisma/schema.prisma","line":19},"default":"admin","values":["MEMBER","admin"]},
+        {"name":"roles","type":"Role[]","nullable":true,"source":{"file":"prisma/schema.prisma","line":20},"values":["MEMBER","admin"]},
+        {"name":"tags","type":"String[]","nullable":true,"source":{"file":"prisma/schema.prisma","line":21}},
+        {"name":"balance","type":"Decimal","source":{"file":"prisma/schema.prisma","line":22},"precision":12,"scale":2,"default":0.5,"nativeType":"Decimal(12, 2)"},
+        {"name":"big","type":"BigInt","source":{"file":"prisma/schema.prisma","line":23},"defaultRaw":"9007199254740993"},
+        {"name":"ratio","type":"Float","source":{"file":"prisma/schema.prisma","line":24},"default":-1.5},
+        {"name":"active","type":"Boolean","source":{"file":"prisma/schema.prisma","line":25},"default":true},
+        {"name":"settings","type":"Json","source":{"file":"prisma/schema.prisma","line":26},"default":"{\"theme\": \"dark\"}"},
+        {"name":"avatar","type":"Bytes","nullable":true,"source":{"file":"prisma/schema.prisma","line":27}},
+        {"name":"created_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":28},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updated_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":29}},
+        {"name":"location","type":"Unsupported(\"\\\"public\\\".geography\")","nullable":true,"source":{"file":"prisma/schema.prisma","line":30},"nativeType":"\"public\".geography"},
+        {"name":"legacy","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":31}},
+        {"name":"manager_id","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":36}}
+      ],
+      "relations": [
+        {"foreignKey":"manager_id","references":"id","on":"users","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"A","references":"id","on":"users","type":"many-to-many","via":"_follows","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":15},
+      "indexes": [
+        {"columns":["display_name","created_at"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Profile",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":48},"nativeType":"Uuid"},
+        {"name":"user_id","type":"Int","source":{"file":"prisma/schema.prisma","line":49},"unique":true},
+        {"name":"bio","type":"String","source":{"file":"prisma/schema.prisma","line":51},"default":"it's \"quoted\" // not a comment","nativeType":"Text"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"users","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":47}
+    },
+    {
+      "table": "Post",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":55},"defaultRaw":"gen_random_uuid()","nativeType":"Uuid"},
+        {"name":"slug","type":"String","source":{"file":"prisma/schema.prisma","line":56}},
+        {"name":"authorId","type":"Int","source":{"file":"prisma/schema.prisma","line":57}},
+        {"name":"editorId","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":59}},
+        {"name":"successorId","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":61},"unique":true,"nativeType":"Uuid"},
+        {"name":"status","type":"Status","source":{"file":"prisma/schema.prisma","line":65},"default":"DRAFT","values":["DRAFT","PUBLISHED"]}
+      ],
+      "relations": [
+        {"foreignKey":"authorId","references":"id","on":"users","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"editorId","references":"id","on":"users","type":"many-to-one","onDelete":"no action","onUpdate":"restrict"},
+        {"foreignKey":"successorId","references":"id","on":"Post","type":"one-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"A","references":"id","on":"Tag","type":"many-to-many","via":"_PostToTag","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":54},
+      "indexes": [
+        {"columns":["authorId","slug"],"type":"unique","name":"post_author_slug"}
+      ]
+    },
+    {
+      "table": "Tag",
+      "columns": [
+        {"name":"name","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":71}},
+        {"name":"code","type":"String","source":{"file":"prisma/schema.prisma","line":72},"unique":true}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":70}
+    },
+    {
+      "table": "Group",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":79}}
+      ],
+      "relations": [
+        {"foreignKey":"A","references":"id","on":"users","type":"many-to-many","via":"_GroupToUser","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":78}
+    },
+    {
+      "table": "Order",
+      "columns": [
+        {"name":"tenantId","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":85}},
+        {"name":"number","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":86}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":84}
+    },
+    {
+      "table": "OrderLine",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":94}},
+        {"name":"orderTenant","type":"Int","source":{"file":"prisma/schema.prisma","line":95}},
+        {"name":"orderNumber","type":"Int","source":{"file":"prisma/schema.prisma","line":96}}
+      ],
+      "relations": [
+        {"foreignKey":"orderTenant","references":"tenantId","on":"Order","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"orderNumber","references":"number","on":"Order","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":93},
+      "indexes": [
+        {"columns":["orderTenant"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Invoice",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":103}},
+        {"name":"orderTenant","type":"Int","source":{"file":"prisma/schema.prisma","line":104}},
+        {"name":"orderNumber","type":"Int","source":{"file":"prisma/schema.prisma","line":105}}
+      ],
+      "relations": [
+        {"foreignKey":"orderTenant","references":"tenantId","on":"Order","type":"one-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"orderNumber","references":"number","on":"Order","type":"one-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":102},
+      "indexes": [
+        {"columns":["orderTenant","orderNumber"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "AuditLog",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":113}},
+        {"name":"payload","type":"Json","source":{"file":"prisma/schema.prisma","line":114}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":112}
+    }
+  ],
+  "warnings": [
+    "prisma/schema.prisma:131: view UserStats skipped: views are not drawn."
+  ]
+}

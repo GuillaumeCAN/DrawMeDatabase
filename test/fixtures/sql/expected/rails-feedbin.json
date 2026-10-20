@@ -1,0 +1,833 @@
+{
+  "tables": [
+    {
+      "table": "account_migration_items",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":61},"autoIncrement":true},
+        {"name":"account_migration_id","type":"bigint","source":{"file":"db/structure.sql","line":62}},
+        {"name":"status","type":"bigint","source":{"file":"db/structure.sql","line":63},"default":0},
+        {"name":"data","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":64},"default":"{}"},
+        {"name":"message","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":65}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":66}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":67}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":60},
+      "indexes": [
+        {"columns":["account_migration_id"],"type":"index","name":"index_account_migration_items_on_account_migration_id"}
+      ]
+    },
+    {
+      "table": "account_migrations",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":95},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":96}},
+        {"name":"api_token","type":"text","source":{"file":"db/structure.sql","line":97}},
+        {"name":"status","type":"bigint","source":{"file":"db/structure.sql","line":98},"default":0},
+        {"name":"data","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":99},"default":"{}"},
+        {"name":"message","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":100}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":101}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":102}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":94},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_account_migrations_on_user_id"}
+      ]
+    },
+    {
+      "table": "actions",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":130},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":131}},
+        {"name":"query","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":132}},
+        {"name":"actions","type":"text[]","nullable":true,"source":{"file":"db/structure.sql","line":133},"default":"{}"},
+        {"name":"feed_ids","type":"text[]","nullable":true,"source":{"file":"db/structure.sql","line":134},"default":"{}"},
+        {"name":"all_feeds","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":135},"default":false},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":136}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":137}},
+        {"name":"title","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":138}},
+        {"name":"tag_ids","type":"bigint[]","nullable":true,"source":{"file":"db/structure.sql","line":139},"default":"{}"},
+        {"name":"action_type","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":140},"default":0},
+        {"name":"computed_feed_ids","type":"bigint[]","nullable":true,"source":{"file":"db/structure.sql","line":141},"default":"{}"},
+        {"name":"status","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":142},"default":0}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":129},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_actions_on_user_id"}
+      ]
+    },
+    {
+      "table": "app_store_notifications",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":170},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":171}},
+        {"name":"original_transaction_id","type":"text","source":{"file":"db/structure.sql","line":172}},
+        {"name":"notification_id","type":"uuid","source":{"file":"db/structure.sql","line":173},"unique":true},
+        {"name":"notification_type","type":"text","source":{"file":"db/structure.sql","line":174}},
+        {"name":"subtype","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":175}},
+        {"name":"version","type":"text","source":{"file":"db/structure.sql","line":176}},
+        {"name":"processed_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":177}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":178}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":179}},
+        {"name":"data","type":"jsonb","source":{"file":"db/structure.sql","line":180}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":169},
+      "indexes": [
+        {"columns":["original_transaction_id"],"type":"index","name":"index_app_store_notifications_on_original_transaction_id"},
+        {"columns":["user_id"],"type":"index","name":"index_app_store_notifications_on_user_id"}
+      ]
+    },
+    {
+      "table": "attribute_changes",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":220},"autoIncrement":true},
+        {"name":"trackable_type","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":221}},
+        {"name":"trackable_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":222}},
+        {"name":"name","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":223}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":224}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":225}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":219},
+      "indexes": [
+        {"columns":["trackable_id","trackable_type","name"],"type":"unique","name":"index_attribute_changes_on_trackable_and_name"}
+      ]
+    },
+    {
+      "table": "authentication_tokens",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":253},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":254}},
+        {"name":"token","type":"text","source":{"file":"db/structure.sql","line":255}},
+        {"name":"purpose","type":"integer","source":{"file":"db/structure.sql","line":256}},
+        {"name":"data","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":257},"default":"{}"},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":258}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":259}},
+        {"name":"active","type":"boolean","source":{"file":"db/structure.sql","line":260},"default":true},
+        {"name":"uuid","type":"uuid","source":{"file":"db/structure.sql","line":261},"defaultRaw":"public.uuid_generate_v4()"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"users","type":"many-to-one"}
+      ],
+      "source": {"file":"db/structure.sql","line":252},
+      "indexes": [
+        {"columns":["purpose","token"],"type":"unique","name":"index_authentication_tokens_on_purpose_and_token"},
+        {"columns":["purpose","token","active"],"type":"index","name":"index_authentication_tokens_on_purpose_and_token_and_active"},
+        {"columns":["user_id"],"type":"index","name":"index_authentication_tokens_on_user_id"},
+        {"columns":["uuid"],"type":"index","name":"index_authentication_tokens_on_uuid"}
+      ]
+    },
+    {
+      "table": "billing_events",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":289},"autoIncrement":true},
+        {"name":"details","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":290}},
+        {"name":"event_type","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":291},"length":255},
+        {"name":"billable_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":292}},
+        {"name":"billable_type","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":293},"length":255},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":294}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":295}},
+        {"name":"event_id","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":296},"length":255,"unique":true},
+        {"name":"info","type":"json","nullable":true,"source":{"file":"db/structure.sql","line":297}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":288},
+      "indexes": [
+        {"columns":["billable_id","billable_type"],"type":"index","name":"index_billing_events_on_billable_id_and_billable_type"}
+      ]
+    },
+    {
+      "table": "coupons",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":325},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":326}},
+        {"name":"coupon_code","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":327},"length":255},
+        {"name":"sent_to","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":328},"length":255},
+        {"name":"redeemed","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":329},"default":false},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":330}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":331}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":324},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_coupons_on_user_id"}
+      ]
+    },
+    {
+      "table": "deleted_users",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":359},"autoIncrement":true},
+        {"name":"email","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":360}},
+        {"name":"customer_id","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":361}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":362}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":363}},
+        {"name":"original_user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":364}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":358},
+      "indexes": [
+        {"columns":["email"],"type":"index","name":"index_deleted_users_on_email"}
+      ]
+    },
+    {
+      "table": "devices",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":392},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":393}},
+        {"name":"token","type":"text","source":{"file":"db/structure.sql","line":394}},
+        {"name":"model","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":395}},
+        {"name":"device_type","type":"bigint","source":{"file":"db/structure.sql","line":396}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":397}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":398}},
+        {"name":"application","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":399}},
+        {"name":"operating_system","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":400}},
+        {"name":"active","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":401},"default":true},
+        {"name":"data","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":402},"default":"{}"}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":391},
+      "indexes": [
+        {"columns":["lower(token)"],"type":"unique","name":"index_devices_on_lower_tokens"},
+        {"columns":["user_id"],"type":"index","name":"index_devices_on_user_id"}
+      ]
+    },
+    {
+      "table": "discovered_feeds",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":430},"autoIncrement":true},
+        {"name":"title","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":431}},
+        {"name":"site_url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":432}},
+        {"name":"feed_url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":433}},
+        {"name":"host","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":434}},
+        {"name":"verified_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":435}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":436}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":437}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":429},
+      "indexes": [
+        {"columns":["site_url","feed_url"],"type":"unique","name":"index_discovered_feeds_on_site_url_and_feed_url"}
+      ]
+    },
+    {
+      "table": "embeds",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":465},"autoIncrement":true},
+        {"name":"provider_id","type":"text","source":{"file":"db/structure.sql","line":466}},
+        {"name":"parent_id","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":467}},
+        {"name":"source","type":"integer","source":{"file":"db/structure.sql","line":468}},
+        {"name":"data","type":"jsonb","source":{"file":"db/structure.sql","line":469}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":470}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":471}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":464},
+      "indexes": [
+        {"columns":["parent_id"],"type":"index","name":"index_embeds_on_parent_id"},
+        {"columns":["source","provider_id"],"type":"unique","name":"index_embeds_on_source_and_provider_id"}
+      ]
+    },
+    {
+      "table": "entries",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":499},"autoIncrement":true},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":500}},
+        {"name":"title","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":501}},
+        {"name":"url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":502}},
+        {"name":"author","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":503}},
+        {"name":"summary","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":504}},
+        {"name":"content","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":505}},
+        {"name":"published","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":506}},
+        {"name":"updated","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":507}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":508}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":509}},
+        {"name":"entry_id","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":510}},
+        {"name":"public_id","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":511},"length":255,"unique":true},
+        {"name":"starred_entries_count","type":"bigint","source":{"file":"db/structure.sql","line":512},"default":0},
+        {"name":"data","type":"json","nullable":true,"source":{"file":"db/structure.sql","line":513}},
+        {"name":"recently_played_entries_count","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":514},"default":0},
+        {"name":"settings","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":515}},
+        {"name":"queued_entries_count","type":"bigint","source":{"file":"db/structure.sql","line":516},"default":0},
+        {"name":"fingerprint","type":"uuid","nullable":true,"source":{"file":"db/structure.sql","line":517}},
+        {"name":"guid","type":"uuid","nullable":true,"source":{"file":"db/structure.sql","line":518}},
+        {"name":"provider","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":519}},
+        {"name":"provider_id","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":520}},
+        {"name":"provider_parent_id","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":521}},
+        {"name":"chapters","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":522}},
+        {"name":"categories","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":523}},
+        {"name":"compressed_original_content","type":"bytea","nullable":true,"source":{"file":"db/structure.sql","line":524}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":498},
+      "indexes": [
+        {"columns":["feed_id"],"type":"index","name":"index_entries_on_feed_id_include_id_published_created_at"},
+        {"columns":["provider","provider_id"],"type":"index","name":"index_entries_on_provider_and_provider_id"}
+      ]
+    },
+    {
+      "table": "feed_stats",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":552},"autoIncrement":true},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":553}},
+        {"name":"day","type":"date","nullable":true,"source":{"file":"db/structure.sql","line":554}},
+        {"name":"entries_count","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":555},"default":0},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":556}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":557}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":551},
+      "indexes": [
+        {"columns":["feed_id"],"type":"index","name":"index_feed_stats_on_feed_id"},
+        {"columns":["feed_id","day"],"type":"index","name":"index_feed_stats_on_feed_id_and_day"}
+      ]
+    },
+    {
+      "table": "feeds",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":585},"autoIncrement":true},
+        {"name":"title","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":586}},
+        {"name":"feed_url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":587},"unique":true},
+        {"name":"site_url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":588}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":589}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":590}},
+        {"name":"subscriptions_count","type":"bigint","source":{"file":"db/structure.sql","line":591},"default":0},
+        {"name":"protected","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":592},"default":false},
+        {"name":"push_expiration","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":593}},
+        {"name":"last_published_entry","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":594}},
+        {"name":"host","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":595}},
+        {"name":"self_url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":596}},
+        {"name":"feed_type","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":597},"default":0},
+        {"name":"active","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":598},"default":true},
+        {"name":"options","type":"json","nullable":true,"source":{"file":"db/structure.sql","line":599}},
+        {"name":"hubs","type":"text[]","nullable":true,"source":{"file":"db/structure.sql","line":600}},
+        {"name":"settings","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":601}},
+        {"name":"standalone_request_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":602}},
+        {"name":"last_change_check","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":603}},
+        {"name":"crawl_data","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":604}},
+        {"name":"redirected_to","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":605}},
+        {"name":"channel_id","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":606}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":584},
+      "indexes": [
+        {"columns":["active"],"type":"index","name":"index_feeds_on_active"},
+        {"columns":["channel_id"],"type":"index","name":"index_feeds_on_channel_id"},
+        {"columns":["feed_type"],"type":"index","name":"index_feeds_on_feed_type"},
+        {"columns":["host"],"type":"index","name":"index_feeds_on_host"},
+        {"columns":["hubs"],"type":"index","name":"index_feeds_on_hubs"},
+        {"columns":["last_published_entry"],"type":"index","name":"index_feeds_on_last_published_entry"},
+        {"columns":["push_expiration"],"type":"index","name":"index_feeds_on_push_expiration"},
+        {"columns":["redirected_to"],"type":"index","name":"index_feeds_on_redirected_to"},
+        {"columns":["standalone_request_at"],"type":"index","name":"index_feeds_on_standalone_request_at"}
+      ]
+    },
+    {
+      "table": "images",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":634},"autoIncrement":true},
+        {"name":"provider","type":"bigint","source":{"file":"db/structure.sql","line":635}},
+        {"name":"provider_id","type":"text","source":{"file":"db/structure.sql","line":636}},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":637}},
+        {"name":"url","type":"text","source":{"file":"db/structure.sql","line":638}},
+        {"name":"url_fingerprint","type":"uuid","source":{"file":"db/structure.sql","line":639}},
+        {"name":"image_fingerprint","type":"uuid","source":{"file":"db/structure.sql","line":640}},
+        {"name":"original_fingerprint","type":"uuid","source":{"file":"db/structure.sql","line":641}},
+        {"name":"storage_path","type":"text","source":{"file":"db/structure.sql","line":642}},
+        {"name":"width","type":"bigint","source":{"file":"db/structure.sql","line":643}},
+        {"name":"height","type":"bigint","source":{"file":"db/structure.sql","line":644}},
+        {"name":"bytesize","type":"bigint","source":{"file":"db/structure.sql","line":645}},
+        {"name":"placeholder_color","type":"text","source":{"file":"db/structure.sql","line":646}},
+        {"name":"data","type":"jsonb","source":{"file":"db/structure.sql","line":647},"default":"{}"},
+        {"name":"variant","type":"text","source":{"file":"db/structure.sql","line":648}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":649}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":650}},
+        {"name":"kind","type":"bigint","source":{"file":"db/structure.sql","line":651},"default":3}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":633},
+      "indexes": [
+        {"columns":["feed_id","image_fingerprint"],"type":"index","name":"index_images_on_feed_id_and_image_fingerprint"},
+        {"columns":["provider","provider_id"],"type":"unique","name":"index_images_on_provider_and_provider_id"},
+        {"columns":["storage_path"],"type":"index","name":"index_images_on_storage_path"},
+        {"columns":["url_fingerprint"],"type":"index","name":"index_images_on_url_fingerprint"}
+      ]
+    },
+    {
+      "table": "import_items",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":679},"autoIncrement":true},
+        {"name":"import_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":680}},
+        {"name":"details","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":681}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":682}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":683}},
+        {"name":"status","type":"bigint","source":{"file":"db/structure.sql","line":684},"default":0},
+        {"name":"error","type":"jsonb","nullable":true,"source":{"file":"db/structure.sql","line":685}},
+        {"name":"site_url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":686}},
+        {"name":"host","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":687}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":678},
+      "indexes": [
+        {"columns":["import_id"],"type":"index","name":"index_import_items_on_import_id"},
+        {"columns":["import_id","status"],"type":"index","name":"index_import_items_on_import_id_and_status"}
+      ]
+    },
+    {
+      "table": "imports",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":715},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":716}},
+        {"name":"complete","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":717},"default":false},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":718}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":719}},
+        {"name":"upload","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":720},"length":255},
+        {"name":"filename","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":721}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":714}
+    },
+    {
+      "table": "in_app_purchases",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":749},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":750}},
+        {"name":"transaction_id","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":751},"unique":true},
+        {"name":"purchase_date","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":752}},
+        {"name":"receipt","type":"json","nullable":true,"source":{"file":"db/structure.sql","line":753}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":754}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":755}},
+        {"name":"response","type":"json","nullable":true,"source":{"file":"db/structure.sql","line":756}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":748},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_in_app_purchases_on_user_id"}
+      ]
+    },
+    {
+      "table": "newsletter_senders",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":784},"autoIncrement":true},
+        {"name":"feed_id","type":"bigint","source":{"file":"db/structure.sql","line":785},"unique":true},
+        {"name":"active","type":"boolean","source":{"file":"db/structure.sql","line":786},"default":true},
+        {"name":"token","type":"text","source":{"file":"db/structure.sql","line":787}},
+        {"name":"full_token","type":"text","source":{"file":"db/structure.sql","line":788}},
+        {"name":"email","type":"text","source":{"file":"db/structure.sql","line":789}},
+        {"name":"name","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":790}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":791}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":792}}
+      ],
+      "relations": [
+        {"foreignKey":"feed_id","references":"id","on":"feeds","type":"one-to-one"}
+      ],
+      "source": {"file":"db/structure.sql","line":783},
+      "indexes": [
+        {"columns":["token"],"type":"index","name":"index_newsletter_senders_on_token"}
+      ]
+    },
+    {
+      "table": "oauth_servers",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":820},"autoIncrement":true},
+        {"name":"host","type":"text","source":{"file":"db/structure.sql","line":821},"unique":true},
+        {"name":"data","type":"jsonb","source":{"file":"db/structure.sql","line":822},"default":"{}"},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":823}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":824}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":819}
+    },
+    {
+      "table": "plans",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":852},"autoIncrement":true},
+        {"name":"stripe_id","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":853},"length":255},
+        {"name":"name","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":854},"length":255},
+        {"name":"price","type":"numeric","nullable":true,"source":{"file":"db/structure.sql","line":855}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":856}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":857}},
+        {"name":"price_tier","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":858}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":851}
+    },
+    {
+      "table": "playlists",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":886},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":887}},
+        {"name":"title","type":"text","source":{"file":"db/structure.sql","line":888}},
+        {"name":"sort_order","type":"bigint","source":{"file":"db/structure.sql","line":889},"default":0},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":890}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":891}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"users","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"db/structure.sql","line":885},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_playlists_on_user_id"},
+        {"columns":["user_id","title"],"type":"unique","name":"index_playlists_on_user_id_and_title"}
+      ]
+    },
+    {
+      "table": "podcast_subscriptions",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":919},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":920}},
+        {"name":"feed_id","type":"bigint","source":{"file":"db/structure.sql","line":921}},
+        {"name":"status","type":"bigint","source":{"file":"db/structure.sql","line":922},"default":0},
+        {"name":"title","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":923}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":924}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":925}},
+        {"name":"playlist_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":926}},
+        {"name":"download_filter","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":927}},
+        {"name":"download_filter_type","type":"bigint","source":{"file":"db/structure.sql","line":928},"default":0},
+        {"name":"chapter_filter","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":929}},
+        {"name":"chapter_filter_type","type":"bigint","source":{"file":"db/structure.sql","line":930},"default":1}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"feed_id","references":"id","on":"feeds","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"db/structure.sql","line":918},
+      "indexes": [
+        {"columns":["feed_id"],"type":"index","name":"index_podcast_subscriptions_on_feed_id"},
+        {"columns":["user_id"],"type":"index","name":"index_podcast_subscriptions_on_user_id"},
+        {"columns":["user_id","feed_id"],"type":"unique","name":"index_podcast_subscriptions_on_user_id_and_feed_id"}
+      ]
+    },
+    {
+      "table": "queued_entries",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":958},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":959}},
+        {"name":"entry_id","type":"bigint","source":{"file":"db/structure.sql","line":960}},
+        {"name":"feed_id","type":"bigint","source":{"file":"db/structure.sql","line":961}},
+        {"name":"order","type":"bigint","source":{"file":"db/structure.sql","line":962},"defaultRaw":"date_part('epoch'::text, now())"},
+        {"name":"progress","type":"bigint","source":{"file":"db/structure.sql","line":963},"default":0},
+        {"name":"duration","type":"bigint","source":{"file":"db/structure.sql","line":964},"default":0},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":965}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":966}},
+        {"name":"playlist_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":967}},
+        {"name":"skipped_chapters","type":"jsonb","source":{"file":"db/structure.sql","line":968},"default":"[]"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"users","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"entry_id","references":"id","on":"entries","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"db/structure.sql","line":957},
+      "indexes": [
+        {"columns":["entry_id"],"type":"index","name":"index_queued_entries_on_entry_id"},
+        {"columns":["feed_id"],"type":"index","name":"index_queued_entries_on_feed_id"},
+        {"columns":["user_id"],"type":"index","name":"index_queued_entries_on_user_id"},
+        {"columns":["user_id","entry_id"],"type":"unique","name":"index_queued_entries_on_user_id_and_entry_id"},
+        {"columns":["user_id","order"],"type":"index","name":"index_queued_entries_on_user_id_and_order"}
+      ]
+    },
+    {
+      "table": "recently_played_entries",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":996},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":997}},
+        {"name":"entry_id","type":"bigint","source":{"file":"db/structure.sql","line":998}},
+        {"name":"progress","type":"bigint","source":{"file":"db/structure.sql","line":999},"default":0},
+        {"name":"duration","type":"bigint","source":{"file":"db/structure.sql","line":1000},"default":0},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1001}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1002}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":995},
+      "indexes": [
+        {"columns":["entry_id"],"type":"index","name":"index_recently_played_entries_on_entry_id"},
+        {"columns":["user_id"],"type":"index","name":"index_recently_played_entries_on_user_id"},
+        {"columns":["user_id","created_at"],"type":"index","name":"index_recently_played_entries_on_user_id_and_created_at"},
+        {"columns":["user_id","entry_id"],"type":"unique","name":"index_recently_played_entries_on_user_id_and_entry_id"}
+      ]
+    },
+    {
+      "table": "recently_read_entries",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1030},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1031}},
+        {"name":"entry_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1032}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1033}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1034}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1029},
+      "indexes": [
+        {"columns":["created_at"],"type":"index","name":"index_recently_read_entries_on_created_at"},
+        {"columns":["entry_id"],"type":"index","name":"index_recently_read_entries_on_entry_id"},
+        {"columns":["user_id"],"type":"index","name":"index_recently_read_entries_on_user_id"},
+        {"columns":["user_id","entry_id"],"type":"unique","name":"index_recently_read_entries_on_user_id_and_entry_id"},
+        {"columns":["user_id","id"],"type":"index","name":"index_recently_read_entries_on_user_id_and_id"}
+      ]
+    },
+    {
+      "table": "saved_searches",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1062},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":1063}},
+        {"name":"name","type":"text","source":{"file":"db/structure.sql","line":1064}},
+        {"name":"query","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":1065}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1066}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1067}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1061},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_saved_searches_on_user_id"}
+      ]
+    },
+    {
+      "table": "sharing_services",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1104},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1105}},
+        {"name":"label","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":1106}},
+        {"name":"url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":1107}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1108}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1109}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1103},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_sharing_services_on_user_id"}
+      ]
+    },
+    {
+      "table": "starred_entries",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1137},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1138}},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1139}},
+        {"name":"entry_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1140}},
+        {"name":"published","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1141}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1142}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1143}},
+        {"name":"source","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":1144}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1136},
+      "indexes": [
+        {"columns":["entry_id"],"type":"index","name":"index_starred_entries_on_entry_id"},
+        {"columns":["feed_id"],"type":"index","name":"index_starred_entries_on_feed_id"},
+        {"columns":["published"],"type":"index","name":"index_starred_entries_on_published"},
+        {"columns":["user_id"],"type":"index","name":"index_starred_entries_on_user_id"},
+        {"columns":["user_id","entry_id"],"type":"unique","name":"index_starred_entries_on_user_id_and_entry_id"}
+      ]
+    },
+    {
+      "table": "subscriptions",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1172},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1173}},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1174}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1175}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1176}},
+        {"name":"title","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":1177}},
+        {"name":"view_inline","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1178},"default":false},
+        {"name":"active","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1179},"default":true},
+        {"name":"push","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1180},"default":false},
+        {"name":"show_updates","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1181},"default":true},
+        {"name":"muted","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1182},"default":false},
+        {"name":"show_retweets","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1183},"default":true},
+        {"name":"media_only","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1184},"default":false},
+        {"name":"kind","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1185},"default":0},
+        {"name":"view_mode","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1186},"default":0},
+        {"name":"fix_status","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1187},"default":0}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1171},
+      "indexes": [
+        {"columns":["created_at"],"type":"index","name":"index_subscriptions_on_created_at"},
+        {"columns":["feed_id"],"type":"index","name":"index_subscriptions_on_feed_id"},
+        {"columns":["feed_id","active","muted"],"type":"index","name":"index_subscriptions_on_feed_id_and_active_and_muted"},
+        {"columns":["kind"],"type":"index","name":"index_subscriptions_on_kind"},
+        {"columns":["media_only"],"type":"index","name":"index_subscriptions_on_media_only"},
+        {"columns":["show_retweets"],"type":"index","name":"index_subscriptions_on_show_retweets"},
+        {"columns":["feed_id","active","muted","show_updates"],"type":"index","name":"index_subscriptions_on_updates"},
+        {"columns":["user_id"],"type":"index","name":"index_subscriptions_on_user_id"},
+        {"columns":["user_id","feed_id"],"type":"unique","name":"index_subscriptions_on_user_id_and_feed_id"}
+      ]
+    },
+    {
+      "table": "suggested_categories",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1215},"autoIncrement":true},
+        {"name":"name","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":1216}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1217}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1218}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1214}
+    },
+    {
+      "table": "suggested_feeds",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1246},"autoIncrement":true},
+        {"name":"suggested_category_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1247}},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1248}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1249}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1250}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1245},
+      "indexes": [
+        {"columns":["feed_id"],"type":"index","name":"index_suggested_feeds_on_feed_id"},
+        {"columns":["suggested_category_id"],"type":"index","name":"index_suggested_feeds_on_suggested_category_id"}
+      ]
+    },
+    {
+      "table": "supported_sharing_services",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1278},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":1279}},
+        {"name":"service_id","type":"character varying","source":{"file":"db/structure.sql","line":1280},"length":255},
+        {"name":"settings","type":"hstore","nullable":true,"source":{"file":"db/structure.sql","line":1281}},
+        {"name":"service_options","type":"json","nullable":true,"source":{"file":"db/structure.sql","line":1282}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1283}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1284}},
+        {"name":"status","type":"bigint","source":{"file":"db/structure.sql","line":1285},"default":0}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1277},
+      "indexes": [
+        {"columns":["user_id"],"type":"index","name":"index_supported_sharing_services_on_user_id"},
+        {"columns":["user_id","service_id"],"type":"unique","name":"index_supported_sharing_services_on_user_id_and_service_id"}
+      ]
+    },
+    {
+      "table": "taggings",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1313},"autoIncrement":true},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1314}},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1315}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1316}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1317}},
+        {"name":"tag_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1318}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1312},
+      "indexes": [
+        {"columns":["tag_id"],"type":"index","name":"index_taggings_on_tag_id"},
+        {"columns":["user_id"],"type":"index","name":"index_taggings_on_user_id"},
+        {"columns":["user_id","feed_id"],"type":"index","name":"index_taggings_on_user_id_and_feed_id"},
+        {"columns":["user_id","tag_id"],"type":"index","name":"index_taggings_on_user_id_and_tag_id"}
+      ]
+    },
+    {
+      "table": "tags",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1346},"autoIncrement":true},
+        {"name":"name","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1347},"length":255},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1348}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1349}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1345},
+      "indexes": [
+        {"columns":["name"],"type":"index","name":"index_tags_on_name"}
+      ]
+    },
+    {
+      "table": "twitter_users",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1377},"autoIncrement":true},
+        {"name":"screen_name","type":"text","source":{"file":"db/structure.sql","line":1378}},
+        {"name":"data","type":"jsonb","source":{"file":"db/structure.sql","line":1379}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1380}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1381}},
+        {"name":"profile_image_url","type":"text","nullable":true,"source":{"file":"db/structure.sql","line":1382}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1376},
+      "indexes": [
+        {"columns":["lower(screen_name)"],"type":"unique","name":"index_twitter_users_on_lower_screen_name"}
+      ]
+    },
+    {
+      "table": "unreads",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1410},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/structure.sql","line":1411}},
+        {"name":"feed_id","type":"bigint","source":{"file":"db/structure.sql","line":1412}},
+        {"name":"entry_id","type":"bigint","source":{"file":"db/structure.sql","line":1413}},
+        {"name":"published","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1414}},
+        {"name":"entry_created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1415}},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1416}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1417}}
+      ],
+      "relations": [
+        {"foreignKey":"entry_id","references":"id","on":"entries","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"db/structure.sql","line":1409},
+      "indexes": [
+        {"columns":["entry_id"],"type":"index","name":"index_unreads_on_entry_id"},
+        {"columns":["feed_id"],"type":"index","name":"index_unreads_on_feed_id"},
+        {"columns":["user_id"],"type":"index","name":"index_unreads_on_user_id"},
+        {"columns":["user_id","created_at"],"type":"index","name":"index_unreads_on_user_id_and_created_at"},
+        {"columns":["user_id","entry_id"],"type":"unique","name":"index_unreads_on_user_id_and_entry_id"},
+        {"columns":["user_id","feed_id","published"],"type":"index","name":"index_unreads_on_user_id_and_feed_id_and_published"},
+        {"columns":["user_id","published"],"type":"index","name":"index_unreads_on_user_id_and_published"}
+      ]
+    },
+    {
+      "table": "updated_entries",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1445},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1446}},
+        {"name":"entry_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1447}},
+        {"name":"feed_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1448}},
+        {"name":"published","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1449}},
+        {"name":"updated","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1450}},
+        {"name":"created_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1451}},
+        {"name":"updated_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1452}}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1444},
+      "indexes": [
+        {"columns":["entry_id"],"type":"index","name":"index_updated_entries_on_entry_id"},
+        {"columns":["feed_id"],"type":"index","name":"index_updated_entries_on_feed_id"},
+        {"columns":["user_id"],"type":"index","name":"index_updated_entries_on_user_id"},
+        {"columns":["user_id","entry_id"],"type":"unique","name":"index_updated_entries_on_user_id_and_entry_id"}
+      ]
+    },
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/structure.sql","line":1480},"autoIncrement":true},
+        {"name":"email","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1481},"length":255},
+        {"name":"password_digest","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1482},"length":255},
+        {"name":"customer_id","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1483},"length":255,"unique":true},
+        {"name":"plan_id","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1484}},
+        {"name":"admin","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1485},"default":false},
+        {"name":"suspended","type":"boolean","nullable":true,"source":{"file":"db/structure.sql","line":1486},"default":false},
+        {"name":"created_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1487}},
+        {"name":"updated_at","type":"timestamp without time zone","source":{"file":"db/structure.sql","line":1488}},
+        {"name":"auth_token","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1489},"length":255,"unique":true},
+        {"name":"password_reset_token","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1490},"length":255,"unique":true},
+        {"name":"password_reset_sent_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1491}},
+        {"name":"settings","type":"hstore","nullable":true,"source":{"file":"db/structure.sql","line":1492}},
+        {"name":"starred_token","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1493},"length":255,"unique":true},
+        {"name":"inbound_email_token","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1494},"length":255,"unique":true},
+        {"name":"tag_visibility","type":"json","nullable":true,"source":{"file":"db/structure.sql","line":1495},"default":"{}"},
+        {"name":"expires_at","type":"timestamp without time zone","nullable":true,"source":{"file":"db/structure.sql","line":1496}},
+        {"name":"newsletter_token","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1497},"unique":true},
+        {"name":"price_tier","type":"bigint","nullable":true,"source":{"file":"db/structure.sql","line":1498}},
+        {"name":"page_token","type":"character varying","nullable":true,"source":{"file":"db/structure.sql","line":1499},"unique":true}
+      ],
+      "relations": [],
+      "source": {"file":"db/structure.sql","line":1479},
+      "indexes": [
+        {"columns":["expires_at"],"type":"index","name":"index_users_on_expires_at"},
+        {"columns":["lower((email)::text)"],"type":"unique","name":"index_users_on_lower_email"}
+      ]
+    }
+  ],
+  "warnings": []
+}

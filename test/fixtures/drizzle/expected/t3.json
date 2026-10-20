@@ -1,0 +1,369 @@
+{
+  "tables": [
+    {
+      "table": "project1_post",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 16
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 17
+          },
+          "length": 256
+        },
+        {
+          "name": "createdById",
+          "type": "varchar",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 18
+          },
+          "length": 255
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 22
+          }
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 26
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "createdById",
+          "references": "id",
+          "on": "project1_user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/server/db/schema.ts",
+        "line": 13
+      },
+      "indexes": [
+        {
+          "columns": [
+            "createdById"
+          ],
+          "type": "index",
+          "name": "created_by_idx"
+        },
+        {
+          "columns": [
+            "name"
+          ],
+          "type": "index",
+          "name": "name_idx"
+        }
+      ]
+    },
+    {
+      "table": "project1_user",
+      "columns": [
+        {
+          "name": "id",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 35
+          },
+          "length": 255
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 40
+          },
+          "length": 255
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 41
+          },
+          "length": 255
+        },
+        {
+          "name": "emailVerified",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 42
+          }
+        },
+        {
+          "name": "image",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 48
+          },
+          "length": 255
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/server/db/schema.ts",
+        "line": 34
+      }
+    },
+    {
+      "table": "project1_account",
+      "columns": [
+        {
+          "name": "userId",
+          "type": "varchar",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 58
+          },
+          "length": 255
+        },
+        {
+          "name": "type",
+          "type": "varchar",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 62
+          },
+          "length": 255
+        },
+        {
+          "name": "provider",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 63
+          },
+          "length": 255
+        },
+        {
+          "name": "providerAccountId",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 64
+          },
+          "length": 255
+        },
+        {
+          "name": "refresh_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 65
+          }
+        },
+        {
+          "name": "access_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 66
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "integer",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 67
+          }
+        },
+        {
+          "name": "token_type",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 68
+          },
+          "length": 255
+        },
+        {
+          "name": "scope",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 69
+          },
+          "length": 255
+        },
+        {
+          "name": "id_token",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 70
+          }
+        },
+        {
+          "name": "session_state",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 71
+          },
+          "length": 255
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "userId",
+          "references": "id",
+          "on": "project1_user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/server/db/schema.ts",
+        "line": 55
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId"
+          ],
+          "type": "index",
+          "name": "account_user_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "project1_session",
+      "columns": [
+        {
+          "name": "sessionToken",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 86
+          },
+          "length": 255
+        },
+        {
+          "name": "userId",
+          "type": "varchar",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 87
+          },
+          "length": 255
+        },
+        {
+          "name": "expires",
+          "type": "timestamp",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 91
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "userId",
+          "references": "id",
+          "on": "project1_user",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/server/db/schema.ts",
+        "line": 83
+      },
+      "indexes": [
+        {
+          "columns": [
+            "userId"
+          ],
+          "type": "index",
+          "name": "t_user_id_idx"
+        }
+      ]
+    },
+    {
+      "table": "project1_verification_token",
+      "columns": [
+        {
+          "name": "identifier",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 103
+          },
+          "length": 255
+        },
+        {
+          "name": "token",
+          "type": "varchar",
+          "primary": true,
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 104
+          },
+          "length": 255
+        },
+        {
+          "name": "expires",
+          "type": "timestamp",
+          "source": {
+            "file": "src/server/db/schema.ts",
+            "line": 105
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/server/db/schema.ts",
+        "line": 100
+      }
+    }
+  ],
+  "warnings": []
+}

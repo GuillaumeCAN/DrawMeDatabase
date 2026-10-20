@@ -1,0 +1,356 @@
+{
+  "tables": [
+    {
+      "table": "audit_log",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary": true,
+          "source": {
+            "file": "src/audit.ts",
+            "line": 5
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "authorId",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "src/audit.ts",
+            "line": 6
+          }
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "source": {
+            "file": "src/audit.ts",
+            "line": 7
+          }
+        },
+        {
+          "name": "at",
+          "type": "timestamp",
+          "nullable": true,
+          "source": {
+            "file": "src/audit.ts",
+            "line": 8
+          },
+          "defaultRaw": "(now())"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "authorId",
+          "references": "id",
+          "on": "authors",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/audit.ts",
+        "line": 4
+      }
+    },
+    {
+      "table": "authors",
+      "columns": [
+        {
+          "name": "id",
+          "type": "serial",
+          "primary": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 30
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "firstName",
+          "type": "varchar",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 31
+          },
+          "length": 100
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 32
+          },
+          "length": 191,
+          "unique": true
+        },
+        {
+          "name": "age",
+          "type": "tinyint",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 33
+          },
+          "unsigned": true
+        },
+        {
+          "name": "rating",
+          "type": "double",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 34
+          },
+          "precision": 5,
+          "scale": 2,
+          "default": 0
+        },
+        {
+          "name": "bio",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 35
+          }
+        },
+        {
+          "name": "avatar",
+          "type": "varbinary",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 36
+          },
+          "length": 1024
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 37
+          },
+          "default": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 38
+          },
+          "defaultRaw": "(now())"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 39
+          },
+          "defaultRaw": "(now())",
+          "onUpdateCurrent": true
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "src/schema.ts",
+        "line": 29
+      }
+    },
+    {
+      "table": "posts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 43
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "author_id",
+          "type": "bigint",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 44
+          },
+          "unsigned": true
+        },
+        {
+          "name": "title",
+          "type": "varchar",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 45
+          },
+          "length": 255
+        },
+        {
+          "name": "slug",
+          "type": "char",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 46
+          },
+          "length": 12,
+          "unique": true
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "source": {
+            "file": "src/schema.ts",
+            "line": 47
+          },
+          "default": "draft",
+          "values": [
+            "draft",
+            "published",
+            "archived"
+          ]
+        },
+        {
+          "name": "visibility",
+          "type": "enum",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 48
+          },
+          "default": "public",
+          "values": [
+            "public",
+            "private"
+          ]
+        },
+        {
+          "name": "price",
+          "type": "decimal",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 49
+          },
+          "precision": 10,
+          "scale": 2,
+          "unsigned": true
+        },
+        {
+          "name": "hash",
+          "type": "binary",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 50
+          },
+          "length": 32
+        },
+        {
+          "name": "meta",
+          "type": "json",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 51
+          },
+          "default": "{}"
+        },
+        {
+          "name": "publishedAt",
+          "type": "datetime",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 52
+          }
+        },
+        {
+          "name": "views",
+          "type": "int",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 53
+          },
+          "defaultRaw": "(0)"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "author_id",
+          "references": "id",
+          "on": "authors",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema.ts",
+        "line": 42
+      },
+      "indexes": [
+        {
+          "columns": [
+            "author_id",
+            "status"
+          ],
+          "type": "index",
+          "name": "posts_author_status_idx"
+        }
+      ]
+    },
+    {
+      "table": "legacy_users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 71
+          }
+        },
+        {
+          "name": "authorId",
+          "type": "bigint",
+          "nullable": true,
+          "source": {
+            "file": "src/schema.ts",
+            "line": 72
+          },
+          "unsigned": true
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "authorId",
+          "references": "id",
+          "on": "authors",
+          "type": "many-to-one",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "src/schema.ts",
+        "line": 70
+      }
+    }
+  ],
+  "warnings": [
+    "src/schema.ts:61: table analytics.page_views skipped: drizzle-kit does not create the tables of another database (mysqlSchema())."
+  ]
+}

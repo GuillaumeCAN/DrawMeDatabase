@@ -1,0 +1,190 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 6
+          },
+          "defaultRaw": "gen_random_uuid()"
+        },
+        {
+          "name": "first_name",
+          "type": "text",
+          "source": {
+            "file": "schema.ts",
+            "line": 7
+          }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "source": {
+            "file": "schema.ts",
+            "line": 8
+          },
+          "defaultRaw": "now()"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 5
+      }
+    },
+    {
+      "table": "posts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 12
+          },
+          "autoIncrement": true
+        },
+        {
+          "name": "authorId",
+          "type": "uuid",
+          "source": {
+            "file": "schema.ts",
+            "line": 13
+          }
+        },
+        {
+          "name": "tags",
+          "type": "text[][]",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 14
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "authorId",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 11
+      },
+      "indexes": [
+        {
+          "columns": [
+            "authorId"
+          ],
+          "type": "index"
+        }
+      ]
+    },
+    {
+      "table": "audit.events",
+      "columns": [
+        {
+          "name": "event_id",
+          "type": "integer",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 20
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 21
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 19
+      }
+    },
+    {
+      "table": "app_settings",
+      "columns": [
+        {
+          "name": "setting_key",
+          "type": "text",
+          "primary": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 27
+          }
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "source": {
+            "file": "schema.ts",
+            "line": 28
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "user_id",
+          "references": "id",
+          "on": "users",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "schema.ts",
+        "line": 26
+      }
+    },
+    {
+      "table": "legacy",
+      "columns": [
+        {
+          "name": "someValue",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "schema.ts",
+            "line": 32
+          }
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "schema.ts",
+        "line": 31
+      }
+    }
+  ],
+  "warnings": [
+    "drizzle.config.ts: drizzle-kit 1 ignores the casing of the config file: the columns are named after the keys of the objects, as it does (snakeCase.table() sets a casing)."
+  ]
+}

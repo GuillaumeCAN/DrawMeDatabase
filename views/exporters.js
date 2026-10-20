@@ -10,9 +10,8 @@
 (function (root) {
     'use strict';
 
-    const FRAMEWORKS = { laravel: 'Laravel', symfony: 'Symfony' };
-
-    const frameworkName = (framework) => FRAMEWORKS[framework] || '';
+    // The label of the framework of the project ('Laravel'), given by the extension from its parsers
+    const frameworkName = (project) => (project && typeof project.frameworkLabel === 'string' ? project.frameworkLabel.trim() : '');
 
     // "blog-app database schema"
     function schemaTitle(project) {
@@ -33,7 +32,7 @@
 
     // A Markdown document with the diagram in a mermaid code block
     function markdownFile(source, { project, layout, date } = {}) {
-        const framework = frameworkName(project && project.framework);
+        const framework = frameworkName(project);
         const day = (date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date()).toISOString().slice(0, 10);
         const origin = framework ? `the ${framework} code` : 'the code';
         return [

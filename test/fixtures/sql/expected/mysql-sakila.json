@@ -1,0 +1,287 @@
+{
+  "tables": [
+    {
+      "table": "actor",
+      "columns": [
+        {"name":"actor_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":45},"unsigned":true,"autoIncrement":true},
+        {"name":"first_name","type":"varchar","source":{"file":"schema.sql","line":46},"length":45},
+        {"name":"last_name","type":"varchar","source":{"file":"schema.sql","line":47},"length":45},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":48},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":44},
+      "indexes": [
+        {"columns":["last_name"],"type":"index","name":"idx_actor_last_name"}
+      ]
+    },
+    {
+      "table": "address",
+      "columns": [
+        {"name":"address_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":58},"unsigned":true,"autoIncrement":true},
+        {"name":"address","type":"varchar","source":{"file":"schema.sql","line":59},"length":50},
+        {"name":"address2","type":"varchar","nullable":true,"source":{"file":"schema.sql","line":60},"length":50,"default":null},
+        {"name":"district","type":"varchar","source":{"file":"schema.sql","line":61},"length":20},
+        {"name":"city_id","type":"smallint","source":{"file":"schema.sql","line":62},"unsigned":true},
+        {"name":"postal_code","type":"varchar","nullable":true,"source":{"file":"schema.sql","line":63},"length":10,"default":null},
+        {"name":"phone","type":"varchar","source":{"file":"schema.sql","line":64},"length":20},
+        {"name":"location","type":"geometry","source":{"file":"schema.sql","line":67}},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":68},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"city_id","references":"city_id","on":"city","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":57},
+      "indexes": [
+        {"columns":["city_id"],"type":"index","name":"idx_fk_city_id"},
+        {"columns":["location"],"type":"spatial","name":"idx_location"}
+      ]
+    },
+    {
+      "table": "category",
+      "columns": [
+        {"name":"category_id","type":"tinyint","primary":true,"source":{"file":"schema.sql","line":80},"unsigned":true,"autoIncrement":true},
+        {"name":"name","type":"varchar","source":{"file":"schema.sql","line":81},"length":25},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":82},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":79}
+    },
+    {
+      "table": "city",
+      "columns": [
+        {"name":"city_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":91},"unsigned":true,"autoIncrement":true},
+        {"name":"city","type":"varchar","source":{"file":"schema.sql","line":92},"length":50},
+        {"name":"country_id","type":"smallint","source":{"file":"schema.sql","line":93},"unsigned":true},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":94},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"country_id","references":"country_id","on":"country","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":90},
+      "indexes": [
+        {"columns":["country_id"],"type":"index","name":"idx_fk_country_id"}
+      ]
+    },
+    {
+      "table": "country",
+      "columns": [
+        {"name":"country_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":105},"unsigned":true,"autoIncrement":true},
+        {"name":"country","type":"varchar","source":{"file":"schema.sql","line":106},"length":50},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":107},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":104}
+    },
+    {
+      "table": "customer",
+      "columns": [
+        {"name":"customer_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":116},"unsigned":true,"autoIncrement":true},
+        {"name":"store_id","type":"tinyint","source":{"file":"schema.sql","line":117},"unsigned":true},
+        {"name":"first_name","type":"varchar","source":{"file":"schema.sql","line":118},"length":45},
+        {"name":"last_name","type":"varchar","source":{"file":"schema.sql","line":119},"length":45},
+        {"name":"email","type":"varchar","nullable":true,"source":{"file":"schema.sql","line":120},"length":50,"default":null},
+        {"name":"address_id","type":"smallint","source":{"file":"schema.sql","line":121},"unsigned":true},
+        {"name":"active","type":"boolean","source":{"file":"schema.sql","line":122},"default":true},
+        {"name":"create_date","type":"datetime","source":{"file":"schema.sql","line":123}},
+        {"name":"last_update","type":"timestamp","nullable":true,"source":{"file":"schema.sql","line":124},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"address_id","references":"address_id","on":"address","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"store_id","references":"store_id","on":"store","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":115},
+      "indexes": [
+        {"columns":["store_id"],"type":"index","name":"idx_fk_store_id"},
+        {"columns":["address_id"],"type":"index","name":"idx_fk_address_id"},
+        {"columns":["last_name"],"type":"index","name":"idx_last_name"}
+      ]
+    },
+    {
+      "table": "film",
+      "columns": [
+        {"name":"film_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":138},"unsigned":true,"autoIncrement":true},
+        {"name":"title","type":"varchar","source":{"file":"schema.sql","line":139},"length":128},
+        {"name":"description","type":"text","nullable":true,"source":{"file":"schema.sql","line":140},"default":null},
+        {"name":"release_year","type":"year","nullable":true,"source":{"file":"schema.sql","line":141},"default":null},
+        {"name":"language_id","type":"tinyint","source":{"file":"schema.sql","line":142},"unsigned":true},
+        {"name":"original_language_id","type":"tinyint","nullable":true,"source":{"file":"schema.sql","line":143},"unsigned":true,"default":null},
+        {"name":"rental_duration","type":"tinyint","source":{"file":"schema.sql","line":144},"unsigned":true,"default":3},
+        {"name":"rental_rate","type":"decimal","source":{"file":"schema.sql","line":145},"precision":4,"scale":2,"default":4.99},
+        {"name":"length","type":"smallint","nullable":true,"source":{"file":"schema.sql","line":146},"unsigned":true,"default":null},
+        {"name":"replacement_cost","type":"decimal","source":{"file":"schema.sql","line":147},"precision":5,"scale":2,"default":19.99},
+        {"name":"rating","type":"enum","nullable":true,"source":{"file":"schema.sql","line":148},"default":"G","values":["G","PG","PG-13","R","NC-17"]},
+        {"name":"special_features","type":"set","nullable":true,"source":{"file":"schema.sql","line":149},"default":null,"values":["Trailers","Commentaries","Deleted Scenes","Behind the Scenes"]},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":150},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"language_id","references":"language_id","on":"language","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"original_language_id","references":"language_id","on":"language","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":137},
+      "indexes": [
+        {"columns":["title"],"type":"index","name":"idx_title"},
+        {"columns":["language_id"],"type":"index","name":"idx_fk_language_id"},
+        {"columns":["original_language_id"],"type":"index","name":"idx_fk_original_language_id"}
+      ]
+    },
+    {
+      "table": "film_actor",
+      "columns": [
+        {"name":"actor_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":164},"unsigned":true},
+        {"name":"film_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":165},"unsigned":true},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":166},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"actor_id","references":"actor_id","on":"actor","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"film_id","references":"film_id","on":"film","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":163},
+      "indexes": [
+        {"columns":["film_id"],"type":"index","name":"idx_fk_film_id"}
+      ]
+    },
+    {
+      "table": "film_category",
+      "columns": [
+        {"name":"film_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":178},"unsigned":true},
+        {"name":"category_id","type":"tinyint","primary":true,"source":{"file":"schema.sql","line":179},"unsigned":true},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":180},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"film_id","references":"film_id","on":"film","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"category_id","references":"category_id","on":"category","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":177}
+    },
+    {
+      "table": "film_text",
+      "columns": [
+        {"name":"film_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":200},"unsigned":true},
+        {"name":"title","type":"varchar","source":{"file":"schema.sql","line":201},"length":255},
+        {"name":"description","type":"text","nullable":true,"source":{"file":"schema.sql","line":202}}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":199},
+      "indexes": [
+        {"columns":["title","description"],"type":"fulltext","name":"idx_title_description"}
+      ]
+    },
+    {
+      "table": "inventory",
+      "columns": [
+        {"name":"inventory_id","type":"mediumint","primary":true,"source":{"file":"schema.sql","line":243},"unsigned":true,"autoIncrement":true},
+        {"name":"film_id","type":"smallint","source":{"file":"schema.sql","line":244},"unsigned":true},
+        {"name":"store_id","type":"tinyint","source":{"file":"schema.sql","line":245},"unsigned":true},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":246},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"store_id","references":"store_id","on":"store","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"film_id","references":"film_id","on":"film","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":242},
+      "indexes": [
+        {"columns":["film_id"],"type":"index","name":"idx_fk_film_id"},
+        {"columns":["store_id","film_id"],"type":"index","name":"idx_store_id_film_id"}
+      ]
+    },
+    {
+      "table": "language",
+      "columns": [
+        {"name":"language_id","type":"tinyint","primary":true,"source":{"file":"schema.sql","line":259},"unsigned":true,"autoIncrement":true},
+        {"name":"name","type":"char","source":{"file":"schema.sql","line":260},"length":20},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":261},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [],
+      "source": {"file":"schema.sql","line":258}
+    },
+    {
+      "table": "payment",
+      "columns": [
+        {"name":"payment_id","type":"smallint","primary":true,"source":{"file":"schema.sql","line":270},"unsigned":true,"autoIncrement":true},
+        {"name":"customer_id","type":"smallint","source":{"file":"schema.sql","line":271},"unsigned":true},
+        {"name":"staff_id","type":"tinyint","source":{"file":"schema.sql","line":272},"unsigned":true},
+        {"name":"rental_id","type":"int","nullable":true,"source":{"file":"schema.sql","line":273},"default":null},
+        {"name":"amount","type":"decimal","source":{"file":"schema.sql","line":274},"precision":5,"scale":2},
+        {"name":"payment_date","type":"datetime","source":{"file":"schema.sql","line":275}},
+        {"name":"last_update","type":"timestamp","nullable":true,"source":{"file":"schema.sql","line":276},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"rental_id","references":"rental_id","on":"rental","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"customer_id","references":"customer_id","on":"customer","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"staff_id","references":"staff_id","on":"staff","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":269},
+      "indexes": [
+        {"columns":["staff_id"],"type":"index","name":"idx_fk_staff_id"},
+        {"columns":["customer_id"],"type":"index","name":"idx_fk_customer_id"}
+      ]
+    },
+    {
+      "table": "rental",
+      "columns": [
+        {"name":"rental_id","type":"int","primary":true,"source":{"file":"schema.sql","line":291},"autoIncrement":true},
+        {"name":"rental_date","type":"datetime","source":{"file":"schema.sql","line":292}},
+        {"name":"inventory_id","type":"mediumint","source":{"file":"schema.sql","line":293},"unsigned":true},
+        {"name":"customer_id","type":"smallint","source":{"file":"schema.sql","line":294},"unsigned":true},
+        {"name":"return_date","type":"datetime","nullable":true,"source":{"file":"schema.sql","line":295},"default":null},
+        {"name":"staff_id","type":"tinyint","source":{"file":"schema.sql","line":296},"unsigned":true},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":297},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"staff_id","references":"staff_id","on":"staff","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"inventory_id","references":"inventory_id","on":"inventory","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"customer_id","references":"customer_id","on":"customer","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":290},
+      "indexes": [
+        {"columns":["rental_date","inventory_id","customer_id"],"type":"unique"},
+        {"columns":["inventory_id"],"type":"index","name":"idx_fk_inventory_id"},
+        {"columns":["customer_id"],"type":"index","name":"idx_fk_customer_id"},
+        {"columns":["staff_id"],"type":"index","name":"idx_fk_staff_id"}
+      ]
+    },
+    {
+      "table": "staff",
+      "columns": [
+        {"name":"staff_id","type":"tinyint","primary":true,"source":{"file":"schema.sql","line":313},"unsigned":true,"autoIncrement":true},
+        {"name":"first_name","type":"varchar","source":{"file":"schema.sql","line":314},"length":45},
+        {"name":"last_name","type":"varchar","source":{"file":"schema.sql","line":315},"length":45},
+        {"name":"address_id","type":"smallint","source":{"file":"schema.sql","line":316},"unsigned":true},
+        {"name":"picture","type":"blob","nullable":true,"source":{"file":"schema.sql","line":317},"default":null},
+        {"name":"email","type":"varchar","nullable":true,"source":{"file":"schema.sql","line":318},"length":50,"default":null},
+        {"name":"store_id","type":"tinyint","source":{"file":"schema.sql","line":319},"unsigned":true},
+        {"name":"active","type":"boolean","source":{"file":"schema.sql","line":320},"default":true},
+        {"name":"username","type":"varchar","source":{"file":"schema.sql","line":321},"length":16},
+        {"name":"password","type":"varchar","nullable":true,"source":{"file":"schema.sql","line":322},"length":40,"default":null},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":323},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"store_id","references":"store_id","on":"store","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"address_id","references":"address_id","on":"address","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":312},
+      "indexes": [
+        {"columns":["store_id"],"type":"index","name":"idx_fk_store_id"},
+        {"columns":["address_id"],"type":"index","name":"idx_fk_address_id"}
+      ]
+    },
+    {
+      "table": "store",
+      "columns": [
+        {"name":"store_id","type":"tinyint","primary":true,"source":{"file":"schema.sql","line":336},"unsigned":true,"autoIncrement":true},
+        {"name":"manager_staff_id","type":"tinyint","source":{"file":"schema.sql","line":337},"unsigned":true,"unique":true},
+        {"name":"address_id","type":"smallint","source":{"file":"schema.sql","line":338},"unsigned":true},
+        {"name":"last_update","type":"timestamp","source":{"file":"schema.sql","line":339},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true}
+      ],
+      "relations": [
+        {"foreignKey":"manager_staff_id","references":"staff_id","on":"staff","type":"one-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"address_id","references":"address_id","on":"address","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"schema.sql","line":335},
+      "indexes": [
+        {"columns":["address_id"],"type":"index","name":"idx_fk_address_id"}
+      ]
+    }
+  ],
+  "warnings": []
+}

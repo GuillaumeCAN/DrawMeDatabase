@@ -1,0 +1,113 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {"name":"nickname","type":"varchar","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":1},"length":50},
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/migration/V1__init.sql","line":5},"unsigned":true,"autoIncrement":true},
+        {"name":"email","type":"varchar","source":{"file":"db/migration/V1__init.sql","line":6},"length":191,"unique":true},
+        {"name":"phone","type":"varchar","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":1},"length":20},
+        {"name":"name","type":"varchar","source":{"file":"db/migration/V2__changes.sql","line":2},"length":100},
+        {"name":"roles","type":"set","nullable":true,"source":{"file":"db/migration/V1__init.sql","line":9},"default":null,"values":["admin","editor"]},
+        {"name":"score","type":"decimal","nullable":true,"source":{"file":"db/migration/V1__init.sql","line":10},"precision":8,"scale":2,"unsigned":true,"default":0},
+        {"name":"ratio","type":"double","nullable":true,"source":{"file":"db/migration/V1__init.sql","line":11},"default":null},
+        {"name":"is_admin","type":"tinyint","source":{"file":"db/migration/V1__init.sql","line":12},"default":0},
+        {"name":"created_at","type":"timestamp","nullable":true,"source":{"file":"db/migration/V1__init.sql","line":13},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamp","source":{"file":"db/migration/V1__init.sql","line":14},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true},
+        {"name":"about","type":"mediumtext","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":3}},
+        {"name":"uuid","type":"char","source":{"file":"db/migration/V1__init.sql","line":16},"length":36,"defaultRaw":"(uuid())"},
+        {"name":"full_name","type":"varchar","nullable":true,"source":{"file":"db/migration/V1__init.sql","line":17},"length":300},
+        {"name":"location","type":"point","nullable":true,"source":{"file":"db/migration/V1__init.sql","line":19},"default":null}
+      ],
+      "relations": [],
+      "source": {"file":"db/migration/V1__init.sql","line":4},
+      "indexes": [
+        {"columns":["name"],"type":"index","name":"users_name_index"},
+        {"columns":["created_at"],"type":"index","name":"users_status_created_index"},
+        {"columns":["about"],"type":"fulltext","name":"users_bio_fulltext"}
+      ]
+    },
+    {
+      "table": "posts",
+      "columns": [
+        {"name":"id","type":"int","primary":true,"source":{"file":"db/migration/V1__init.sql","line":28},"autoIncrement":true},
+        {"name":"user_id","type":"bigint","source":{"file":"db/migration/V1__init.sql","line":29},"unsigned":true},
+        {"name":"title","type":"varchar","source":{"file":"db/migration/V1__init.sql","line":30},"length":200},
+        {"name":"slug","type":"varchar","nullable":true,"source":{"file":"db/migration/V1__init.sql","line":31},"length":200,"unique":true},
+        {"name":"summary","type":"text","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":5}},
+        {"name":"views","type":"int","source":{"file":"db/migration/V2__changes.sql","line":5},"unsigned":true,"default":0}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"id","on":"users","type":"many-to-one","onDelete":"no action"}
+      ],
+      "source": {"file":"db/migration/V1__init.sql","line":27},
+      "indexes": [
+        {"columns":["title","slug"],"type":"index","name":"posts_title_slug_idx"}
+      ]
+    },
+    {
+      "table": "post_labels",
+      "columns": [
+        {"name":"post_id","type":"int","primary":true,"source":{"file":"db/migration/V2__changes.sql","line":12}},
+        {"name":"label_id","type":"int","primary":true,"source":{"file":"db/migration/V2__changes.sql","line":13}},
+        {"name":"weight","type":"smallint","source":{"file":"db/migration/V10__later.sql","line":2},"default":1}
+      ],
+      "relations": [
+        {"foreignKey":"post_id","references":"id","on":"posts","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"label_id","references":"id","on":"tags","type":"many-to-one"}
+      ],
+      "source": {"file":"db/migration/V2__changes.sql","line":11}
+    },
+    {
+      "table": "tags",
+      "columns": [
+        {"name":"id","type":"int","primary":true,"source":{"file":"db/migration/V1.1__routines.sql","line":14},"autoIncrement":true},
+        {"name":"name","type":"varchar","source":{"file":"db/migration/V1.1__routines.sql","line":14},"length":50},
+        {"name":"color","type":"char","nullable":true,"source":{"file":"db/migration/V1_2__underscore.sql","line":2},"length":7,"default":"#000000"}
+      ],
+      "relations": [],
+      "source": {"file":"db/migration/V1.1__routines.sql","line":14},
+      "indexes": [
+        {"columns":["name"],"type":"index"}
+      ]
+    },
+    {
+      "table": "users_archive",
+      "columns": [
+        {"name":"nickname","type":"varchar","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"length":50},
+        {"name":"id","type":"bigint","primary":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"unsigned":true,"autoIncrement":true},
+        {"name":"email","type":"varchar","source":{"file":"db/migration/V2__changes.sql","line":20},"length":191,"unique":true},
+        {"name":"phone","type":"varchar","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"length":20},
+        {"name":"name","type":"varchar","source":{"file":"db/migration/V2__changes.sql","line":20},"length":100},
+        {"name":"status","type":"enum","source":{"file":"db/migration/V2__changes.sql","line":20},"default":"active","values":["active","banned"]},
+        {"name":"roles","type":"set","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"default":null,"values":["admin","editor"]},
+        {"name":"score","type":"decimal","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"precision":8,"scale":2,"unsigned":true,"default":0},
+        {"name":"ratio","type":"double","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"default":null},
+        {"name":"is_admin","type":"tinyint","source":{"file":"db/migration/V2__changes.sql","line":20},"default":0},
+        {"name":"created_at","type":"timestamp","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"defaultRaw":"CURRENT_TIMESTAMP"},
+        {"name":"updated_at","type":"timestamp","source":{"file":"db/migration/V2__changes.sql","line":20},"defaultRaw":"CURRENT_TIMESTAMP","onUpdateCurrent":true},
+        {"name":"about","type":"mediumtext","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20}},
+        {"name":"uuid","type":"char","source":{"file":"db/migration/V2__changes.sql","line":20},"length":36,"defaultRaw":"(uuid())"},
+        {"name":"full_name","type":"varchar","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"length":300},
+        {"name":"location","type":"point","nullable":true,"source":{"file":"db/migration/V2__changes.sql","line":20},"default":null}
+      ],
+      "relations": [],
+      "source": {"file":"db/migration/V2__changes.sql","line":20},
+      "indexes": [
+        {"columns":["name"],"type":"index"},
+        {"columns":["status","created_at"],"type":"index"},
+        {"columns":["about"],"type":"fulltext"}
+      ]
+    },
+    {
+      "table": "settings",
+      "columns": [
+        {"name":"key","type":"varchar","primary":true,"source":{"file":"db/migration/more/V3__nested.sql","line":2},"length":64},
+        {"name":"value","type":"json","nullable":true,"source":{"file":"db/migration/more/V3__nested.sql","line":2}}
+      ],
+      "relations": [],
+      "source": {"file":"db/migration/more/V3__nested.sql","line":2}
+    }
+  ],
+  "warnings": []
+}

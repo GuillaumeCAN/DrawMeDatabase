@@ -1,0 +1,23 @@
+{
+  "tables": [
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"integer","nullable":true,"source":{"file":"db/migrations/20151129054053_test_migration.sql","line":3}},
+        {"name":"name","type":"varchar","nullable":true,"source":{"file":"db/migrations/20151129054053_test_migration.sql","line":4},"length":255}
+      ],
+      "relations": [],
+      "source": {"file":"db/migrations/20151129054053_test_migration.sql","line":2}
+    },
+    {
+      "table": "posts",
+      "columns": [
+        {"name":"id","type":"integer","nullable":true,"source":{"file":"db/migrations/20200227231541_test_posts.sql","line":3}},
+        {"name":"name","type":"varchar","nullable":true,"source":{"file":"db/migrations/20200227231541_test_posts.sql","line":4},"length":255}
+      ],
+      "relations": [],
+      "source": {"file":"db/migrations/20200227231541_test_posts.sql","line":2}
+    }
+  ],
+  "warnings": []
+}

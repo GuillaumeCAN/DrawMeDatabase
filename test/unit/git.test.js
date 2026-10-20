@@ -14,7 +14,7 @@ const os = require('os');
 const path = require('path');
 const childProcess = require('child_process');
 
-const { lineMapping, tableStatus, createStatusReader } = require('../../parsers/git');
+const { lineMapping, tableStatus, createStatusReader, sourcePaths } = require('../../parsers/git');
 const laravel = require('../../parsers/laravel');
 
 const TMP = fs.realpathSync(os.tmpdir());
@@ -120,6 +120,103 @@ describe('createStatusReader without git', () => {
         const removed = createStatusReader(dir, { git: false, overrides: new Map([[file('a.php'), 'one\nthree\n']]) });
         assert.equal(removed.statusOf(file('a.php'))(1, 2), 'unsaved');
         assert.equal(removed.statusOf(file('a.php'))(2, 2), null);
+    });
+});
+
+describe('createStatusReader with the sources of a parser', () => {
+    it('reads the folders and the files of the sources, the missing ones left out', () => {
+        const { dir, file } = repository({ 'a.php': 'one\ntwo\n' });
+        fs.mkdirSync(path.join(dir, 'schema'));
+        fs.writeFileSync(path.join(dir, 'schema', 'main.x'), 'model\n');
+        fs.writeFileSync(path.join(dir, 'config.x'), 'path\n');
+        fs.writeFileSync(path.join(dir, 'other.x'), 'not read\n');
+        commitAll(dir);
+        fs.writeFileSync(file('a.php'), 'one\nTWO\n');
+        fs.writeFileSync(path.join(dir, 'schema', 'main.x'), 'model\nfield\n');
+        fs.writeFileSync(path.join(dir, 'config.x'), 'other path\n');
+        fs.writeFileSync(path.join(dir, 'other.x'), 'changed, not read\n');
+        fs.writeFileSync(path.join(dir, 'schema', 'new.x'), 'new\n');
+
+        const sources = {
+            folders: [{ path: path.join(dir, 'database', 'migrations'), recursive: false }, { path: path.join(dir, 'schema'), recursive: true }],
+            files: [path.join(dir, 'config.x'), path.join(dir, 'missing.x')],
+            extensions: ['.php', '.x'],
+        };
+        const cache = new Map();
+        const reader = createStatusReader(sources, { cache });
+        assert.equal(reader.warning, null);
+        assert.equal(reader.statusOf(file('a.php'))(1, 1), 'committed');
+        assert.equal(reader.statusOf(file('a.php'))(2, 2), 'modified');
+        assert.equal(reader.statusOf(path.join(dir, 'schema', 'main.x'))(1, 1), 'committed');
+        assert.equal(reader.statusOf(path.join(dir, 'schema', 'main.x'))(2, 2), 'modified');
+        assert.equal(reader.statusOf(path.join(dir, 'schema', 'new.x'))(1, 1), 'untracked');
+        assert.equal(reader.statusOf(path.join(dir, 'config.x'))(1, 1), 'modified');
+        // A file outside of the sources: git did not read it
+        assert.equal(reader.statusOf(path.join(dir, 'other.x'))(1, 1), 'committed');
+        assert.equal(cache.size, 1, 'one git run for all the sources');
+
+        // Only missing files: no git status, and nothing to tell
+        const none = createStatusReader({ folders: [], files: [path.join(dir, 'missing.x')] });
+        assert.equal(none.warning, null);
+        assert.equal(none.statusOf(file('a.php'))(1, 1), null);
+    });
+
+    it('reads a saved file only to compare it with the text of an editor (a large SQL dump is not read twice)', () => {
+        const { dir, file } = repository({ 'a.php': 'one\ntwo\n', 'b.php': 'three\n' });
+        commitAll(dir);
+        fs.writeFileSync(file('a.php'), 'one\nTWO\n');
+        const reads = [];
+        const readFileSync = fs.readFileSync;
+        fs.readFileSync = function (filePath, ...rest) {
+            reads.push(path.basename(String(filePath)));
+            return readFileSync.call(this, filePath, ...rest);
+        };
+        try {
+            const reader = createStatusReader([dir], { overrides: new Map([[file('b.php'), 'three\nfour\n']]) });
+            assert.deepEqual([reader.statusOf(file('a.php'))(1, 1), reader.statusOf(file('a.php'))(2, 2), reader.addedOf(file('a.php'))(2)], ['committed', 'modified', true]);
+            assert.deepEqual([reader.statusOf(file('b.php'))(1, 1), reader.statusOf(file('b.php'))(2, 2)], ['committed', 'unsaved']);
+            // A folder or a missing file has no status, as before
+            assert.deepEqual([reader.statusOf(path.join(dir, 'database'))(1, 1), reader.statusOf(file('missing.php'))(1, 1)], [null, null]);
+        } finally {
+            fs.readFileSync = readFileSync;
+        }
+        assert.deepEqual(reads, ['b.php']);
+    });
+
+    it('takes a folder, a list of paths, or sources', () => {
+        assert.deepEqual(sourcePaths('/app/db'), ['/app/db']);
+        assert.deepEqual(sourcePaths(['/app/db', 3, '/app/x']), ['/app/db', '/app/x']);
+        assert.deepEqual(sourcePaths({ folders: [{ path: '/app/db', recursive: false }, '/app/src', { path: '' }], files: ['/app/schema.x', ''] }), ['/app/db', '/app/src', '/app/schema.x']);
+        assert.deepEqual(sourcePaths(undefined), []);
+    });
+});
+
+describe('createStatusReader: lines not in HEAD', () => {
+    it('addedOf(): the lines added since HEAD, of a file that is not in HEAD, or typed in an editor; the saved ones only with git', () => {
+        const dir = fs.mkdtempSync(path.join(TMP, 'dmdb-added-'));
+        created.push(dir);
+        const file = path.join(dir, 'schema.txt');
+        fs.writeFileSync(file, 'a\nb\nc\n');
+        git(dir, 'init', '-q');
+        commitAll(dir);
+        fs.writeFileSync(file, 'a\nb\nx\ny\nc\n');
+        const fresh = path.join(dir, 'new.txt');
+        fs.writeFileSync(fresh, 'n\n');
+        const reader = createStatusReader([dir]);
+        assert.deepEqual([1, 2, 3, 4, 5].map(line => reader.addedOf(file)(line)), [false, false, true, true, false]);
+        assert.equal(reader.addedOf(fresh)(1), true);
+        // The status of the lines is the same as before
+        assert.deepEqual([reader.statusOf(file)(1, 2), reader.statusOf(file)(3, 4), reader.statusOf(file)(1, 5), reader.statusOf(fresh)(1, 1)], ['committed', 'modified', 'modified', 'untracked']);
+
+        // An editor: a typed line is not in HEAD, the others are the lines of the saved file
+        const edited = createStatusReader([dir], { overrides: new Map([[file, 'a\nTYPED\nb\nx\ny\nc\n']]) });
+        assert.deepEqual([1, 2, 3, 4, 5, 6].map(line => edited.addedOf(file)(line)), [false, true, false, true, true, false]);
+        // A file only in an editor
+        assert.equal(createStatusReader([dir], { overrides: new Map([[path.join(dir, 'draft.txt'), 'd\n']]) }).addedOf(path.join(dir, 'draft.txt'))(1), true);
+        // Without git: the typed lines only
+        const offline = createStatusReader([dir], { git: false, overrides: new Map([[file, 'a\nTYPED\nb\n']]) });
+        assert.deepEqual([1, 2, 3].map(line => offline.addedOf(file)(line)), [false, true, false]);
+        assert.deepEqual([1, 3].map(line => createStatusReader([dir], { git: false }).addedOf(file)(line)), [false, false]);
     });
 });
 

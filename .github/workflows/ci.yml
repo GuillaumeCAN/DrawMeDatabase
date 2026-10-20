@@ -1,5 +1,7 @@
 # Lint, unit tests, integration test in VS Code, then the .vsix as an artifact. The integration
-# test also runs on the oldest VS Code allowed by engines.vscode, in a job of its own.
+# test also runs on the oldest VS Code allowed by engines.vscode, in a job of its own. On a pull
+# request to main that changes the version, a third job runs the checks of the release that its
+# merge starts.
 # Also called by release.yml, which publishes the .vsix built here.
 
 name: CI
@@ -19,8 +21,10 @@ permissions:
   contents: read
 
 concurrency:
-  # "ci-" prefix: release.yml calls this workflow on the same ref, a shared group would deadlock
-  group: ci-${{ github.ref }}
+  # "ci-" prefix: release.yml calls this workflow on the same ref, a shared group would deadlock.
+  # github.workflow is the caller's name ("Release") when release.yml calls it: the build of a
+  # release neither waits behind nor gets replaced by the CI run of the same push to main.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -97,3 +101,37 @@ jobs:
 
       - name: Integration test in VS Code ${{ env.VSCODE_TEST_VERSION }}
         run: xvfb-run -a npm test --ignore-scripts
+
+  # Merging a pull request that changes the version releases it (release.yml): its CHANGELOG
+  # section is checked here, so that a missing, empty or "Unreleased" section shows on the pull
+  # request instead of failing the release on main
+  release-notes:
+    name: Version and changelog of the release
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # The merge commit of the pull request and its parents: the first parent is main
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Version and changelog
+        run: |
+          version=$(node -p "require('./package.json').version")
+          base=$(git show HEAD^1:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          if [ "$version" = "$base" ]; then
+            echo "::notice::The version stays $version: merging this pull request releases nothing"
+            exit 0
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=package.json::Version \"$version\" is not MAJOR.MINOR.PATCH, as the registries need"
+            exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "$base" "$version" | sort -V | tail -n 1)" != "$version" ]; then
+            echo "::error file=package.json::Version $version is lower than $base on main: raise it"
+            exit 1
+          fi
+          bash .github/scripts/release-notes.sh "v$version" /dev/null
+          echo "::notice::Merging this pull request releases v$version (main is at $base)"

@@ -1,0 +1,594 @@
+{
+  "tables": [
+    {
+      "table": "user",
+      "columns": [
+        {"name":"user_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":13},"nativeType":"Uuid"},
+        {"name":"username","type":"String","source":{"file":"prisma/schema.prisma","line":14},"length":255,"unique":true,"nativeType":"VarChar(255)"},
+        {"name":"password","type":"String","source":{"file":"prisma/schema.prisma","line":15},"length":60,"nativeType":"VarChar(60)"},
+        {"name":"role","type":"String","source":{"file":"prisma/schema.prisma","line":16},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"logo_url","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":17},"length":2183,"nativeType":"VarChar(2183)"},
+        {"name":"display_name","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":18},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"two_factor_required","type":"Boolean","source":{"file":"prisma/schema.prisma","line":19},"default":false},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":20},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":21},"nativeType":"Timestamptz(6)"},
+        {"name":"deleted_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":22},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":12}
+    },
+    {
+      "table": "api_key",
+      "columns": [
+        {"name":"api_key_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":41},"nativeType":"Uuid"},
+        {"name":"user_id","type":"String","source":{"file":"prisma/schema.prisma","line":42},"nativeType":"Uuid"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":43},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"key_hash","type":"String","source":{"file":"prisma/schema.prisma","line":44},"length":128,"unique":true,"nativeType":"VarChar(128)"},
+        {"name":"key_prefix","type":"String","source":{"file":"prisma/schema.prisma","line":45},"length":20,"nativeType":"VarChar(20)"},
+        {"name":"last_used_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":46},"nativeType":"Timestamptz(6)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":47},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":40},
+      "indexes": [
+        {"columns":["user_id"],"type":"index"}
+      ]
+    },
+    {
+      "table": "session",
+      "columns": [
+        {"name":"session_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":56},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":57},"nativeType":"Uuid"},
+        {"name":"browser","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":58},"length":20,"nativeType":"VarChar(20)"},
+        {"name":"os","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":59},"length":20,"nativeType":"VarChar(20)"},
+        {"name":"device","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":60},"length":20,"nativeType":"VarChar(20)"},
+        {"name":"screen","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":61},"length":11,"nativeType":"VarChar(11)"},
+        {"name":"language","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":62},"length":35,"nativeType":"VarChar(35)"},
+        {"name":"country","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":63},"length":2,"nativeType":"Char(2)"},
+        {"name":"region","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":64},"length":20,"nativeType":"VarChar(20)"},
+        {"name":"city","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":65},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"distinct_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":66},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":67},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":55},
+      "indexes": [
+        {"columns":["created_at"],"type":"index"},
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["website_id","created_at"],"type":"index"},
+        {"columns":["website_id","created_at","browser"],"type":"index"},
+        {"columns":["website_id","created_at","os"],"type":"index"},
+        {"columns":["website_id","created_at","device"],"type":"index"},
+        {"columns":["website_id","created_at","screen"],"type":"index"},
+        {"columns":["website_id","created_at","language"],"type":"index"},
+        {"columns":["website_id","created_at","country"],"type":"index"},
+        {"columns":["website_id","created_at","region"],"type":"index"},
+        {"columns":["website_id","created_at","city"],"type":"index"}
+      ]
+    },
+    {
+      "table": "session_link",
+      "columns": [
+        {"name":"website_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":88},"nativeType":"Uuid"},
+        {"name":"session_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":89},"nativeType":"Uuid"},
+        {"name":"distinct_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":90},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":91},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":87},
+      "indexes": [
+        {"columns":["website_id","session_id"],"type":"index"}
+      ]
+    },
+    {
+      "table": "website",
+      "columns": [
+        {"name":"website_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":99},"nativeType":"Uuid"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":100},"length":100,"nativeType":"VarChar(100)"},
+        {"name":"domain","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":101},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"reset_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":102},"nativeType":"Timestamptz(6)"},
+        {"name":"user_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":103},"nativeType":"Uuid"},
+        {"name":"team_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":104},"nativeType":"Uuid"},
+        {"name":"created_by","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":105},"nativeType":"Uuid"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":106},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":107},"nativeType":"Timestamptz(6)"},
+        {"name":"deleted_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":108},"nativeType":"Timestamptz(6)"},
+        {"name":"recorder_enabled","type":"Boolean","source":{"file":"prisma/schema.prisma","line":110},"default":false},
+        {"name":"replay_config","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":111}}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"created_by","references":"user_id","on":"user","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"team_id","references":"team_id","on":"team","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":98},
+      "indexes": [
+        {"columns":["user_id"],"type":"index"},
+        {"columns":["team_id"],"type":"index"},
+        {"columns":["created_at"],"type":"index"},
+        {"columns":["created_by"],"type":"index"}
+      ]
+    },
+    {
+      "table": "website_event",
+      "columns": [
+        {"name":"event_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":134},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":135},"nativeType":"Uuid"},
+        {"name":"session_id","type":"String","source":{"file":"prisma/schema.prisma","line":136},"nativeType":"Uuid"},
+        {"name":"visit_id","type":"String","source":{"file":"prisma/schema.prisma","line":137},"nativeType":"Uuid"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":138},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"url_path","type":"String","source":{"file":"prisma/schema.prisma","line":139},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"url_query","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":140},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"utm_source","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":141},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"utm_medium","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":142},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"utm_campaign","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":143},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"utm_content","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":144},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"utm_term","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":145},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"referrer_path","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":146},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"referrer_query","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":147},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"referrer_domain","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":148},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"page_title","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":149},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"gclid","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":150},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"fbclid","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":151},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"msclkid","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":152},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"ttclid","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":153},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"li_fat_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":154},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"twclid","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":155},"length":255,"nativeType":"VarChar(255)"},
+        {"name":"event_type","type":"Int","source":{"file":"prisma/schema.prisma","line":156},"default":1,"nativeType":"Integer"},
+        {"name":"event_name","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":157},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"tag","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":158},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"hostname","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":159},"length":100,"nativeType":"VarChar(100)"},
+        {"name":"lcp","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":160},"precision":10,"scale":1,"nativeType":"Decimal(10, 1)"},
+        {"name":"inp","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":161},"precision":10,"scale":1,"nativeType":"Decimal(10, 1)"},
+        {"name":"cls","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":162},"precision":10,"scale":4,"nativeType":"Decimal(10, 4)"},
+        {"name":"fcp","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":163},"precision":10,"scale":1,"nativeType":"Decimal(10, 1)"},
+        {"name":"ttfb","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":164},"precision":10,"scale":1,"nativeType":"Decimal(10, 1)"}
+      ],
+      "relations": [
+        {"foreignKey":"session_id","references":"session_id","on":"session","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":133},
+      "indexes": [
+        {"columns":["created_at"],"type":"index"},
+        {"columns":["session_id"],"type":"index"},
+        {"columns":["visit_id"],"type":"index"},
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["website_id","created_at"],"type":"index"},
+        {"columns":["website_id","created_at","url_path"],"type":"index"},
+        {"columns":["website_id","created_at","url_query"],"type":"index"},
+        {"columns":["website_id","created_at","referrer_domain"],"type":"index"},
+        {"columns":["website_id","created_at","page_title"],"type":"index"},
+        {"columns":["website_id","created_at","event_name"],"type":"index"},
+        {"columns":["website_id","created_at","tag"],"type":"index"},
+        {"columns":["website_id","session_id","created_at"],"type":"index"},
+        {"columns":["website_id","visit_id","created_at"],"type":"index"},
+        {"columns":["website_id","created_at","hostname"],"type":"index"}
+      ]
+    },
+    {
+      "table": "event_data",
+      "columns": [
+        {"name":"event_data_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":187},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":188},"nativeType":"Uuid"},
+        {"name":"website_event_id","type":"String","source":{"file":"prisma/schema.prisma","line":189},"nativeType":"Uuid"},
+        {"name":"data_key","type":"String","source":{"file":"prisma/schema.prisma","line":190},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"string_value","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":191},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"number_value","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":192},"precision":19,"scale":4,"nativeType":"Decimal(19, 4)"},
+        {"name":"date_value","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":193},"nativeType":"Timestamptz(6)"},
+        {"name":"data_type","type":"Int","source":{"file":"prisma/schema.prisma","line":194},"nativeType":"Integer"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":195},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"website_event_id","references":"event_id","on":"website_event","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":186},
+      "indexes": [
+        {"columns":["created_at"],"type":"index"},
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["website_event_id"],"type":"index"},
+        {"columns":["website_id","created_at"],"type":"index"},
+        {"columns":["website_id","created_at","data_key"],"type":"index"}
+      ]
+    },
+    {
+      "table": "session_data",
+      "columns": [
+        {"name":"session_data_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":209},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":210},"nativeType":"Uuid"},
+        {"name":"session_id","type":"String","source":{"file":"prisma/schema.prisma","line":211},"nativeType":"Uuid"},
+        {"name":"data_key","type":"String","source":{"file":"prisma/schema.prisma","line":212},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"string_value","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":213},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"number_value","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":214},"precision":19,"scale":4,"nativeType":"Decimal(19, 4)"},
+        {"name":"date_value","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":215},"nativeType":"Timestamptz(6)"},
+        {"name":"data_type","type":"Int","source":{"file":"prisma/schema.prisma","line":216},"nativeType":"Integer"},
+        {"name":"distinct_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":217},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":218},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"session_id","references":"session_id","on":"session","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":208},
+      "indexes": [
+        {"columns":["created_at"],"type":"index"},
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["session_id"],"type":"index"},
+        {"columns":["session_id","created_at"],"type":"index"},
+        {"columns":["website_id","created_at","data_key"],"type":"index"},
+        {"columns":["session_id","data_key"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "team",
+      "columns": [
+        {"name":"team_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":233},"nativeType":"Uuid"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":234},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"access_code","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":235},"length":50,"unique":true,"nativeType":"VarChar(50)"},
+        {"name":"logo_url","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":236},"length":2183,"nativeType":"VarChar(2183)"},
+        {"name":"two_factor_required","type":"Boolean","source":{"file":"prisma/schema.prisma","line":237},"default":false},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":238},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":239},"nativeType":"Timestamptz(6)"},
+        {"name":"deleted_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":240},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":232},
+      "indexes": [
+        {"columns":["access_code"],"type":"index"}
+      ]
+    },
+    {
+      "table": "team_user",
+      "columns": [
+        {"name":"team_user_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":253},"nativeType":"Uuid"},
+        {"name":"team_id","type":"String","source":{"file":"prisma/schema.prisma","line":254},"nativeType":"Uuid"},
+        {"name":"user_id","type":"String","source":{"file":"prisma/schema.prisma","line":255},"nativeType":"Uuid"},
+        {"name":"role","type":"String","source":{"file":"prisma/schema.prisma","line":256},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":257},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":258},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"team_id","references":"team_id","on":"team","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":252},
+      "indexes": [
+        {"columns":["team_id"],"type":"index"},
+        {"columns":["user_id"],"type":"index"}
+      ]
+    },
+    {
+      "table": "report",
+      "columns": [
+        {"name":"report_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":269},"nativeType":"Uuid"},
+        {"name":"user_id","type":"String","source":{"file":"prisma/schema.prisma","line":270},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":271},"nativeType":"Uuid"},
+        {"name":"type","type":"String","source":{"file":"prisma/schema.prisma","line":272},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":273},"length":200,"nativeType":"VarChar(200)"},
+        {"name":"description","type":"String","source":{"file":"prisma/schema.prisma","line":274},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"parameters","type":"Json","source":{"file":"prisma/schema.prisma","line":275}},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":276},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":277},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":268},
+      "indexes": [
+        {"columns":["user_id"],"type":"index"},
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["type"],"type":"index"},
+        {"columns":["name"],"type":"index"}
+      ]
+    },
+    {
+      "table": "annotation",
+      "columns": [
+        {"name":"annotation_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":290},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":291},"nativeType":"Uuid"},
+        {"name":"user_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":292},"nativeType":"Uuid"},
+        {"name":"date","type":"DateTime","source":{"file":"prisma/schema.prisma","line":293},"nativeType":"Timestamptz(6)"},
+        {"name":"all_day","type":"Boolean","source":{"file":"prisma/schema.prisma","line":294},"default":true},
+        {"name":"note","type":"String","source":{"file":"prisma/schema.prisma","line":295},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":296},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":297},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":289},
+      "indexes": [
+        {"columns":["website_id","date"],"type":"index"}
+      ]
+    },
+    {
+      "table": "segment",
+      "columns": [
+        {"name":"segment_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":306},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":307},"nativeType":"Uuid"},
+        {"name":"type","type":"String","source":{"file":"prisma/schema.prisma","line":308},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":309},"length":200,"nativeType":"VarChar(200)"},
+        {"name":"parameters","type":"Json","source":{"file":"prisma/schema.prisma","line":310}},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":311},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":312},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":305},
+      "indexes": [
+        {"columns":["website_id"],"type":"index"}
+      ]
+    },
+    {
+      "table": "revenue",
+      "columns": [
+        {"name":"revenue_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":321},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":322},"nativeType":"Uuid"},
+        {"name":"session_id","type":"String","source":{"file":"prisma/schema.prisma","line":323},"nativeType":"Uuid"},
+        {"name":"event_id","type":"String","source":{"file":"prisma/schema.prisma","line":324},"nativeType":"Uuid"},
+        {"name":"event_name","type":"String","source":{"file":"prisma/schema.prisma","line":325},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"currency","type":"String","source":{"file":"prisma/schema.prisma","line":326},"length":10,"nativeType":"VarChar(10)"},
+        {"name":"revenue","type":"Decimal","nullable":true,"source":{"file":"prisma/schema.prisma","line":327},"precision":19,"scale":4,"nativeType":"Decimal(19, 4)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":328},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"session_id","references":"session_id","on":"session","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":320},
+      "indexes": [
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["session_id"],"type":"index"},
+        {"columns":["website_id","created_at"],"type":"index"},
+        {"columns":["website_id","session_id","created_at"],"type":"index"}
+      ]
+    },
+    {
+      "table": "link",
+      "columns": [
+        {"name":"link_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":341},"nativeType":"Uuid"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":342},"length":100,"nativeType":"VarChar(100)"},
+        {"name":"url","type":"String","source":{"file":"prisma/schema.prisma","line":343},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"slug","type":"String","source":{"file":"prisma/schema.prisma","line":344},"length":100,"unique":true,"nativeType":"VarChar(100)"},
+        {"name":"user_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":345},"nativeType":"Uuid"},
+        {"name":"team_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":346},"nativeType":"Uuid"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":347},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":348},"nativeType":"Timestamptz(6)"},
+        {"name":"deleted_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":349},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"team_id","references":"team_id","on":"team","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":340},
+      "indexes": [
+        {"columns":["slug"],"type":"index"},
+        {"columns":["user_id"],"type":"index"},
+        {"columns":["team_id"],"type":"index"},
+        {"columns":["created_at"],"type":"index"}
+      ]
+    },
+    {
+      "table": "pixel",
+      "columns": [
+        {"name":"pixel_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":362},"nativeType":"Uuid"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":363},"length":100,"nativeType":"VarChar(100)"},
+        {"name":"slug","type":"String","source":{"file":"prisma/schema.prisma","line":364},"length":100,"unique":true,"nativeType":"VarChar(100)"},
+        {"name":"user_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":365},"nativeType":"Uuid"},
+        {"name":"team_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":366},"nativeType":"Uuid"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":367},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":368},"nativeType":"Timestamptz(6)"},
+        {"name":"deleted_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":369},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"team_id","references":"team_id","on":"team","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":361},
+      "indexes": [
+        {"columns":["slug"],"type":"index"},
+        {"columns":["user_id"],"type":"index"},
+        {"columns":["team_id"],"type":"index"},
+        {"columns":["created_at"],"type":"index"}
+      ]
+    },
+    {
+      "table": "board",
+      "columns": [
+        {"name":"board_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":382},"nativeType":"Uuid"},
+        {"name":"type","type":"String","source":{"file":"prisma/schema.prisma","line":383},"length":50,"nativeType":"VarChar(50)"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":384},"length":200,"nativeType":"VarChar(200)"},
+        {"name":"description","type":"String","source":{"file":"prisma/schema.prisma","line":385},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"parameters","type":"Json","source":{"file":"prisma/schema.prisma","line":386}},
+        {"name":"user_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":387},"nativeType":"Uuid"},
+        {"name":"team_id","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":388},"nativeType":"Uuid"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":389},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":390},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"},
+        {"foreignKey":"team_id","references":"team_id","on":"team","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":381},
+      "indexes": [
+        {"columns":["user_id"],"type":"index"},
+        {"columns":["team_id"],"type":"index"},
+        {"columns":["created_at"],"type":"index"}
+      ]
+    },
+    {
+      "table": "share",
+      "columns": [
+        {"name":"share_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":402},"nativeType":"Uuid"},
+        {"name":"entity_id","type":"String","source":{"file":"prisma/schema.prisma","line":403},"nativeType":"Uuid"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":404},"length":200,"nativeType":"VarChar(200)"},
+        {"name":"share_type","type":"Int","source":{"file":"prisma/schema.prisma","line":405},"nativeType":"Integer"},
+        {"name":"slug","type":"String","source":{"file":"prisma/schema.prisma","line":406},"length":100,"unique":true,"nativeType":"VarChar(100)"},
+        {"name":"parameters","type":"Json","source":{"file":"prisma/schema.prisma","line":407}},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":408},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":409},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":401},
+      "indexes": [
+        {"columns":["entity_id"],"type":"index"}
+      ]
+    },
+    {
+      "table": "session_replay",
+      "columns": [
+        {"name":"replay_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":416},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":417},"nativeType":"Uuid"},
+        {"name":"session_id","type":"String","source":{"file":"prisma/schema.prisma","line":418},"nativeType":"Uuid"},
+        {"name":"visit_id","type":"String","source":{"file":"prisma/schema.prisma","line":419},"nativeType":"Uuid"},
+        {"name":"chunk_index","type":"Int","source":{"file":"prisma/schema.prisma","line":420},"nativeType":"Integer"},
+        {"name":"events","type":"Bytes","source":{"file":"prisma/schema.prisma","line":421}},
+        {"name":"event_count","type":"Int","source":{"file":"prisma/schema.prisma","line":422},"nativeType":"Integer"},
+        {"name":"started_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":423},"nativeType":"Timestamptz(6)"},
+        {"name":"ended_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":424},"nativeType":"Timestamptz(6)"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":425},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":415},
+      "indexes": [
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["session_id"],"type":"index"},
+        {"columns":["visit_id"],"type":"index"},
+        {"columns":["website_id","session_id"],"type":"index"},
+        {"columns":["website_id","visit_id"],"type":"index"},
+        {"columns":["website_id","created_at"],"type":"index"},
+        {"columns":["session_id","chunk_index"],"type":"index"}
+      ]
+    },
+    {
+      "table": "session_replay_saved",
+      "columns": [
+        {"name":"saved_replay_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":440},"nativeType":"Uuid"},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":441},"length":100,"nativeType":"VarChar(100)"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":442},"nativeType":"Uuid"},
+        {"name":"visit_id","type":"String","source":{"file":"prisma/schema.prisma","line":443},"nativeType":"Uuid"},
+        {"name":"created_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":444},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":445},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":439},
+      "indexes": [
+        {"columns":["website_id","visit_id"],"type":"unique"},
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["visit_id"],"type":"index"},
+        {"columns":["website_id","created_at"],"type":"index"}
+      ]
+    },
+    {
+      "table": "heatmap_event",
+      "columns": [
+        {"name":"heatmap_event_id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":457},"nativeType":"Uuid"},
+        {"name":"website_id","type":"String","source":{"file":"prisma/schema.prisma","line":458},"nativeType":"Uuid"},
+        {"name":"session_id","type":"String","source":{"file":"prisma/schema.prisma","line":459},"nativeType":"Uuid"},
+        {"name":"visit_id","type":"String","source":{"file":"prisma/schema.prisma","line":460},"nativeType":"Uuid"},
+        {"name":"url_path","type":"String","source":{"file":"prisma/schema.prisma","line":461},"length":500,"nativeType":"VarChar(500)"},
+        {"name":"event_type","type":"Int","source":{"file":"prisma/schema.prisma","line":462},"nativeType":"Integer"},
+        {"name":"x","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":463},"nativeType":"Integer"},
+        {"name":"y","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":464},"nativeType":"Integer"},
+        {"name":"page_x","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":465},"nativeType":"Integer"},
+        {"name":"page_y","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":466},"nativeType":"Integer"},
+        {"name":"page_w","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":467},"nativeType":"Integer"},
+        {"name":"viewport_w","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":468},"nativeType":"Integer"},
+        {"name":"viewport_h","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":469},"nativeType":"Integer"},
+        {"name":"page_h","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":470},"nativeType":"Integer"},
+        {"name":"scroll_pct","type":"Int","nullable":true,"source":{"file":"prisma/schema.prisma","line":471},"nativeType":"Integer"},
+        {"name":"created_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":472},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"website_id","references":"website_id","on":"website","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":456},
+      "indexes": [
+        {"columns":["website_id"],"type":"index"},
+        {"columns":["visit_id"],"type":"index"},
+        {"columns":["website_id","created_at"],"type":"index"},
+        {"columns":["website_id","url_path","event_type","created_at"],"type":"index"}
+      ]
+    },
+    {
+      "table": "two_factor_auth",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":484}},
+        {"name":"user_id","type":"String","source":{"file":"prisma/schema.prisma","line":485},"unique":true,"nativeType":"Uuid"},
+        {"name":"secret","type":"String","source":{"file":"prisma/schema.prisma","line":486}},
+        {"name":"is_enabled","type":"Boolean","source":{"file":"prisma/schema.prisma","line":487},"default":false},
+        {"name":"created_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":488},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":489},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":483}
+    },
+    {
+      "table": "two_factor_backup_code",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":496}},
+        {"name":"user_id","type":"String","source":{"file":"prisma/schema.prisma","line":497},"nativeType":"Uuid"},
+        {"name":"code_hash","type":"String","source":{"file":"prisma/schema.prisma","line":498}},
+        {"name":"used","type":"Boolean","source":{"file":"prisma/schema.prisma","line":499},"default":false},
+        {"name":"created_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":500},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":495},
+      "indexes": [
+        {"columns":["user_id"],"type":"index"}
+      ]
+    },
+    {
+      "table": "two_factor_otp_used",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":508}},
+        {"name":"user_id","type":"String","source":{"file":"prisma/schema.prisma","line":509},"nativeType":"Uuid"},
+        {"name":"otp","type":"String","source":{"file":"prisma/schema.prisma","line":510}},
+        {"name":"expires_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":511},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":507},
+      "indexes": [
+        {"columns":["user_id","otp"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "two_factor_rate_limit",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":519}},
+        {"name":"user_id","type":"String","source":{"file":"prisma/schema.prisma","line":520},"unique":true,"nativeType":"Uuid"},
+        {"name":"attempts","type":"Int","source":{"file":"prisma/schema.prisma","line":521},"default":0},
+        {"name":"locked_until","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":522},"nativeType":"Timestamptz(6)"},
+        {"name":"updated_at","type":"DateTime","source":{"file":"prisma/schema.prisma","line":523},"nativeType":"Timestamptz(6)"}
+      ],
+      "relations": [
+        {"foreignKey":"user_id","references":"user_id","on":"user","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":518}
+    },
+    {
+      "table": "app_setting",
+      "columns": [
+        {"name":"key","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":530}},
+        {"name":"value","type":"String","source":{"file":"prisma/schema.prisma","line":531}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":529}
+    }
+  ],
+  "warnings": []
+}

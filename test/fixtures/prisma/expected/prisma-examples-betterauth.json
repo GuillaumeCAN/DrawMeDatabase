@@ -1,0 +1,71 @@
+{
+  "tables": [
+    {
+      "table": "user",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":16}},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":17}},
+        {"name":"email","type":"String","source":{"file":"prisma/schema.prisma","line":18},"unique":true},
+        {"name":"emailVerified","type":"Boolean","source":{"file":"prisma/schema.prisma","line":19}},
+        {"name":"image","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":20}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":21}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":22}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":15}
+    },
+    {
+      "table": "session",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":31}},
+        {"name":"expiresAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":32}},
+        {"name":"token","type":"String","source":{"file":"prisma/schema.prisma","line":33},"unique":true},
+        {"name":"createdAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":34}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":35}},
+        {"name":"ipAddress","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":36}},
+        {"name":"userAgent","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":37}},
+        {"name":"userId","type":"String","source":{"file":"prisma/schema.prisma","line":38}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"user","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":30}
+    },
+    {
+      "table": "account",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":46}},
+        {"name":"accountId","type":"String","source":{"file":"prisma/schema.prisma","line":47}},
+        {"name":"providerId","type":"String","source":{"file":"prisma/schema.prisma","line":48}},
+        {"name":"userId","type":"String","source":{"file":"prisma/schema.prisma","line":49}},
+        {"name":"accessToken","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":51}},
+        {"name":"refreshToken","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":52}},
+        {"name":"idToken","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":53}},
+        {"name":"accessTokenExpiresAt","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":54}},
+        {"name":"refreshTokenExpiresAt","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":55}},
+        {"name":"scope","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":56}},
+        {"name":"password","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":57}},
+        {"name":"createdAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":58}},
+        {"name":"updatedAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":59}}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"id","on":"user","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":45}
+    },
+    {
+      "table": "verification",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":65}},
+        {"name":"identifier","type":"String","source":{"file":"prisma/schema.prisma","line":66}},
+        {"name":"value","type":"String","source":{"file":"prisma/schema.prisma","line":67}},
+        {"name":"expiresAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":68}},
+        {"name":"createdAt","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":69}},
+        {"name":"updatedAt","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":70}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":64}
+    }
+  ],
+  "warnings": []
+}

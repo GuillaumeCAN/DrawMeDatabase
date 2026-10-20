@@ -1,0 +1,10 @@
+{
+  "name": "drizzle-workspace",
+  "private": true,
+  "dependencies": {
+    "drizzle-orm": "^0.45.4"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11"
+  }
+}

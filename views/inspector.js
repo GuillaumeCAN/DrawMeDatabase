@@ -11,7 +11,8 @@
 // with textContent.
 //
 // tableInfo(schema, name) builds the info of a table from the schema on screen;
-// create({ element, onAction }).render(info, t) draws it. onAction(id, value):
+// create({ element, onAction }).render(info, t) draws it; openKey(framework, file, t) is the text of
+// the button that opens the file of a table (the Schema view says the same). onAction(id, value):
 //   'close', 'open' (the file of the table), 'openColumn' (a column name), 'select' (a table
 //   name), 'neighbours', 'action' (the id of an action of a section), 'pro'.
 (function (root) {
@@ -19,6 +20,15 @@
 
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const GIT_STATUSES = ['untracked', 'modified', 'unsaved'];
+
+    // The key of the text that opens the file of a table: 'Open the migration'
+    // (inspector.open.laravel)..., 'Open the SQL file' for a table read from a SQL file whatever the
+    // framework (a Laravel schema dump: database/schema/<connection>-schema.sql or .dump), else
+    // 'Open the file'
+    function openKey(framework, file, t) {
+        const key = typeof file === 'string' && /\.(?:sql|dump)$/i.test(file) ? 'inspector.open.sql' : typeof framework === 'string' ? `inspector.open.${framework}` : '';
+        return key && t.has && t.has(key) ? key : 'inspector.open';
+    }
 
     // The info of a table: { table, git, source, framework, columns, outgoing, incoming }, or null
     function tableInfo(schema, name) {
@@ -217,7 +227,7 @@
             if (info.source) {
                 const open = element('button', { type: 'button', className: 'panel-button primary', title: `${info.source.file}:${info.source.line}` }, [
                     icon('file'),
-                    element('span', { text: t(info.framework === 'laravel' ? 'inspector.open.laravel' : info.framework === 'symfony' ? 'inspector.open.symfony' : 'inspector.open') }),
+                    element('span', { text: t(openKey(info.framework, info.source.file, t)) }),
                 ]);
                 open.addEventListener('click', () => action('open'));
                 buttons.push(open);
@@ -273,7 +283,7 @@
         return { render };
     }
 
-    const api = { create, tableInfo };
+    const api = { create, tableInfo, openKey };
     if (typeof module === 'object' && module.exports) {
         module.exports = api;
     } else {

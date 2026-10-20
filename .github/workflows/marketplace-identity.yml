@@ -1,0 +1,126 @@
+# One-time setup of the VS Code Marketplace publication (docs/publishing.md), run by hand: signs
+# in as the user-assigned managed identity through GitHub OIDC, prints its Azure DevOps ID (the ID
+# to add as a member of the publisher), then checks whether it is already a member.
+# Publishes nothing and changes nothing.
+#
+# The client ID and the tenant ID are typed in the Run workflow form, or else read from the
+# repository variables AZURE_CLIENT_ID and AZURE_TENANT_ID. The form lets this run before the
+# variables exist: setting them is what turns on the publication by release.yml, the last step.
+
+name: Marketplace identity
+
+on:
+  workflow_dispatch:
+    inputs:
+      client-id:
+        description: Client ID of the managed identity (empty = the repository variable AZURE_CLIENT_ID)
+        type: string
+        required: false
+      tenant-id:
+        description: Tenant ID of Microsoft Entra ID (empty = the repository variable AZURE_TENANT_ID)
+        type: string
+        required: false
+
+permissions: {}
+
+jobs:
+  # Outside the marketplace environment: a run without the IDs stops here, before the next job.
+  # A job that names an environment that does not exist yet creates it, with no deployment rules.
+  ids:
+    name: Client ID and tenant ID
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    outputs:
+      client-id: ${{ steps.ids.outputs.client-id }}
+      tenant-id: ${{ steps.ids.outputs.tenant-id }}
+    steps:
+      - name: Client ID and tenant ID
+        id: ids
+        env:
+          INPUT_CLIENT_ID: ${{ inputs.client-id }}
+          INPUT_TENANT_ID: ${{ inputs.tenant-id }}
+          VAR_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          VAR_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+        run: |
+          client_id=$(printf '%s' "${INPUT_CLIENT_ID:-$VAR_CLIENT_ID}" | tr -d '[:space:]')
+          tenant_id=$(printf '%s' "${INPUT_TENANT_ID:-$VAR_TENANT_ID}" | tr -d '[:space:]')
+          if [ -z "$client_id" ] || [ -z "$tenant_id" ]; then
+            echo "::error::Type the client ID and the tenant ID in the Run workflow form, or set the repository variables AZURE_CLIENT_ID and AZURE_TENANT_ID (docs/publishing.md)"
+            exit 1
+          fi
+          guid='^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
+          if ! [[ "$client_id" =~ $guid ]]; then
+            echo "::error::The client ID \"$client_id\" is not an ID like 00000000-0000-0000-0000-000000000000: copy the Client ID of the identity (docs/publishing.md, step 5)"
+            exit 1
+          fi
+          if ! [[ "$tenant_id" =~ $guid ]]; then
+            echo "::error::The tenant ID \"$tenant_id\" is not an ID like 00000000-0000-0000-0000-000000000000: copy the Tenant ID of Microsoft Entra ID (docs/publishing.md, step 5)"
+            exit 1
+          fi
+          echo "client-id=$client_id" >> "$GITHUB_OUTPUT"
+          echo "tenant-id=$tenant_id" >> "$GITHUB_OUTPUT"
+
+  identity:
+    name: Azure DevOps ID of the publishing identity
+    needs: ids
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Same environment as the marketplace job of release.yml: same federated credential. When the
+    # environment has required reviewers, this job waits for an approval (Review deployments).
+    environment: marketplace
+    permissions:
+      contents: read
+      id-token: write # OIDC token exchanged by azure/login
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # Only for the vsce CLI, at the version of package-lock.json
+      - run: npm ci --ignore-scripts
+
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ needs.ids.outputs.client-id }} # the managed identity, not an app registration
+          tenant-id: ${{ needs.ids.outputs.tenant-id }}
+          allow-no-subscriptions: true
+
+      # The Azure DevOps ID is neither the client ID nor the object (principal) ID of the identity.
+      # 499b84ac-1321-427f-aa17-267ca6975798 is the Azure DevOps resource. Only the ID and the
+      # display name are printed.
+      - name: Azure DevOps ID
+        run: |
+          profile=$(az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798 \
+            --query '{id: id, displayName: displayName}' --output json)
+          id=$(jq -r '.id' <<< "$profile")
+          name=$(jq -r '.displayName' <<< "$profile")
+          echo "Azure DevOps ID: $id"
+          echo "Display name: $name"
+          {
+            echo "### Azure DevOps ID of the identity"
+            echo
+            echo "- ID: \`$id\`"
+            echo "- Display name: $name"
+            echo
+            echo "Add this ID as a **Contributor** in the *Members* of the publisher (docs/publishing.md)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # vsce verify-pat --azure-credential reads the role assignments of the publisher: it succeeds
+      # when the identity has a role on it (Reader, Creator, Contributor or Owner). Before the
+      # identity is added, it fails: a warning, not an error.
+      - name: Membership of the publisher
+        run: |
+          publisher=$(node -p "require('./package.json').publisher")
+          if npx vsce verify-pat "$publisher" --azure-credential; then
+            echo "::notice::The identity has a role on the publisher $publisher: it needs Contributor to publish"
+            echo "The identity has a role on the publisher \`$publisher\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::The identity has no role on the publisher $publisher yet: add the Azure DevOps ID above as Contributor, then run this workflow again"
+            echo "The identity has **no role** on the publisher \`$publisher\` yet." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,0 +1,227 @@
+{
+  "tables": [
+    {
+      "table": "atala_objects",
+      "columns": [
+        {"name":"atala_object_id","type":"atala_object_id","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":51}},
+        {"name":"object_content","type":"bytea","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":52}},
+        {"name":"received_at","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":53}},
+        {"name":"atala_object_status","type":"atala_object_status","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":54},"default":"PENDING","values":["SCHEDULED","PENDING","MERGED","PROCESSED"]}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":49},
+      "indexes": [
+        {"columns":["atala_object_status"],"type":"index","name":"atala_objects_atala_object_status_index"},
+        {"columns":["received_at"],"type":"index","name":"atala_objects_received_at"}
+      ]
+    },
+    {
+      "table": "contexts",
+      "columns": [
+        {"name":"context_id","type":"id_type","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":67}},
+        {"name":"did_suffix","type":"id_type","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":68}},
+        {"name":"context","type":"text","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":69}},
+        {"name":"added_on_transaction_id","type":"transaction_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":70}},
+        {"name":"added_on","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":71}},
+        {"name":"added_on_absn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":72}},
+        {"name":"added_on_osn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":73}},
+        {"name":"revoked_on_transaction_id","type":"transaction_id","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":74}},
+        {"name":"revoked_on","type":"timestamptz","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":75}},
+        {"name":"revoked_on_absn","type":"int4","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":76}},
+        {"name":"revoked_on_osn","type":"int4","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":77}}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":65},
+      "indexes": [
+        {"columns":["did_suffix","context"],"type":"unique","name":"unique_did_suffix_and_context_string_on_non_revoked"}
+      ]
+    },
+    {
+      "table": "did_data",
+      "columns": [
+        {"name":"did_suffix","type":"id_type","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":88}},
+        {"name":"last_operation","type":"operation_hash","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":89}},
+        {"name":"transaction_id","type":"transaction_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":90}},
+        {"name":"ledger","type":"varchar","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":91},"length":32},
+        {"name":"published_on","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":92}},
+        {"name":"published_on_absn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":93}},
+        {"name":"published_on_osn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":94}}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":86}
+    },
+    {
+      "table": "key_values",
+      "columns": [
+        {"name":"key","type":"varchar","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":101},"length":64},
+        {"name":"value","type":"text","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":102}}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":99}
+    },
+    {
+      "table": "metrics_counters",
+      "columns": [
+        {"name":"counter_name","type":"varchar","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":109},"length":256},
+        {"name":"counter_value","type":"non_negative_int_type","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":110},"default":0}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":107}
+    },
+    {
+      "table": "protocol_versions",
+      "columns": [
+        {"name":"major_version","type":"non_negative_int_type","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":117}},
+        {"name":"minor_version","type":"non_negative_int_type","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":118}},
+        {"name":"version_name","type":"varchar","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":119},"length":256},
+        {"name":"effective_since","type":"block_no","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":120}},
+        {"name":"published_in","type":"transaction_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":121}},
+        {"name":"is_effective","type":"bool","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":122}},
+        {"name":"proposer_did","type":"id_type","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":123}}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":115}
+    },
+    {
+      "table": "public_keys",
+      "columns": [
+        {"name":"did_suffix","type":"id_type","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":131}},
+        {"name":"key_id","type":"text","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":132}},
+        {"name":"key_usage","type":"key_usage","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":133},"values":["MASTER_KEY","ISSUING_KEY","KEY_AGREEMENT_KEY","AUTHENTICATION_KEY","REVOCATION_KEY","CAPABILITY_INVOCATION_KEY","CAPABILITY_DELEGATION_KEY","VDR_KEY"]},
+        {"name":"curve","type":"text","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":134}},
+        {"name":"added_on","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":135}},
+        {"name":"added_on_absn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":136}},
+        {"name":"added_on_osn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":137}},
+        {"name":"revoked_on","type":"timestamptz","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":138}},
+        {"name":"revoked_on_absn","type":"int4","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":139}},
+        {"name":"revoked_on_osn","type":"int4","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":140}},
+        {"name":"added_on_transaction_id","type":"transaction_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":141}},
+        {"name":"revoked_on_transaction_id","type":"transaction_id","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":142}},
+        {"name":"ledger","type":"varchar","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":143},"length":32},
+        {"name":"compressed","type":"bytea","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":144}}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":129}
+    },
+    {
+      "table": "atala_object_tx_submissions",
+      "columns": [
+        {"name":"atala_object_id","type":"atala_object_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":152}},
+        {"name":"ledger","type":"varchar","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":153},"length":32},
+        {"name":"transaction_id","type":"transaction_id","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":154}},
+        {"name":"submission_timestamp","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":155}},
+        {"name":"status","type":"atala_object_transaction_status","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":156},"values":["PENDING","DELETED","IN_LEDGER"]}
+      ],
+      "relations": [
+        {"foreignKey":"atala_object_id","references":"atala_object_id","on":"atala_objects","type":"many-to-one"}
+      ],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":150},
+      "indexes": [
+        {"columns":["atala_object_id"],"type":"index","name":"atala_object_tx_submissions_atala_object_id_index"},
+        {"columns":["submission_timestamp","status","ledger"],"type":"index","name":"atala_object_tx_submissions_filter_index"},
+        {"columns":["atala_object_id","submission_timestamp"],"type":"index","name":"atala_object_tx_submissions_latest_index"}
+      ]
+    },
+    {
+      "table": "atala_object_txs",
+      "columns": [
+        {"name":"atala_object_id","type":"atala_object_id","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":175}},
+        {"name":"ledger","type":"varchar","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":176},"length":32},
+        {"name":"block_number","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":177}},
+        {"name":"block_timestamp","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":178}},
+        {"name":"block_index","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":179}},
+        {"name":"transaction_id","type":"transaction_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":180}}
+      ],
+      "relations": [
+        {"foreignKey":"atala_object_id","references":"atala_object_id","on":"atala_objects","type":"one-to-one"}
+      ],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":173},
+      "indexes": [
+        {"columns":["atala_object_id"],"type":"index","name":"atala_object_txs_atala_object_id_index"}
+      ]
+    },
+    {
+      "table": "atala_operations",
+      "columns": [
+        {"name":"signed_atala_operation_id","type":"atala_operation_id","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":192}},
+        {"name":"atala_object_id","type":"atala_object_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":193}},
+        {"name":"atala_operation_status","type":"atala_operation_status","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":194},"values":["UNKNOWN","RECEIVED","APPLIED","REJECTED"]},
+        {"name":"status_details","type":"varchar","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":195},"length":256,"default":""}
+      ],
+      "relations": [
+        {"foreignKey":"atala_object_id","references":"atala_object_id","on":"atala_objects","type":"many-to-one"}
+      ],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":190}
+    },
+    {
+      "table": "services",
+      "columns": [
+        {"name":"service_id","type":"id_type","primary":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":204}},
+        {"name":"id","type":"text","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":205}},
+        {"name":"did_suffix","type":"id_type","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":206}},
+        {"name":"type","type":"text","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":207}},
+        {"name":"added_on_transaction_id","type":"transaction_id","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":208}},
+        {"name":"added_on","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":209}},
+        {"name":"added_on_absn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":210}},
+        {"name":"added_on_osn","type":"int4","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":211}},
+        {"name":"revoked_on_transaction_id","type":"transaction_id","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":212}},
+        {"name":"revoked_on","type":"timestamptz","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":213}},
+        {"name":"revoked_on_absn","type":"int4","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":214}},
+        {"name":"revoked_on_osn","type":"int4","nullable":true,"source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":215}},
+        {"name":"ledger","type":"varchar","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":216},"length":32},
+        {"name":"service_endpoints","type":"text","source":{"file":"src/main/resources/db/migration/V1__create_tables.sql","line":217}}
+      ],
+      "relations": [
+        {"foreignKey":"did_suffix","references":"did_suffix","on":"did_data","type":"many-to-one"}
+      ],
+      "source": {"file":"src/main/resources/db/migration/V1__create_tables.sql","line":202},
+      "indexes": [
+        {"columns":["did_suffix","id"],"type":"unique","name":"unique_did_suffix_and_id_on_non_revoked"}
+      ]
+    },
+    {
+      "table": "vdr_entries",
+      "columns": [
+        {"name":"entry_id","type":"operation_hash","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":5}},
+        {"name":"event_hash","type":"operation_hash","primary":true,"source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":6}},
+        {"name":"did_suffix","type":"id_type","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":7}},
+        {"name":"nonce","type":"bytea","nullable":true,"source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":8}},
+        {"name":"data_type","type":"varchar","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":9},"length":16},
+        {"name":"data_bytes","type":"bytea","nullable":true,"source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":10}},
+        {"name":"data_ipfs","type":"varchar","nullable":true,"source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":11},"length":256},
+        {"name":"previous_event_hash","type":"operation_hash","nullable":true,"source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":12}},
+        {"name":"status","type":"vdr_entry_status","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":13},"default":"ACTIVE","values":["ACTIVE","DEACTIVATED"]},
+        {"name":"created_at","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":14}},
+        {"name":"created_at_absn","type":"int4","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":15}},
+        {"name":"created_at_osn","type":"int4","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":16}},
+        {"name":"created_at_tx_id","type":"transaction_id","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":17}},
+        {"name":"created_at_ledger","type":"varchar","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":18},"length":32}
+      ],
+      "relations": [
+        {"foreignKey":"did_suffix","references":"did_suffix","on":"did_data","type":"many-to-one"}
+      ],
+      "source": {"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":3},
+      "indexes": [
+        {"columns":["did_suffix"],"type":"index","name":"vdr_entries_did_suffix_idx"},
+        {"columns":["entry_id"],"type":"index","name":"vdr_entries_entry_id_idx"},
+        {"columns":["previous_event_hash"],"type":"index","name":"vdr_entries_prev_event_idx"}
+      ]
+    },
+    {
+      "table": "vdr_entry_heads",
+      "columns": [
+        {"name":"entry_id","type":"operation_hash","primary":true,"source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":30}},
+        {"name":"latest_hash","type":"operation_hash","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":31}},
+        {"name":"status","type":"vdr_entry_status","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":32},"default":"ACTIVE","values":["ACTIVE","DEACTIVATED"]},
+        {"name":"updated_at","type":"timestamptz","source":{"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":33},"defaultRaw":"NOW()"}
+      ],
+      "relations": [],
+      "source": {"file":"src/main/resources/db/migration/V3__vdr_storage.sql","line":28},
+      "indexes": [
+        {"columns":["latest_hash"],"type":"index","name":"vdr_entry_heads_latest_idx"},
+        {"columns":["status","entry_id"],"type":"index","name":"vdr_entry_heads_status_idx"}
+      ]
+    }
+  ],
+  "warnings": []
+}

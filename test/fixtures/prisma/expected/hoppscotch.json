@@ -1,0 +1,416 @@
+{
+  "tables": [
+    {
+      "table": "Team",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":42}},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":43}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":41}
+    },
+    {
+      "table": "TeamMember",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":53}},
+        {"name":"role","type":"TeamAccessRole","source":{"file":"prisma/schema.prisma","line":54},"values":["OWNER","VIEWER","EDITOR"]},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":55}},
+        {"name":"teamID","type":"String","source":{"file":"prisma/schema.prisma","line":56}}
+      ],
+      "relations": [
+        {"foreignKey":"teamID","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":52},
+      "indexes": [
+        {"columns":["teamID","userUid"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "TeamInvitation",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":64}},
+        {"name":"teamID","type":"String","source":{"file":"prisma/schema.prisma","line":65}},
+        {"name":"creatorUid","type":"String","source":{"file":"prisma/schema.prisma","line":66}},
+        {"name":"inviteeEmail","type":"String","source":{"file":"prisma/schema.prisma","line":67}},
+        {"name":"inviteeRole","type":"TeamAccessRole","source":{"file":"prisma/schema.prisma","line":68},"values":["OWNER","VIEWER","EDITOR"]}
+      ],
+      "relations": [
+        {"foreignKey":"teamID","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":63},
+      "indexes": [
+        {"columns":["teamID","inviteeEmail"],"type":"unique"},
+        {"columns":["teamID"],"type":"index"}
+      ]
+    },
+    {
+      "table": "TeamCollection",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":77}},
+        {"name":"parentID","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":78}},
+        {"name":"teamID","type":"String","source":{"file":"prisma/schema.prisma","line":79}},
+        {"name":"title","type":"String","source":{"file":"prisma/schema.prisma","line":80}},
+        {"name":"orderIndex","type":"Int","source":{"file":"prisma/schema.prisma","line":81}},
+        {"name":"data","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":82}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":83},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":84},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"parentID","references":"id","on":"TeamCollection","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamID","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":76},
+      "indexes": [
+        {"columns":["teamID","parentID","orderIndex"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "TeamRequest",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":95}},
+        {"name":"collectionID","type":"String","source":{"file":"prisma/schema.prisma","line":96}},
+        {"name":"teamID","type":"String","source":{"file":"prisma/schema.prisma","line":97}},
+        {"name":"title","type":"String","source":{"file":"prisma/schema.prisma","line":98}},
+        {"name":"request","type":"Json","source":{"file":"prisma/schema.prisma","line":99}},
+        {"name":"mockExamples","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":100}},
+        {"name":"orderIndex","type":"Int","source":{"file":"prisma/schema.prisma","line":101}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":102},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":103},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"collectionID","references":"id","on":"TeamCollection","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"teamID","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":94},
+      "indexes": [
+        {"columns":["teamID","collectionID","orderIndex"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "TeamEnvironment",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":112}},
+        {"name":"teamID","type":"String","source":{"file":"prisma/schema.prisma","line":113}},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":114}},
+        {"name":"variables","type":"Json","source":{"file":"prisma/schema.prisma","line":115}}
+      ],
+      "relations": [
+        {"foreignKey":"teamID","references":"id","on":"Team","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":111}
+    },
+    {
+      "table": "User",
+      "columns": [
+        {"name":"uid","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":125}},
+        {"name":"displayName","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":126}},
+        {"name":"email","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":127},"unique":true},
+        {"name":"photoURL","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":128}},
+        {"name":"isAdmin","type":"Boolean","source":{"file":"prisma/schema.prisma","line":129},"default":false},
+        {"name":"refreshToken","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":130}},
+        {"name":"currentRESTSession","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":131}},
+        {"name":"currentGQLSession","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":132}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":133},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"lastLoggedOn","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":134},"nativeType":"Timestamptz(3)"},
+        {"name":"lastActiveOn","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":135},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":124}
+    },
+    {
+      "table": "Account",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":151}},
+        {"name":"userId","type":"String","source":{"file":"prisma/schema.prisma","line":152}},
+        {"name":"provider","type":"String","source":{"file":"prisma/schema.prisma","line":153}},
+        {"name":"providerAccountId","type":"String","source":{"file":"prisma/schema.prisma","line":154}},
+        {"name":"providerRefreshToken","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":155}},
+        {"name":"providerAccessToken","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":156}},
+        {"name":"providerScope","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":157}},
+        {"name":"loggedIn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":158},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"userId","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":150},
+      "indexes": [
+        {"columns":["provider","providerAccountId"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "VerificationToken",
+      "columns": [
+        {"name":"deviceIdentifier","type":"String","source":{"file":"prisma/schema.prisma","line":166}},
+        {"name":"token","type":"String","source":{"file":"prisma/schema.prisma","line":167},"unique":true},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":168}},
+        {"name":"expiresOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":169},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"userUid","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":165},
+      "indexes": [
+        {"columns":["deviceIdentifier","token"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "UserSettings",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":177}},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":178},"unique":true},
+        {"name":"properties","type":"Json","source":{"file":"prisma/schema.prisma","line":179}},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":180},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"userUid","references":"uid","on":"User","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":176}
+    },
+    {
+      "table": "UserHistory",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":186}},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":187}},
+        {"name":"reqType","type":"ReqType","source":{"file":"prisma/schema.prisma","line":188},"values":["REST","GQL"]},
+        {"name":"request","type":"Json","source":{"file":"prisma/schema.prisma","line":189}},
+        {"name":"responseMetadata","type":"Json","source":{"file":"prisma/schema.prisma","line":190}},
+        {"name":"isStarred","type":"Boolean","source":{"file":"prisma/schema.prisma","line":191}},
+        {"name":"executedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":192},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"userUid","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":185}
+    },
+    {
+      "table": "UserEnvironment",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":198}},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":199}},
+        {"name":"name","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":200}},
+        {"name":"variables","type":"Json","source":{"file":"prisma/schema.prisma","line":201}},
+        {"name":"isGlobal","type":"Boolean","source":{"file":"prisma/schema.prisma","line":202}}
+      ],
+      "relations": [
+        {"foreignKey":"userUid","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":197}
+    },
+    {
+      "table": "InvitedUsers",
+      "columns": [
+        {"name":"adminUid","type":"String","source":{"file":"prisma/schema.prisma","line":208}},
+        {"name":"adminEmail","type":"String","source":{"file":"prisma/schema.prisma","line":209}},
+        {"name":"inviteeEmail","type":"String","source":{"file":"prisma/schema.prisma","line":210},"unique":true},
+        {"name":"invitedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":211},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"adminUid","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":207}
+    },
+    {
+      "table": "UserRequest",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":217}},
+        {"name":"collectionID","type":"String","source":{"file":"prisma/schema.prisma","line":218}},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":219}},
+        {"name":"title","type":"String","source":{"file":"prisma/schema.prisma","line":220}},
+        {"name":"request","type":"Json","source":{"file":"prisma/schema.prisma","line":221}},
+        {"name":"type","type":"ReqType","source":{"file":"prisma/schema.prisma","line":222},"values":["REST","GQL"]},
+        {"name":"mockExamples","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":223}},
+        {"name":"orderIndex","type":"Int","source":{"file":"prisma/schema.prisma","line":224}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":225},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":226},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"collectionID","references":"id","on":"UserCollection","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"userUid","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":216},
+      "indexes": [
+        {"columns":["userUid","collectionID","orderIndex"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "UserCollection",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":235}},
+        {"name":"parentID","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":236}},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":237}},
+        {"name":"title","type":"String","source":{"file":"prisma/schema.prisma","line":238}},
+        {"name":"type","type":"ReqType","source":{"file":"prisma/schema.prisma","line":239},"values":["REST","GQL"]},
+        {"name":"orderIndex","type":"Int","source":{"file":"prisma/schema.prisma","line":240}},
+        {"name":"data","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":241}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":242},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":243},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"parentID","references":"id","on":"UserCollection","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"},
+        {"foreignKey":"userUid","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":234},
+      "indexes": [
+        {"columns":["userUid","parentID","orderIndex"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "MockServer",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":258}},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":259}},
+        {"name":"subdomain","type":"String","source":{"file":"prisma/schema.prisma","line":260},"unique":true},
+        {"name":"creatorUid","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":261}},
+        {"name":"collectionID","type":"String","source":{"file":"prisma/schema.prisma","line":262}},
+        {"name":"workspaceType","type":"WorkspaceType","source":{"file":"prisma/schema.prisma","line":263},"values":["USER","TEAM"]},
+        {"name":"workspaceID","type":"String","source":{"file":"prisma/schema.prisma","line":264}},
+        {"name":"delayInMs","type":"Int","source":{"file":"prisma/schema.prisma","line":265},"default":0},
+        {"name":"isPublic","type":"Boolean","source":{"file":"prisma/schema.prisma","line":266},"default":true},
+        {"name":"isActive","type":"Boolean","source":{"file":"prisma/schema.prisma","line":267},"default":true},
+        {"name":"hitCount","type":"Int","source":{"file":"prisma/schema.prisma","line":268},"default":0},
+        {"name":"lastHitAt","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":269},"nativeType":"Timestamptz(3)"},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":270},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":271},"nativeType":"Timestamptz(3)"},
+        {"name":"deletedAt","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":272},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"creatorUid","references":"uid","on":"User","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":257}
+    },
+    {
+      "table": "MockServerLog",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":280}},
+        {"name":"mockServerID","type":"String","source":{"file":"prisma/schema.prisma","line":281}},
+        {"name":"requestMethod","type":"String","source":{"file":"prisma/schema.prisma","line":282}},
+        {"name":"requestPath","type":"String","source":{"file":"prisma/schema.prisma","line":283}},
+        {"name":"requestHeaders","type":"Json","source":{"file":"prisma/schema.prisma","line":284}},
+        {"name":"requestBody","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":285}},
+        {"name":"requestQuery","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":286}},
+        {"name":"responseStatus","type":"Int","source":{"file":"prisma/schema.prisma","line":287}},
+        {"name":"responseHeaders","type":"Json","source":{"file":"prisma/schema.prisma","line":288}},
+        {"name":"responseBody","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":289}},
+        {"name":"responseTime","type":"Int","source":{"file":"prisma/schema.prisma","line":290}},
+        {"name":"ipAddress","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":291}},
+        {"name":"userAgent","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":292}},
+        {"name":"executedAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":293},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"mockServerID","references":"id","on":"MockServer","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":279},
+      "indexes": [
+        {"columns":["mockServerID"],"type":"index"},
+        {"columns":["mockServerID","executedAt"],"type":"index"}
+      ]
+    },
+    {
+      "table": "MockServerActivity",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":302}},
+        {"name":"mockServerID","type":"String","source":{"file":"prisma/schema.prisma","line":303}},
+        {"name":"action","type":"MockServerAction","source":{"file":"prisma/schema.prisma","line":304},"values":["CREATED","DELETED","ACTIVATED","DEACTIVATED"]},
+        {"name":"performedBy","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":305}},
+        {"name":"performedAt","type":"DateTime","source":{"file":"prisma/schema.prisma","line":306},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"mockServerID","references":"id","on":"MockServer","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":301},
+      "indexes": [
+        {"columns":["mockServerID"],"type":"index"}
+      ]
+    },
+    {
+      "table": "Shortcode",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":318},"unique":true},
+        {"name":"request","type":"Json","source":{"file":"prisma/schema.prisma","line":319}},
+        {"name":"creatorUid","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":320}},
+        {"name":"embedProperties","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":321}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":322},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":323},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"creatorUid","references":"uid","on":"User","type":"many-to-one","onDelete":"set null","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":317},
+      "indexes": [
+        {"columns":["id","creatorUid"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "InfraConfig",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":331}},
+        {"name":"name","type":"String","source":{"file":"prisma/schema.prisma","line":332},"unique":true},
+        {"name":"value","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":333}},
+        {"name":"isEncrypted","type":"Boolean","source":{"file":"prisma/schema.prisma","line":334},"default":false},
+        {"name":"lastSyncedEnvFileValue","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":335}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":336},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":337},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":330}
+    },
+    {
+      "table": "PersonalAccessToken",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":341}},
+        {"name":"userUid","type":"String","source":{"file":"prisma/schema.prisma","line":342}},
+        {"name":"label","type":"String","source":{"file":"prisma/schema.prisma","line":343}},
+        {"name":"token","type":"String","source":{"file":"prisma/schema.prisma","line":344},"unique":true},
+        {"name":"expiresOn","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":345},"nativeType":"Timestamptz(3)"},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":346},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":347},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [
+        {"foreignKey":"userUid","references":"uid","on":"User","type":"many-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":340}
+    },
+    {
+      "table": "InfraToken",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":353}},
+        {"name":"creatorUid","type":"String","source":{"file":"prisma/schema.prisma","line":354}},
+        {"name":"label","type":"String","source":{"file":"prisma/schema.prisma","line":355}},
+        {"name":"token","type":"String","source":{"file":"prisma/schema.prisma","line":356},"unique":true},
+        {"name":"expiresOn","type":"DateTime","nullable":true,"source":{"file":"prisma/schema.prisma","line":357},"nativeType":"Timestamptz(3)"},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":358},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":359},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":352}
+    },
+    {
+      "table": "PublishedDocs",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":363}},
+        {"name":"slug","type":"String","source":{"file":"prisma/schema.prisma","line":364}},
+        {"name":"title","type":"String","source":{"file":"prisma/schema.prisma","line":365}},
+        {"name":"collectionID","type":"String","source":{"file":"prisma/schema.prisma","line":366}},
+        {"name":"creatorUid","type":"String","source":{"file":"prisma/schema.prisma","line":367}},
+        {"name":"version","type":"String","source":{"file":"prisma/schema.prisma","line":368}},
+        {"name":"autoSync","type":"Boolean","source":{"file":"prisma/schema.prisma","line":369}},
+        {"name":"documentTree","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":370}},
+        {"name":"workspaceType","type":"WorkspaceType","source":{"file":"prisma/schema.prisma","line":371},"values":["USER","TEAM"]},
+        {"name":"workspaceID","type":"String","source":{"file":"prisma/schema.prisma","line":372}},
+        {"name":"environmentID","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":373}},
+        {"name":"environmentName","type":"String","nullable":true,"source":{"file":"prisma/schema.prisma","line":374}},
+        {"name":"environmentVariables","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":375}},
+        {"name":"metadata","type":"Json","nullable":true,"source":{"file":"prisma/schema.prisma","line":376}},
+        {"name":"createdOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":377},"defaultRaw":"CURRENT_TIMESTAMP","nativeType":"Timestamptz(3)"},
+        {"name":"updatedOn","type":"DateTime","source":{"file":"prisma/schema.prisma","line":378},"nativeType":"Timestamptz(3)"}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":362},
+      "indexes": [
+        {"columns":["slug","version"],"type":"unique"},
+        {"columns":["collectionID"],"type":"index"}
+      ]
+    }
+  ],
+  "warnings": []
+}

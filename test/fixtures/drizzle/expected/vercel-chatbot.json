@@ -1,0 +1,510 @@
+{
+  "tables": [
+    {
+      "table": "User",
+      "columns": [
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 15
+          },
+          "defaultRaw": "now()"
+        },
+        {
+          "name": "email",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 16
+          },
+          "length": 64
+        },
+        {
+          "name": "emailVerified",
+          "type": "boolean",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 17
+          },
+          "default": false
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 18
+          },
+          "defaultRaw": "gen_random_uuid()"
+        },
+        {
+          "name": "image",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 19
+          }
+        },
+        {
+          "name": "isAnonymous",
+          "type": "boolean",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 20
+          },
+          "default": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 21
+          }
+        },
+        {
+          "name": "password",
+          "type": "varchar",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 22
+          },
+          "length": 64
+        },
+        {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 23
+          },
+          "defaultRaw": "now()"
+        }
+      ],
+      "relations": [],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 14
+      }
+    },
+    {
+      "table": "Chat",
+      "columns": [
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 29
+          }
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 30
+          },
+          "defaultRaw": "gen_random_uuid()"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 31
+          }
+        },
+        {
+          "name": "userId",
+          "type": "uuid",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 32
+          }
+        },
+        {
+          "name": "visibility",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 35
+          },
+          "default": "private"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "userId",
+          "references": "id",
+          "on": "User",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 28
+      }
+    },
+    {
+      "table": "Message_v2",
+      "columns": [
+        {
+          "name": "attachments",
+          "type": "json",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 43
+          }
+        },
+        {
+          "name": "chatId",
+          "type": "uuid",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 44
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 47
+          }
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 48
+          },
+          "defaultRaw": "gen_random_uuid()"
+        },
+        {
+          "name": "parts",
+          "type": "json",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 49
+          }
+        },
+        {
+          "name": "role",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 50
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "chatId",
+          "references": "id",
+          "on": "Chat",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 42
+      }
+    },
+    {
+      "table": "Vote_v2",
+      "columns": [
+        {
+          "name": "chatId",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 58
+          }
+        },
+        {
+          "name": "isUpvoted",
+          "type": "boolean",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 61
+          }
+        },
+        {
+          "name": "messageId",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 62
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "chatId",
+          "references": "id",
+          "on": "Chat",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "messageId",
+          "references": "id",
+          "on": "Message_v2",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 55
+      }
+    },
+    {
+      "table": "Document",
+      "columns": [
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 76
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 77
+          }
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 78
+          },
+          "defaultRaw": "gen_random_uuid()"
+        },
+        {
+          "name": "text",
+          "type": "varchar",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 79
+          },
+          "default": "text"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 82
+          }
+        },
+        {
+          "name": "userId",
+          "type": "uuid",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 83
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "userId",
+          "references": "id",
+          "on": "User",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 73
+      }
+    },
+    {
+      "table": "Suggestion",
+      "columns": [
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 97
+          }
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 98
+          }
+        },
+        {
+          "name": "documentCreatedAt",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 99
+          }
+        },
+        {
+          "name": "documentId",
+          "type": "uuid",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 100
+          }
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 101
+          },
+          "defaultRaw": "gen_random_uuid()"
+        },
+        {
+          "name": "isResolved",
+          "type": "boolean",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 102
+          },
+          "default": false
+        },
+        {
+          "name": "originalText",
+          "type": "text",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 103
+          }
+        },
+        {
+          "name": "suggestedText",
+          "type": "text",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 104
+          }
+        },
+        {
+          "name": "userId",
+          "type": "uuid",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 105
+          }
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "userId",
+          "references": "id",
+          "on": "User",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "documentId",
+          "references": "id",
+          "on": "Document",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        {
+          "foreignKey": "documentCreatedAt",
+          "references": "createdAt",
+          "on": "Document",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 94
+      }
+    },
+    {
+      "table": "Stream",
+      "columns": [
+        {
+          "name": "chatId",
+          "type": "uuid",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 123
+          }
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamp",
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 124
+          }
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "primary": true,
+          "source": {
+            "file": "lib/db/schema.ts",
+            "line": 125
+          },
+          "defaultRaw": "gen_random_uuid()"
+        }
+      ],
+      "relations": [
+        {
+          "foreignKey": "chatId",
+          "references": "id",
+          "on": "Chat",
+          "type": "many-to-one",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      ],
+      "source": {
+        "file": "lib/db/schema.ts",
+        "line": 120
+      }
+    }
+  ],
+  "warnings": []
+}

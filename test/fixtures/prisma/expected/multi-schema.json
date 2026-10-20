@@ -1,0 +1,55 @@
+{
+  "tables": [
+    {
+      "table": "auth.users",
+      "columns": [
+        {"name":"id","type":"String","primary":true,"source":{"file":"prisma/schema.prisma","line":10},"nativeType":"Uuid"},
+        {"name":"email","type":"String","source":{"file":"prisma/schema.prisma","line":11},"unique":true}
+      ],
+      "relations": [
+        {"foreignKey":"A","references":"id","on":"auth.Role","type":"many-to-many","via":"auth._AccountToRole","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":9}
+    },
+    {
+      "table": "auth.Role",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":20}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":19}
+    },
+    {
+      "table": "users",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":28},"autoIncrement":true},
+        {"name":"account_id","type":"String","source":{"file":"prisma/schema.prisma","line":29},"unique":true,"nativeType":"Uuid"}
+      ],
+      "relations": [
+        {"foreignKey":"account_id","references":"id","on":"auth.users","type":"one-to-one","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":27}
+    },
+    {
+      "table": "Post",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":38}},
+        {"name":"authorId","type":"Int","source":{"file":"prisma/schema.prisma","line":39}}
+      ],
+      "relations": [
+        {"foreignKey":"authorId","references":"id","on":"users","type":"many-to-one","onDelete":"restrict","onUpdate":"cascade"},
+        {"foreignKey":"A","references":"id","on":"Topic","type":"many-to-many","via":"_PostToTopic","onDelete":"cascade","onUpdate":"cascade"}
+      ],
+      "source": {"file":"prisma/schema.prisma","line":37}
+    },
+    {
+      "table": "Topic",
+      "columns": [
+        {"name":"id","type":"Int","primary":true,"source":{"file":"prisma/schema.prisma","line":47}}
+      ],
+      "relations": [],
+      "source": {"file":"prisma/schema.prisma","line":46}
+    }
+  ],
+  "warnings": []
+}

@@ -1,9 +1,9 @@
 {
   "name": "draw-me-database",
-  "displayName": "DrawMeDatabase",
+  "displayName": "DrawMeDatabase: ER Diagram (ERD) for Laravel, Symfony, Prisma, Drizzle & SQL",
   "publisher": "GuillaumeCancalon",
-  "description": "A VSCode extension that allows you to visualize a schematic of your database based on your code",
-  "version": "1.7.0",
+  "description": "%description%",
+  "version": "1.8.0",
   "icon": "images/logo_128.png",
   "engines": {
     "vscode": "^1.96.0"
@@ -13,7 +13,39 @@
     "url": "https://github.com/GuillaumeCAN/DrawMeDatabase"
   },
   "categories": [
+    "Visualization",
     "Other"
+  ],
+  "keywords": [
+    "erd",
+    "er diagram",
+    "entity relationship diagram",
+    "database diagram",
+    "database schema",
+    "schema",
+    "database",
+    "diagram",
+    "mermaid",
+    "laravel",
+    "eloquent",
+    "migrations",
+    "symfony",
+    "doctrine",
+    "prisma",
+    "drizzle",
+    "drizzle orm",
+    "orm",
+    "sql",
+    "postgresql",
+    "postgres",
+    "mysql",
+    "mariadb",
+    "sqlite",
+    "supabase",
+    "flyway",
+    "dbmate",
+    "golang-migrate",
+    "pg_dump"
   ],
   "activationEvents": [
     "onStartupFinished",
@@ -135,6 +167,29 @@
           "default": "",
           "scope": "resource",
           "markdownDescription": "%setting.frameworkPath%",
+          "order": 0
+        },
+        "DrawMeDatabase.framework": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "laravel",
+            "symfony",
+            "prisma",
+            "drizzle",
+            "sql"
+          ],
+          "enumDescriptions": [
+            "%setting.framework.auto%",
+            "%setting.framework.laravel%",
+            "%setting.framework.symfony%",
+            "%setting.framework.prisma%",
+            "%setting.framework.drizzle%",
+            "%setting.framework.sql%"
+          ],
+          "default": "auto",
+          "scope": "resource",
+          "markdownDescription": "%setting.framework%",
           "order": 0
         },
         "DrawMeDatabase.autoRefresh": {

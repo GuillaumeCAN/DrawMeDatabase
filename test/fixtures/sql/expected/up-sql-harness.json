@@ -1,0 +1,2048 @@
+{
+  "tables": [
+    {"table":"migrations","columns":[],"relations":[],"source":{"file":"0000_alter_table_migrations.up.sql","line":2}},
+    {
+      "table": "principals",
+      "columns": [
+        {"name":"principal_id","type":"serial","primary":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":2},"autoIncrement":true},
+        {"name":"principal_uid","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":3}},
+        {"name":"principal_uid_unique","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":4},"unique":true},
+        {"name":"principal_email","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":5}},
+        {"name":"principal_type","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":6}},
+        {"name":"principal_display_name","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":7}},
+        {"name":"principal_admin","type":"boolean","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":8}},
+        {"name":"principal_blocked","type":"boolean","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":9}},
+        {"name":"principal_salt","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":10}},
+        {"name":"principal_created","type":"bigint","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":11}},
+        {"name":"principal_updated","type":"bigint","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":12}},
+        {"name":"principal_user_password","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":14}},
+        {"name":"principal_sa_parent_type","type":"text","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":16}},
+        {"name":"principal_sa_parent_id","type":"integer","nullable":true,"source":{"file":"0001_create_table_a_principals.up.sql","line":17}}
+      ],
+      "relations": [],
+      "source": {"file":"0001_create_table_a_principals.up.sql","line":1},
+      "indexes": [
+        {"columns":["LOWER(principal_email)"],"type":"unique","name":"principals_lower_email"},
+        {"columns":["principal_sa_parent_id","principal_sa_parent_type"],"type":"index","name":"principals_sa_parent_id_sa_parent_type"}
+      ]
+    },
+    {
+      "table": "spaces",
+      "columns": [
+        {"name":"space_id","type":"serial","primary":true,"source":{"file":"0001_create_table_b_spaces.up.sql","line":2},"autoIncrement":true},
+        {"name":"space_version","type":"integer","source":{"file":"0001_create_table_b_spaces.up.sql","line":3},"default":0},
+        {"name":"space_parent_id","type":"integer","nullable":true,"source":{"file":"0001_create_table_b_spaces.up.sql","line":4},"default":null},
+        {"name":"space_uid","type":"text","source":{"file":"0001_create_table_b_spaces.up.sql","line":5}},
+        {"name":"space_description","type":"text","nullable":true,"source":{"file":"0001_create_table_b_spaces.up.sql","line":6}},
+        {"name":"space_created_by","type":"integer","source":{"file":"0001_create_table_b_spaces.up.sql","line":8}},
+        {"name":"space_created","type":"bigint","source":{"file":"0001_create_table_b_spaces.up.sql","line":9}},
+        {"name":"space_updated","type":"bigint","source":{"file":"0001_create_table_b_spaces.up.sql","line":10}},
+        {"name":"space_deleted","type":"bigint","nullable":true,"source":{"file":"0046_alter_table_spaces_add_deletetimestamp.up.sql","line":1},"default":null}
+      ],
+      "relations": [
+        {"foreignKey":"space_parent_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0001_create_table_b_spaces.up.sql","line":1},
+      "indexes": [
+        {"columns":["space_parent_id"],"type":"index","name":"spaces_parent_id"},
+        {"columns":["space_deleted","space_parent_id"],"type":"index","name":"spaces_deleted_parent_id"},
+        {"columns":["LOWER(space_uid)"],"type":"index","name":"idx_spaces_lower_space_uid"}
+      ]
+    },
+    {
+      "table": "repositories",
+      "columns": [
+        {"name":"repo_id","type":"serial","primary":true,"source":{"file":"0001_create_table_c_repositories.up.sql","line":2},"autoIncrement":true},
+        {"name":"repo_version","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":3},"default":0},
+        {"name":"repo_parent_id","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":4}},
+        {"name":"repo_uid","type":"text","source":{"file":"0001_create_table_c_repositories.up.sql","line":5}},
+        {"name":"repo_description","type":"text","nullable":true,"source":{"file":"0001_create_table_c_repositories.up.sql","line":6}},
+        {"name":"repo_created_by","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":8}},
+        {"name":"repo_created","type":"bigint","source":{"file":"0001_create_table_c_repositories.up.sql","line":9}},
+        {"name":"repo_updated","type":"bigint","source":{"file":"0001_create_table_c_repositories.up.sql","line":10}},
+        {"name":"repo_git_uid","type":"text","source":{"file":"0001_create_table_c_repositories.up.sql","line":11},"unique":true},
+        {"name":"repo_default_branch","type":"text","source":{"file":"0001_create_table_c_repositories.up.sql","line":12}},
+        {"name":"repo_fork_id","type":"integer","nullable":true,"source":{"file":"0001_create_table_c_repositories.up.sql","line":13}},
+        {"name":"repo_pullreq_seq","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":14}},
+        {"name":"repo_num_forks","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":15}},
+        {"name":"repo_num_pulls","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":16}},
+        {"name":"repo_num_closed_pulls","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":17}},
+        {"name":"repo_num_open_pulls","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":18}},
+        {"name":"repo_num_merged_pulls","type":"integer","source":{"file":"0001_create_table_c_repositories.up.sql","line":19}},
+        {"name":"repo_size","type":"integer","source":{"file":"0038_alter_table_c_repositories.up.sql","line":2},"default":0},
+        {"name":"repo_size_updated","type":"bigint","source":{"file":"0038_alter_table_c_repositories.up.sql","line":3},"default":0},
+        {"name":"repo_deleted","type":"bigint","nullable":true,"source":{"file":"0045_alter_table_repo_add_deletetimestamp.up.sql","line":1},"default":null},
+        {"name":"repo_is_empty","type":"boolean","source":{"file":"0048_alter_table_repo_add_isempty.up.sql","line":1},"default":false},
+        {"name":"repo_state","type":"integer","nullable":true,"source":{"file":"0057_alter_repositories_add_state.up.sql","line":2},"default":0},
+        {"name":"repo_last_git_push","type":"bigint","source":{"file":"0099_alter_repositories_add_last_updated.up.sql","line":2},"default":0},
+        {"name":"repo_lfs_size","type":"bigint","source":{"file":"0113_alter_usage_metrics_rename.up.sql","line":2},"default":0},
+        {"name":"repo_tags","type":"jsonb","source":{"file":"0143_alter_repositories_add_tags.up.sql","line":1},"default":"{}"},
+        {"name":"repo_type","type":"text","nullable":true,"source":{"file":"0154_create_linked_repositories.up.sql","line":1}}
+      ],
+      "relations": [
+        {"foreignKey":"repo_parent_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0001_create_table_c_repositories.up.sql","line":1},
+      "indexes": [
+        {"columns":["repo_parent_id","LOWER(repo_uid)"],"type":"unique","name":"repositories_parent_id_uid"},
+        {"columns":["repo_deleted"],"type":"index","name":"repositories_deleted"}
+      ]
+    },
+    {
+      "table": "paths",
+      "columns": [
+        {"name":"path_id","type":"serial","primary":true,"source":{"file":"0001_create_table_d_paths.up.sql","line":2},"autoIncrement":true},
+        {"name":"path_version","type":"integer","source":{"file":"0001_create_table_d_paths.up.sql","line":3},"default":0},
+        {"name":"path_value","type":"text","source":{"file":"0001_create_table_d_paths.up.sql","line":4}},
+        {"name":"path_value_unique","type":"text","source":{"file":"0001_create_table_d_paths.up.sql","line":5},"unique":true},
+        {"name":"path_is_primary","type":"boolean","nullable":true,"source":{"file":"0001_create_table_d_paths.up.sql","line":6},"default":null},
+        {"name":"path_repo_id","type":"integer","nullable":true,"source":{"file":"0001_create_table_d_paths.up.sql","line":7}},
+        {"name":"path_space_id","type":"integer","nullable":true,"source":{"file":"0001_create_table_d_paths.up.sql","line":8}},
+        {"name":"path_created_by","type":"integer","source":{"file":"0001_create_table_d_paths.up.sql","line":9}},
+        {"name":"path_created","type":"bigint","source":{"file":"0001_create_table_d_paths.up.sql","line":10}},
+        {"name":"path_updated","type":"bigint","source":{"file":"0001_create_table_d_paths.up.sql","line":11}}
+      ],
+      "relations": [
+        {"foreignKey":"path_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"path_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"path_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0001_create_table_d_paths.up.sql","line":1},
+      "indexes": [
+        {"columns":["path_repo_id","path_is_primary"],"type":"unique","name":"paths_repo_id_is_primary"},
+        {"columns":["path_space_id","path_is_primary"],"type":"unique","name":"paths_space_id_is_primary"}
+      ]
+    },
+    {
+      "table": "tokens",
+      "columns": [
+        {"name":"token_id","type":"serial","primary":true,"source":{"file":"0001_create_table_e_tokens.up.sql","line":2},"autoIncrement":true},
+        {"name":"token_type","type":"text","nullable":true,"source":{"file":"0001_create_table_e_tokens.up.sql","line":3}},
+        {"name":"token_uid","type":"text","nullable":true,"source":{"file":"0001_create_table_e_tokens.up.sql","line":4}},
+        {"name":"token_principal_id","type":"integer","nullable":true,"source":{"file":"0001_create_table_e_tokens.up.sql","line":5}},
+        {"name":"token_expires_at","type":"bigint","nullable":true,"source":{"file":"0001_create_table_e_tokens.up.sql","line":6}},
+        {"name":"token_issued_at","type":"bigint","nullable":true,"source":{"file":"0001_create_table_e_tokens.up.sql","line":8}},
+        {"name":"token_created_by","type":"integer","nullable":true,"source":{"file":"0001_create_table_e_tokens.up.sql","line":9}}
+      ],
+      "relations": [
+        {"foreignKey":"token_principal_id","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0001_create_table_e_tokens.up.sql","line":1},
+      "indexes": [
+        {"columns":["token_type","token_expires_at"],"type":"index","name":"tokens_type_expires_at"},
+        {"columns":["token_principal_id","LOWER(token_uid)"],"type":"unique","name":"tokens_principal_id_uid"}
+      ]
+    },
+    {
+      "table": "pullreqs",
+      "columns": [
+        {"name":"pullreq_id","type":"serial","primary":true,"source":{"file":"0003_create_table_pullreqs.up.sql","line":2},"autoIncrement":true},
+        {"name":"pullreq_version","type":"integer","source":{"file":"0003_create_table_pullreqs.up.sql","line":3},"default":0},
+        {"name":"pullreq_created_by","type":"integer","source":{"file":"0003_create_table_pullreqs.up.sql","line":4}},
+        {"name":"pullreq_created","type":"bigint","source":{"file":"0003_create_table_pullreqs.up.sql","line":5}},
+        {"name":"pullreq_updated","type":"bigint","source":{"file":"0003_create_table_pullreqs.up.sql","line":6}},
+        {"name":"pullreq_edited","type":"bigint","source":{"file":"0003_create_table_pullreqs.up.sql","line":7}},
+        {"name":"pullreq_number","type":"integer","source":{"file":"0003_create_table_pullreqs.up.sql","line":8}},
+        {"name":"pullreq_state","type":"text","source":{"file":"0003_create_table_pullreqs.up.sql","line":9}},
+        {"name":"pullreq_is_draft","type":"text","source":{"file":"0003_create_table_pullreqs.up.sql","line":10},"default":false},
+        {"name":"pullreq_comment_count","type":"integer","source":{"file":"0003_create_table_pullreqs.up.sql","line":11},"default":0},
+        {"name":"pullreq_title","type":"text","source":{"file":"0003_create_table_pullreqs.up.sql","line":12}},
+        {"name":"pullreq_description","type":"text","source":{"file":"0003_create_table_pullreqs.up.sql","line":13}},
+        {"name":"pullreq_source_repo_id","type":"integer","nullable":true,"source":{"file":"0146_alter_pullreq_source_repo_id_nullable.up.sql","line":7}},
+        {"name":"pullreq_source_branch","type":"text","source":{"file":"0003_create_table_pullreqs.up.sql","line":15}},
+        {"name":"pullreq_source_sha","type":"text","source":{"file":"0003_create_table_pullreqs.up.sql","line":16}},
+        {"name":"pullreq_target_repo_id","type":"integer","source":{"file":"0003_create_table_pullreqs.up.sql","line":17}},
+        {"name":"pullreq_target_branch","type":"text","source":{"file":"0003_create_table_pullreqs.up.sql","line":18}},
+        {"name":"pullreq_activity_seq","type":"integer","source":{"file":"0146_alter_pullreq_source_repo_id_nullable.up.sql","line":10},"default":0},
+        {"name":"pullreq_merged_by","type":"integer","nullable":true,"source":{"file":"0003_create_table_pullreqs.up.sql","line":20}},
+        {"name":"pullreq_merged","type":"bigint","nullable":true,"source":{"file":"0003_create_table_pullreqs.up.sql","line":21}},
+        {"name":"pullreq_merge_method","type":"text","nullable":true,"source":{"file":"0003_create_table_pullreqs.up.sql","line":22}},
+        {"name":"pullreq_merge_check_status","type":"text","source":{"file":"0146_alter_pullreq_source_repo_id_nullable.up.sql","line":13},"default":"unchecked"},
+        {"name":"pullreq_merge_target_sha","type":"text","nullable":true,"source":{"file":"0003_create_table_pullreqs.up.sql","line":24}},
+        {"name":"pullreq_merge_base_sha","type":"text","source":{"file":"0015_alter_pullreq_merge_base_not_nullable.up.sql","line":4},"default":""},
+        {"name":"pullreq_merge_sha","type":"text","nullable":true,"source":{"file":"0003_create_table_pullreqs.up.sql","line":26}},
+        {"name":"pullreq_merge_conflicts","type":"text","nullable":true,"source":{"file":"0003_create_table_pullreqs.up.sql","line":27}},
+        {"name":"pullreq_unresolved_count","type":"integer","source":{"file":"0016_alter_pullreq_add_unresolved.up.sql","line":1},"default":0},
+        {"name":"pullreq_commit_count","type":"integer","nullable":true,"source":{"file":"0037_alter_pullreq_add_commit_count.up.sql","line":2}},
+        {"name":"pullreq_file_count","type":"integer","nullable":true,"source":{"file":"0037_alter_pullreq_add_commit_count.up.sql","line":3}},
+        {"name":"pullreq_closed","type":"bigint","nullable":true,"source":{"file":"0049_alter_table_pullreq_add_closed.up.sql","line":1}},
+        {"name":"pullreq_additions","type":"integer","nullable":true,"source":{"file":"0059_alter_pullreqs_add_additions_deletions.up.sql","line":2}},
+        {"name":"pullreq_deletions","type":"integer","nullable":true,"source":{"file":"0059_alter_pullreqs_add_additions_deletions.up.sql","line":3}},
+        {"name":"pullreq_rebase_check_status","type":"text","source":{"file":"0080_alter_table_pullreq_add_rebaseability.up.sql","line":2},"default":"unchecked"},
+        {"name":"pullreq_rebase_conflicts","type":"text","nullable":true,"source":{"file":"0080_alter_table_pullreq_add_rebaseability.up.sql","line":3}},
+        {"name":"pullreq_merge_violations_bypassed","type":"boolean","nullable":true,"source":{"file":"0111_alter_table_pullreqs.up.sql","line":2},"default":null}
+      ],
+      "relations": [
+        {"foreignKey":"pullreq_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"pullreq_target_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"pullreq_merged_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"pullreq_source_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"set null","onUpdate":"no action"}
+      ],
+      "source": {"file":"0003_create_table_pullreqs.up.sql","line":1},
+      "indexes": [
+        {"columns":["pullreq_target_repo_id","pullreq_number"],"type":"unique","name":"pullreqs_target_repo_id_number"},
+        {"columns":["pullreq_source_repo_id","pullreq_source_branch","pullreq_target_repo_id","pullreq_target_branch"],"type":"unique","name":"pullreqs_source_repo_branch_target_repo_branch"}
+      ]
+    },
+    {
+      "table": "pullreq_activities",
+      "columns": [
+        {"name":"pullreq_activity_id","type":"serial","primary":true,"source":{"file":"0005_create_table_pullreq_activities.up.sql","line":2},"autoIncrement":true},
+        {"name":"pullreq_activity_version","type":"bigint","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":3}},
+        {"name":"pullreq_activity_created_by","type":"integer","nullable":true,"source":{"file":"0005_create_table_pullreq_activities.up.sql","line":4}},
+        {"name":"pullreq_activity_created","type":"bigint","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":5}},
+        {"name":"pullreq_activity_updated","type":"bigint","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":6}},
+        {"name":"pullreq_activity_edited","type":"bigint","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":7}},
+        {"name":"pullreq_activity_deleted","type":"bigint","nullable":true,"source":{"file":"0005_create_table_pullreq_activities.up.sql","line":8}},
+        {"name":"pullreq_activity_parent_id","type":"integer","nullable":true,"source":{"file":"0005_create_table_pullreq_activities.up.sql","line":9}},
+        {"name":"pullreq_activity_repo_id","type":"integer","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":10}},
+        {"name":"pullreq_activity_pullreq_id","type":"integer","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":11}},
+        {"name":"pullreq_activity_order","type":"integer","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":12}},
+        {"name":"pullreq_activity_sub_order","type":"integer","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":13}},
+        {"name":"pullreq_activity_reply_seq","type":"integer","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":14}},
+        {"name":"pullreq_activity_type","type":"text","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":15}},
+        {"name":"pullreq_activity_kind","type":"text","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":16}},
+        {"name":"pullreq_activity_text","type":"text","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":17}},
+        {"name":"pullreq_activity_payload","type":"jsonb","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":18},"default":"{}"},
+        {"name":"pullreq_activity_metadata","type":"jsonb","source":{"file":"0005_create_table_pullreq_activities.up.sql","line":19},"default":"{}"},
+        {"name":"pullreq_activity_resolved_by","type":"integer","nullable":true,"source":{"file":"0005_create_table_pullreq_activities.up.sql","line":20},"default":0},
+        {"name":"pullreq_activity_resolved","type":"bigint","nullable":true,"source":{"file":"0005_create_table_pullreq_activities.up.sql","line":21}},
+        {"name":"pullreq_activity_outdated","type":"boolean","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":2}},
+        {"name":"pullreq_activity_code_comment_merge_base_sha","type":"text","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":3}},
+        {"name":"pullreq_activity_code_comment_source_sha","type":"text","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":4}},
+        {"name":"pullreq_activity_code_comment_path","type":"text","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":5}},
+        {"name":"pullreq_activity_code_comment_line_new","type":"integer","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":6}},
+        {"name":"pullreq_activity_code_comment_span_new","type":"integer","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":7}},
+        {"name":"pullreq_activity_code_comment_line_old","type":"integer","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":8}},
+        {"name":"pullreq_activity_code_comment_span_old","type":"integer","nullable":true,"source":{"file":"0014_alter_pullreq_activity_code_comments.up.sql","line":9}}
+      ],
+      "relations": [
+        {"foreignKey":"pullreq_activity_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"pullreq_activity_parent_id","references":"pullreq_activity_id","on":"pullreq_activities","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"pullreq_activity_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"pullreq_activity_pullreq_id","references":"pullreq_id","on":"pullreqs","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"pullreq_activity_resolved_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"}
+      ],
+      "source": {"file":"0005_create_table_pullreq_activities.up.sql","line":1},
+      "indexes": [
+        {"columns":["pullreq_activity_pullreq_id","pullreq_activity_order","pullreq_activity_sub_order"],"type":"unique","name":"pullreq_activities_pullreq_id_order_sub_order"}
+      ]
+    },
+    {
+      "table": "webhooks",
+      "columns": [
+        {"name":"webhook_id","type":"serial","primary":true,"source":{"file":"0007_create_table_webhooks.up.sql","line":2},"autoIncrement":true},
+        {"name":"webhook_version","type":"integer","source":{"file":"0007_create_table_webhooks.up.sql","line":3},"default":0},
+        {"name":"webhook_created_by","type":"integer","source":{"file":"0007_create_table_webhooks.up.sql","line":4}},
+        {"name":"webhook_created","type":"bigint","source":{"file":"0007_create_table_webhooks.up.sql","line":5}},
+        {"name":"webhook_updated","type":"bigint","source":{"file":"0007_create_table_webhooks.up.sql","line":6}},
+        {"name":"webhook_space_id","type":"integer","nullable":true,"source":{"file":"0007_create_table_webhooks.up.sql","line":7}},
+        {"name":"webhook_repo_id","type":"integer","nullable":true,"source":{"file":"0007_create_table_webhooks.up.sql","line":8}},
+        {"name":"webhook_display_name","type":"text","source":{"file":"0007_create_table_webhooks.up.sql","line":9}},
+        {"name":"webhook_description","type":"text","source":{"file":"0007_create_table_webhooks.up.sql","line":10}},
+        {"name":"webhook_url","type":"text","source":{"file":"0007_create_table_webhooks.up.sql","line":11}},
+        {"name":"webhook_secret","type":"text","source":{"file":"0007_create_table_webhooks.up.sql","line":12}},
+        {"name":"webhook_enabled","type":"boolean","source":{"file":"0007_create_table_webhooks.up.sql","line":13}},
+        {"name":"webhook_insecure","type":"boolean","source":{"file":"0007_create_table_webhooks.up.sql","line":14}},
+        {"name":"webhook_triggers","type":"text","source":{"file":"0007_create_table_webhooks.up.sql","line":15}},
+        {"name":"webhook_latest_execution_result","type":"text","nullable":true,"source":{"file":"0007_create_table_webhooks.up.sql","line":16}},
+        {"name":"webhook_uid","type":"text","nullable":true,"source":{"file":"0039_alter_table_webhooks_uid.up.sql","line":1}},
+        {"name":"webhook_scope","type":"integer","nullable":true,"source":{"file":"0089_alter_webhooks_add_scope.up.sql","line":1},"default":0},
+        {"name":"webhook_type","type":"integer","nullable":true,"source":{"file":"0090_alter_webhooks_add_type.up.sql","line":2},"default":0},
+        {"name":"webhook_extra_headers","type":"jsonb","nullable":true,"source":{"file":"0156_alter_table_webhooks_add_extra_headers.up.sql","line":1}}
+      ],
+      "relations": [
+        {"foreignKey":"webhook_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"webhook_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"webhook_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0007_create_table_webhooks.up.sql","line":1},
+      "indexes": [
+        {"columns":["webhook_repo_id","LOWER(webhook_uid)"],"type":"unique","name":"webhooks_repo_id_uid"},
+        {"columns":["webhook_space_id","LOWER(webhook_uid)"],"type":"unique","name":"webhooks_space_id_uid"}
+      ]
+    },
+    {
+      "table": "webhook_executions",
+      "columns": [
+        {"name":"webhook_execution_id","type":"serial","primary":true,"source":{"file":"0009_create_table_webhook_executions.up.sql","line":2},"autoIncrement":true},
+        {"name":"webhook_execution_retrigger_of","type":"integer","nullable":true,"source":{"file":"0009_create_table_webhook_executions.up.sql","line":3}},
+        {"name":"webhook_execution_retriggerable","type":"boolean","source":{"file":"0009_create_table_webhook_executions.up.sql","line":4}},
+        {"name":"webhook_execution_webhook_id","type":"integer","source":{"file":"0009_create_table_webhook_executions.up.sql","line":5}},
+        {"name":"webhook_execution_trigger_type","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":6}},
+        {"name":"webhook_execution_trigger_id","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":7}},
+        {"name":"webhook_execution_result","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":8}},
+        {"name":"webhook_execution_created","type":"bigint","source":{"file":"0009_create_table_webhook_executions.up.sql","line":9}},
+        {"name":"webhook_execution_duration","type":"bigint","source":{"file":"0009_create_table_webhook_executions.up.sql","line":10}},
+        {"name":"webhook_execution_error","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":11}},
+        {"name":"webhook_execution_request_url","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":12}},
+        {"name":"webhook_execution_request_headers","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":13}},
+        {"name":"webhook_execution_request_body","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":14}},
+        {"name":"webhook_execution_response_status_code","type":"integer","source":{"file":"0009_create_table_webhook_executions.up.sql","line":15}},
+        {"name":"webhook_execution_response_status","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":16}},
+        {"name":"webhook_execution_response_headers","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":17}},
+        {"name":"webhook_execution_response_body","type":"text","source":{"file":"0009_create_table_webhook_executions.up.sql","line":18}}
+      ],
+      "relations": [],
+      "source": {"file":"0009_create_table_webhook_executions.up.sql","line":1},
+      "indexes": [
+        {"columns":["webhook_execution_webhook_id"],"type":"index","name":"webhook_executions_webhook_id"},
+        {"columns":["webhook_execution_created"],"type":"index","name":"webhook_executions_created"}
+      ]
+    },
+    {
+      "table": "pullreq_reviews",
+      "columns": [
+        {"name":"pullreq_review_id","type":"serial","primary":true,"source":{"file":"0011_create_table_pullreq_reviews.up.sql","line":2},"autoIncrement":true},
+        {"name":"pullreq_review_created_by","type":"integer","source":{"file":"0011_create_table_pullreq_reviews.up.sql","line":3}},
+        {"name":"pullreq_review_created","type":"bigint","source":{"file":"0011_create_table_pullreq_reviews.up.sql","line":4}},
+        {"name":"pullreq_review_updated","type":"bigint","source":{"file":"0011_create_table_pullreq_reviews.up.sql","line":5}},
+        {"name":"pullreq_review_pullreq_id","type":"integer","source":{"file":"0011_create_table_pullreq_reviews.up.sql","line":6}},
+        {"name":"pullreq_review_decision","type":"text","source":{"file":"0011_create_table_pullreq_reviews.up.sql","line":7}},
+        {"name":"pullreq_review_sha","type":"text","source":{"file":"0011_create_table_pullreq_reviews.up.sql","line":8}}
+      ],
+      "relations": [
+        {"foreignKey":"pullreq_review_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"pullreq_review_pullreq_id","references":"pullreq_id","on":"pullreqs","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0011_create_table_pullreq_reviews.up.sql","line":1},
+      "indexes": [
+        {"columns":["pullreq_review_pullreq_id"],"type":"index","name":"index_pullreq_review_pullreq_id"}
+      ]
+    },
+    {
+      "table": "pullreq_reviewers",
+      "columns": [
+        {"name":"pullreq_reviewer_pullreq_id","type":"integer","primary":true,"source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":2}},
+        {"name":"pullreq_reviewer_principal_id","type":"integer","primary":true,"source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":3}},
+        {"name":"pullreq_reviewer_created_by","type":"integer","source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":4}},
+        {"name":"pullreq_reviewer_created","type":"bigint","source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":5}},
+        {"name":"pullreq_reviewer_updated","type":"bigint","source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":6}},
+        {"name":"pullreq_reviewer_repo_id","type":"integer","source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":7}},
+        {"name":"pullreq_reviewer_type","type":"text","source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":8}},
+        {"name":"pullreq_reviewer_latest_review_id","type":"integer","nullable":true,"source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":9}},
+        {"name":"pullreq_reviewer_review_decision","type":"text","source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":10}},
+        {"name":"pullreq_reviewer_sha","type":"text","source":{"file":"0013_create_table_pullreq_reviewers.up.sql","line":11}}
+      ],
+      "relations": [
+        {"foreignKey":"pullreq_reviewer_pullreq_id","references":"pullreq_id","on":"pullreqs","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"pullreq_reviewer_principal_id","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"pullreq_reviewer_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"pullreq_reviewer_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"pullreq_reviewer_latest_review_id","references":"pullreq_review_id","on":"pullreq_reviews","type":"many-to-one","onDelete":"set null","onUpdate":"no action"}
+      ],
+      "source": {"file":"0013_create_table_pullreq_reviewers.up.sql","line":1}
+    },
+    {
+      "table": "checks",
+      "columns": [
+        {"name":"check_id","type":"serial","primary":true,"source":{"file":"0017_create_table_checks.up.sql","line":2},"autoIncrement":true},
+        {"name":"check_created_by","type":"integer","source":{"file":"0017_create_table_checks.up.sql","line":3}},
+        {"name":"check_created","type":"bigint","source":{"file":"0017_create_table_checks.up.sql","line":4}},
+        {"name":"check_updated","type":"bigint","source":{"file":"0017_create_table_checks.up.sql","line":5}},
+        {"name":"check_repo_id","type":"integer","source":{"file":"0017_create_table_checks.up.sql","line":6}},
+        {"name":"check_commit_sha","type":"text","source":{"file":"0017_create_table_checks.up.sql","line":7}},
+        {"name":"check_uid","type":"text","source":{"file":"0017_create_table_checks.up.sql","line":9}},
+        {"name":"check_status","type":"text","source":{"file":"0017_create_table_checks.up.sql","line":10}},
+        {"name":"check_summary","type":"text","source":{"file":"0017_create_table_checks.up.sql","line":11}},
+        {"name":"check_link","type":"text","source":{"file":"0017_create_table_checks.up.sql","line":12}},
+        {"name":"check_payload","type":"json","source":{"file":"0017_create_table_checks.up.sql","line":13}},
+        {"name":"check_metadata","type":"json","source":{"file":"0017_create_table_checks.up.sql","line":14}},
+        {"name":"check_payload_version","type":"text","source":{"file":"0018_alter_check_add_payload_version.up.sql","line":2},"default":""},
+        {"name":"check_payload_kind","type":"text","source":{"file":"0018_alter_check_add_payload_version.up.sql","line":3},"default":""},
+        {"name":"check_started","type":"bigint","source":{"file":"0041_alter_checks_add_started_ended.up.sql","line":2},"default":0},
+        {"name":"check_ended","type":"bigint","source":{"file":"0041_alter_checks_add_started_ended.up.sql","line":4},"default":0}
+      ],
+      "relations": [
+        {"foreignKey":"check_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"check_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0017_create_table_checks.up.sql","line":1},
+      "indexes": [
+        {"columns":["check_repo_id","check_commit_sha","check_uid"],"type":"unique","name":"checks_repo_id_commit_sha_uid"},
+        {"columns":["check_repo_id","check_created"],"type":"index","name":"checks_repo_id_created"}
+      ]
+    },
+    {
+      "table": "memberships",
+      "columns": [
+        {"name":"membership_space_id","type":"integer","primary":true,"source":{"file":"0019_create_table_memberships.up.sql","line":2}},
+        {"name":"membership_principal_id","type":"integer","primary":true,"source":{"file":"0019_create_table_memberships.up.sql","line":3}},
+        {"name":"membership_created_by","type":"integer","source":{"file":"0019_create_table_memberships.up.sql","line":4}},
+        {"name":"membership_created","type":"bigint","source":{"file":"0019_create_table_memberships.up.sql","line":5}},
+        {"name":"membership_updated","type":"bigint","source":{"file":"0019_create_table_memberships.up.sql","line":6}},
+        {"name":"membership_role","type":"text","source":{"file":"0019_create_table_memberships.up.sql","line":7}}
+      ],
+      "relations": [
+        {"foreignKey":"membership_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"membership_principal_id","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"membership_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"}
+      ],
+      "source": {"file":"0019_create_table_memberships.up.sql","line":1}
+    },
+    {
+      "table": "jobs",
+      "columns": [
+        {"name":"job_uid","type":"text","primary":true,"source":{"file":"0022_create_table_jobs.up.sql","line":2}},
+        {"name":"job_created","type":"bigint","source":{"file":"0022_create_table_jobs.up.sql","line":3}},
+        {"name":"job_updated","type":"bigint","source":{"file":"0022_create_table_jobs.up.sql","line":4}},
+        {"name":"job_type","type":"text","source":{"file":"0022_create_table_jobs.up.sql","line":5}},
+        {"name":"job_priority","type":"integer","source":{"file":"0022_create_table_jobs.up.sql","line":6}},
+        {"name":"job_data","type":"text","source":{"file":"0022_create_table_jobs.up.sql","line":7}},
+        {"name":"job_result","type":"text","source":{"file":"0022_create_table_jobs.up.sql","line":8}},
+        {"name":"job_max_duration_seconds","type":"integer","source":{"file":"0022_create_table_jobs.up.sql","line":9}},
+        {"name":"job_max_retries","type":"integer","source":{"file":"0022_create_table_jobs.up.sql","line":10}},
+        {"name":"job_state","type":"text","source":{"file":"0022_create_table_jobs.up.sql","line":11}},
+        {"name":"job_scheduled","type":"bigint","source":{"file":"0022_create_table_jobs.up.sql","line":12}},
+        {"name":"job_total_executions","type":"integer","nullable":true,"source":{"file":"0022_create_table_jobs.up.sql","line":13}},
+        {"name":"job_run_by","type":"text","source":{"file":"0022_create_table_jobs.up.sql","line":14}},
+        {"name":"job_run_deadline","type":"bigint","nullable":true,"source":{"file":"0022_create_table_jobs.up.sql","line":15}},
+        {"name":"job_run_progress","type":"integer","source":{"file":"0022_create_table_jobs.up.sql","line":16}},
+        {"name":"job_last_executed","type":"bigint","nullable":true,"source":{"file":"0022_create_table_jobs.up.sql","line":17}},
+        {"name":"job_is_recurring","type":"boolean","source":{"file":"0022_create_table_jobs.up.sql","line":18}},
+        {"name":"job_recurring_cron","type":"text","source":{"file":"0022_create_table_jobs.up.sql","line":19}},
+        {"name":"job_consecutive_failures","type":"integer","source":{"file":"0022_create_table_jobs.up.sql","line":20}},
+        {"name":"job_last_failure_error","type":"text","source":{"file":"0022_create_table_jobs.up.sql","line":21}},
+        {"name":"job_group_id","type":"text","source":{"file":"0025_alter_table_job_add_group_id.up.sql","line":1},"default":""}
+      ],
+      "relations": [],
+      "source": {"file":"0022_create_table_jobs.up.sql","line":1},
+      "indexes": [
+        {"columns":["job_scheduled"],"type":"index","name":"jobs_scheduled"},
+        {"columns":["job_run_deadline"],"type":"index","name":"jobs_run_deadline"},
+        {"columns":["job_last_executed"],"type":"index","name":"jobs_last_executed"},
+        {"columns":["job_group_id"],"type":"index","name":"job_group_id"}
+      ]
+    },
+    {
+      "table": "pipelines",
+      "columns": [
+        {"name":"pipeline_id","type":"serial","primary":true,"source":{"file":"0027_create_ci_tables.up.sql","line":2},"autoIncrement":true},
+        {"name":"pipeline_description","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":3}},
+        {"name":"pipeline_uid","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":4}},
+        {"name":"pipeline_seq","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":5},"default":0},
+        {"name":"pipeline_disabled","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":6}},
+        {"name":"pipeline_repo_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":7}},
+        {"name":"pipeline_default_branch","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":8}},
+        {"name":"pipeline_created_by","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":9}},
+        {"name":"pipeline_config_path","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":10}},
+        {"name":"pipeline_created","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":11}},
+        {"name":"pipeline_updated","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":12}},
+        {"name":"pipeline_version","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":13}}
+      ],
+      "relations": [
+        {"foreignKey":"pipeline_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"pipeline_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action"}
+      ],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":1},
+      "indexes": [
+        {"columns":["pipeline_repo_id","pipeline_uid"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "executions",
+      "columns": [
+        {"name":"execution_id","type":"serial","primary":true,"source":{"file":"0027_create_ci_tables.up.sql","line":22},"autoIncrement":true},
+        {"name":"execution_pipeline_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":23}},
+        {"name":"execution_repo_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":24}},
+        {"name":"execution_created_by","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":25}},
+        {"name":"execution_trigger","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":26}},
+        {"name":"execution_number","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":27}},
+        {"name":"execution_parent","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":28}},
+        {"name":"execution_status","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":29}},
+        {"name":"execution_error","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":30}},
+        {"name":"execution_event","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":31}},
+        {"name":"execution_action","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":32}},
+        {"name":"execution_link","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":33}},
+        {"name":"execution_timestamp","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":34}},
+        {"name":"execution_title","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":35}},
+        {"name":"execution_message","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":36}},
+        {"name":"execution_before","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":37}},
+        {"name":"execution_after","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":38}},
+        {"name":"execution_ref","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":39}},
+        {"name":"execution_source_repo","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":40}},
+        {"name":"execution_source","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":41}},
+        {"name":"execution_target","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":42}},
+        {"name":"execution_author","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":43}},
+        {"name":"execution_author_name","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":44}},
+        {"name":"execution_author_email","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":45}},
+        {"name":"execution_author_avatar","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":46}},
+        {"name":"execution_sender","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":47}},
+        {"name":"execution_params","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":48}},
+        {"name":"execution_cron","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":49}},
+        {"name":"execution_deploy","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":50}},
+        {"name":"execution_deploy_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":51}},
+        {"name":"execution_debug","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":52},"default":false},
+        {"name":"execution_started","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":53}},
+        {"name":"execution_finished","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":54}},
+        {"name":"execution_created","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":55}},
+        {"name":"execution_updated","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":56}},
+        {"name":"execution_version","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":57}}
+      ],
+      "relations": [
+        {"foreignKey":"execution_pipeline_id","references":"pipeline_id","on":"pipelines","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"execution_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"execution_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action"}
+      ],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":21},
+      "indexes": [
+        {"columns":["execution_pipeline_id","execution_number"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "secrets",
+      "columns": [
+        {"name":"secret_id","type":"serial","primary":true,"source":{"file":"0027_create_ci_tables.up.sql","line":68},"autoIncrement":true},
+        {"name":"secret_uid","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":69}},
+        {"name":"secret_space_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":70}},
+        {"name":"secret_description","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":71}},
+        {"name":"secret_data","type":"bytea","source":{"file":"0027_create_ci_tables.up.sql","line":72}},
+        {"name":"secret_created_by","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":73}},
+        {"name":"secret_created","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":74}},
+        {"name":"secret_updated","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":75}},
+        {"name":"secret_version","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":76}}
+      ],
+      "relations": [
+        {"foreignKey":"secret_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"secret_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action"}
+      ],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":67},
+      "indexes": [
+        {"columns":["secret_space_id","secret_uid"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "stages",
+      "columns": [
+        {"name":"stage_id","type":"serial","primary":true,"source":{"file":"0027_create_ci_tables.up.sql","line":85},"autoIncrement":true},
+        {"name":"stage_execution_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":86}},
+        {"name":"stage_repo_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":87}},
+        {"name":"stage_number","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":88}},
+        {"name":"stage_kind","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":89}},
+        {"name":"stage_type","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":90}},
+        {"name":"stage_name","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":91}},
+        {"name":"stage_status","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":92}},
+        {"name":"stage_error","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":93}},
+        {"name":"stage_parent_group_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":94}},
+        {"name":"stage_errignore","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":95}},
+        {"name":"stage_exit_code","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":96}},
+        {"name":"stage_limit","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":97}},
+        {"name":"stage_os","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":98}},
+        {"name":"stage_arch","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":99}},
+        {"name":"stage_variant","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":100}},
+        {"name":"stage_kernel","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":101}},
+        {"name":"stage_machine","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":102}},
+        {"name":"stage_started","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":103}},
+        {"name":"stage_stopped","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":104}},
+        {"name":"stage_created","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":105}},
+        {"name":"stage_updated","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":106}},
+        {"name":"stage_version","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":107}},
+        {"name":"stage_on_success","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":108}},
+        {"name":"stage_on_failure","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":109}},
+        {"name":"stage_depends_on","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":110}},
+        {"name":"stage_labels","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":111}},
+        {"name":"stage_limit_repo","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":112},"default":0}
+      ],
+      "relations": [
+        {"foreignKey":"stage_execution_id","references":"execution_id","on":"executions","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":84},
+      "indexes": [
+        {"columns":["stage_execution_id","stage_number"],"type":"unique"},
+        {"columns":["stage_status"],"type":"index","name":"ix_stage_in_progress"}
+      ]
+    },
+    {
+      "table": "steps",
+      "columns": [
+        {"name":"step_id","type":"serial","primary":true,"source":{"file":"0027_create_ci_tables.up.sql","line":122},"autoIncrement":true},
+        {"name":"step_stage_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":123}},
+        {"name":"step_number","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":124}},
+        {"name":"step_name","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":125}},
+        {"name":"step_status","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":126}},
+        {"name":"step_error","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":127}},
+        {"name":"step_parent_group_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":128}},
+        {"name":"step_errignore","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":129}},
+        {"name":"step_exit_code","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":130}},
+        {"name":"step_started","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":131}},
+        {"name":"step_stopped","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":132}},
+        {"name":"step_version","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":133}},
+        {"name":"step_depends_on","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":134}},
+        {"name":"step_image","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":135}},
+        {"name":"step_detached","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":136}},
+        {"name":"step_schema","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":137}}
+      ],
+      "relations": [
+        {"foreignKey":"step_stage_id","references":"stage_id","on":"stages","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":121},
+      "indexes": [
+        {"columns":["step_stage_id","step_number"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "logs",
+      "columns": [
+        {"name":"log_id","type":"serial","primary":true,"source":{"file":"0027_create_ci_tables.up.sql","line":144},"autoIncrement":true},
+        {"name":"log_data","type":"bytea","source":{"file":"0027_create_ci_tables.up.sql","line":145}}
+      ],
+      "relations": [
+        {"foreignKey":"log_id","references":"step_id","on":"steps","type":"one-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":143}
+    },
+    {
+      "table": "triggers",
+      "columns": [
+        {"name":"trigger_id","type":"serial","primary":true,"source":{"file":"0027_create_ci_tables.up.sql","line":180},"autoIncrement":true},
+        {"name":"trigger_uid","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":181}},
+        {"name":"trigger_pipeline_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":182}},
+        {"name":"trigger_type","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":183}},
+        {"name":"trigger_repo_id","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":184}},
+        {"name":"trigger_secret","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":185}},
+        {"name":"trigger_description","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":186}},
+        {"name":"trigger_disabled","type":"boolean","source":{"file":"0027_create_ci_tables.up.sql","line":187}},
+        {"name":"trigger_created_by","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":188}},
+        {"name":"trigger_actions","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":189}},
+        {"name":"trigger_created","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":190}},
+        {"name":"trigger_updated","type":"bigint","source":{"file":"0027_create_ci_tables.up.sql","line":191}},
+        {"name":"trigger_version","type":"integer","source":{"file":"0027_create_ci_tables.up.sql","line":192}}
+      ],
+      "relations": [
+        {"foreignKey":"trigger_pipeline_id","references":"pipeline_id","on":"pipelines","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"trigger_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":179},
+      "indexes": [
+        {"columns":["trigger_pipeline_id","trigger_uid"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "plugins",
+      "columns": [
+        {"name":"plugin_uid","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":201},"unique":true},
+        {"name":"plugin_description","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":202}},
+        {"name":"plugin_logo","type":"text","source":{"file":"0027_create_ci_tables.up.sql","line":203}},
+        {"name":"plugin_spec","type":"bytea","source":{"file":"0027_create_ci_tables.up.sql","line":204}},
+        {"name":"plugin_type","type":"text","source":{"file":"0033_alter_ci_tables.up.sql","line":2}},
+        {"name":"plugin_version","type":"text","source":{"file":"0033_alter_ci_tables.up.sql","line":3}}
+      ],
+      "relations": [],
+      "source": {"file":"0027_create_ci_tables.up.sql","line":200}
+    },
+    {
+      "table": "space_paths",
+      "columns": [
+        {"name":"space_path_id","type":"serial","primary":true,"source":{"file":"0030_create_table_space_paths.up.sql","line":2},"autoIncrement":true},
+        {"name":"space_path_uid","type":"text","source":{"file":"0030_create_table_space_paths.up.sql","line":3}},
+        {"name":"space_path_uid_unique","type":"text","source":{"file":"0030_create_table_space_paths.up.sql","line":4}},
+        {"name":"space_path_is_primary","type":"boolean","nullable":true,"source":{"file":"0030_create_table_space_paths.up.sql","line":5},"default":null},
+        {"name":"space_path_space_id","type":"integer","source":{"file":"0030_create_table_space_paths.up.sql","line":6}},
+        {"name":"space_path_parent_id","type":"integer","nullable":true,"source":{"file":"0030_create_table_space_paths.up.sql","line":7}},
+        {"name":"space_path_created_by","type":"integer","source":{"file":"0030_create_table_space_paths.up.sql","line":8}},
+        {"name":"space_path_created","type":"bigint","source":{"file":"0030_create_table_space_paths.up.sql","line":9}},
+        {"name":"space_path_updated","type":"bigint","source":{"file":"0030_create_table_space_paths.up.sql","line":10}}
+      ],
+      "relations": [
+        {"foreignKey":"space_path_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"space_path_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"space_path_parent_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0030_create_table_space_paths.up.sql","line":1},
+      "indexes": [
+        {"columns":["space_path_space_id","space_path_is_primary"],"type":"unique","name":"space_paths_space_id_is_primary"},
+        {"columns":["space_path_uid_unique"],"type":"unique","name":"space_paths_uid_unique_no_parent"},
+        {"columns":["space_path_parent_id","space_path_uid_unique"],"type":"unique","name":"space_paths_uid_unique"}
+      ]
+    },
+    {
+      "table": "pullreq_file_views",
+      "columns": [
+        {"name":"pullreq_file_view_pullreq_id","type":"integer","primary":true,"source":{"file":"0032_create_table_pullreq_file_views.up.sql","line":2}},
+        {"name":"pullreq_file_view_principal_id","type":"integer","primary":true,"source":{"file":"0032_create_table_pullreq_file_views.up.sql","line":3}},
+        {"name":"pullreq_file_view_path","type":"text","primary":true,"source":{"file":"0032_create_table_pullreq_file_views.up.sql","line":4}},
+        {"name":"pullreq_file_view_sha","type":"text","source":{"file":"0032_create_table_pullreq_file_views.up.sql","line":5}},
+        {"name":"pullreq_file_view_obsolete","type":"boolean","source":{"file":"0032_create_table_pullreq_file_views.up.sql","line":6}},
+        {"name":"pullreq_file_view_created","type":"bigint","source":{"file":"0032_create_table_pullreq_file_views.up.sql","line":7}},
+        {"name":"pullreq_file_view_updated","type":"bigint","source":{"file":"0032_create_table_pullreq_file_views.up.sql","line":8}}
+      ],
+      "relations": [
+        {"foreignKey":"pullreq_file_view_pullreq_id","references":"pullreq_id","on":"pullreqs","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"pullreq_file_view_principal_id","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0032_create_table_pullreq_file_views.up.sql","line":1},
+      "indexes": [
+        {"columns":["pullreq_file_view_pullreq_id","pullreq_file_view_path"],"type":"index","name":"pullreq_file_views_pullreq_id_file_path"}
+      ]
+    },
+    {
+      "table": "rules",
+      "columns": [
+        {"name":"rule_id","type":"serial","primary":true,"source":{"file":"0036_create_table_rules.up.sql","line":2},"autoIncrement":true},
+        {"name":"rule_version","type":"integer","source":{"file":"0036_create_table_rules.up.sql","line":3}},
+        {"name":"rule_created_by","type":"integer","source":{"file":"0036_create_table_rules.up.sql","line":4}},
+        {"name":"rule_created","type":"bigint","source":{"file":"0036_create_table_rules.up.sql","line":5}},
+        {"name":"rule_updated","type":"bigint","source":{"file":"0036_create_table_rules.up.sql","line":6}},
+        {"name":"rule_space_id","type":"integer","nullable":true,"source":{"file":"0036_create_table_rules.up.sql","line":7}},
+        {"name":"rule_repo_id","type":"integer","nullable":true,"source":{"file":"0036_create_table_rules.up.sql","line":8}},
+        {"name":"rule_uid","type":"text","source":{"file":"0036_create_table_rules.up.sql","line":9}},
+        {"name":"rule_description","type":"text","source":{"file":"0036_create_table_rules.up.sql","line":10}},
+        {"name":"rule_type","type":"text","source":{"file":"0036_create_table_rules.up.sql","line":11}},
+        {"name":"rule_state","type":"text","source":{"file":"0036_create_table_rules.up.sql","line":12}},
+        {"name":"rule_pattern","type":"json","source":{"file":"0036_create_table_rules.up.sql","line":13}},
+        {"name":"rule_definition","type":"json","source":{"file":"0036_create_table_rules.up.sql","line":14}},
+        {"name":"rule_scope","type":"integer","nullable":true,"source":{"file":"0088_alter_rules_add_scope.up.sql","line":1},"default":0},
+        {"name":"rule_repo_target","type":"json","source":{"file":"0133_alter_rules_add_repo_target.up.sql","line":1},"default":"{}"}
+      ],
+      "relations": [
+        {"foreignKey":"rule_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"set null","onUpdate":"no action"},
+        {"foreignKey":"rule_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"rule_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0036_create_table_rules.up.sql","line":1},
+      "indexes": [
+        {"columns":["rule_space_id","LOWER(rule_uid)"],"type":"unique","name":"rules_space_id_uid"},
+        {"columns":["rule_repo_id","LOWER(rule_uid)"],"type":"unique","name":"rules_repo_id_uid"}
+      ]
+    },
+    {
+      "table": "templates",
+      "columns": [
+        {"name":"template_id","type":"serial","primary":true,"source":{"file":"0040_alter_table_templates_add_type.up.sql","line":4},"autoIncrement":true},
+        {"name":"template_uid","type":"text","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":5}},
+        {"name":"template_type","type":"text","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":6}},
+        {"name":"template_description","type":"text","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":7}},
+        {"name":"template_space_id","type":"integer","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":8}},
+        {"name":"template_data","type":"bytea","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":9}},
+        {"name":"template_created","type":"bigint","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":10}},
+        {"name":"template_updated","type":"bigint","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":11}},
+        {"name":"template_version","type":"integer","source":{"file":"0040_alter_table_templates_add_type.up.sql","line":12}}
+      ],
+      "relations": [
+        {"foreignKey":"template_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0040_alter_table_templates_add_type.up.sql","line":3},
+      "indexes": [
+        {"columns":["template_space_id","template_uid","template_type"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "settings",
+      "columns": [
+        {"name":"setting_id","type":"serial","primary":true,"source":{"file":"0047_create_table_settings.up.sql","line":2},"autoIncrement":true},
+        {"name":"setting_space_id","type":"integer","nullable":true,"source":{"file":"0047_create_table_settings.up.sql","line":3}},
+        {"name":"setting_repo_id","type":"integer","nullable":true,"source":{"file":"0047_create_table_settings.up.sql","line":4}},
+        {"name":"setting_key","type":"text","source":{"file":"0047_create_table_settings.up.sql","line":5}},
+        {"name":"setting_value","type":"json","nullable":true,"source":{"file":"0047_create_table_settings.up.sql","line":6}}
+      ],
+      "relations": [
+        {"foreignKey":"setting_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"setting_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0047_create_table_settings.up.sql","line":1},
+      "indexes": [
+        {"columns":["setting_space_id","LOWER(setting_key)"],"type":"unique","name":"settings_space_id_key"},
+        {"columns":["setting_repo_id","LOWER(setting_key)"],"type":"unique","name":"settings_repo_id_key"},
+        {"columns":["LOWER(setting_key)"],"type":"unique","name":"settings_sys_key"}
+      ]
+    },
+    {
+      "table": "public_access_repo",
+      "columns": [
+        {"name":"public_access_repo_id","type":"integer","primary":true,"source":{"file":"0050_create_table_public_resources.up.sql","line":2}}
+      ],
+      "relations": [
+        {"foreignKey":"public_access_repo_id","references":"repo_id","on":"repositories","type":"one-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0050_create_table_public_resources.up.sql","line":1}
+    },
+    {
+      "table": "public_access_space",
+      "columns": [
+        {"name":"public_access_space_id","type":"integer","primary":true,"source":{"file":"0050_create_table_public_resources.up.sql","line":10}}
+      ],
+      "relations": [
+        {"foreignKey":"public_access_space_id","references":"space_id","on":"spaces","type":"one-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0050_create_table_public_resources.up.sql","line":9}
+    },
+    {
+      "table": "public_keys",
+      "columns": [
+        {"name":"public_key_id","type":"serial","primary":true,"source":{"file":"0051_create_table_public_key.up.sql","line":2},"autoIncrement":true},
+        {"name":"public_key_principal_id","type":"integer","source":{"file":"0051_create_table_public_key.up.sql","line":3}},
+        {"name":"public_key_created","type":"bigint","source":{"file":"0051_create_table_public_key.up.sql","line":4}},
+        {"name":"public_key_verified","type":"bigint","nullable":true,"source":{"file":"0051_create_table_public_key.up.sql","line":5}},
+        {"name":"public_key_identifier","type":"text","source":{"file":"0051_create_table_public_key.up.sql","line":6}},
+        {"name":"public_key_usage","type":"text","source":{"file":"0051_create_table_public_key.up.sql","line":7}},
+        {"name":"public_key_fingerprint","type":"text","source":{"file":"0051_create_table_public_key.up.sql","line":8}},
+        {"name":"public_key_content","type":"text","source":{"file":"0051_create_table_public_key.up.sql","line":9}},
+        {"name":"public_key_comment","type":"text","source":{"file":"0051_create_table_public_key.up.sql","line":10}},
+        {"name":"public_key_type","type":"text","source":{"file":"0051_create_table_public_key.up.sql","line":11}},
+        {"name":"public_key_scheme","type":"text","source":{"file":"0112_alter_table_public_keys.up.sql","line":2},"default":"ssh"},
+        {"name":"public_key_valid_from","type":"bigint","nullable":true,"source":{"file":"0117_create_table_public_key_sub_keys.up.sql","line":17}},
+        {"name":"public_key_valid_to","type":"bigint","nullable":true,"source":{"file":"0117_create_table_public_key_sub_keys.up.sql","line":18}},
+        {"name":"public_key_revocation_reason","type":"text","nullable":true,"source":{"file":"0117_create_table_public_key_sub_keys.up.sql","line":19}},
+        {"name":"public_key_metadata","type":"json","source":{"file":"0117_create_table_public_key_sub_keys.up.sql","line":20},"default":"{}"}
+      ],
+      "relations": [
+        {"foreignKey":"public_key_principal_id","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0051_create_table_public_key.up.sql","line":1},
+      "indexes": [
+        {"columns":["public_key_fingerprint"],"type":"index","name":"public_keys_fingerprint"},
+        {"columns":["public_key_principal_id","LOWER(public_key_identifier)"],"type":"unique","name":"public_keys_principal_id_identifier"}
+      ]
+    },
+    {
+      "table": "infra_provider_configs",
+      "columns": [
+        {"name":"ipconf_id","type":"serial","primary":true,"source":{"file":"0052_create_cde_tables.up.sql","line":3},"autoIncrement":true},
+        {"name":"ipconf_uid","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":4}},
+        {"name":"ipconf_display_name","type":"text","source":{"file":"0054_alter_cde_tables_change_name_and_indexes.up.sql","line":1}},
+        {"name":"ipconf_type","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":6}},
+        {"name":"ipconf_space_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":7}},
+        {"name":"ipconf_created","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":8}},
+        {"name":"ipconf_updated","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":9}},
+        {"name":"ipconf_metadata","type":"jsonb","nullable":true,"source":{"file":"0100_alter_table_infra_provider_configs_add_metadata.up.sql","line":1}},
+        {"name":"ipconf_is_deleted","type":"bool","source":{"file":"0102_alter_table_infra_provider_configs_soft_delete.up.sql","line":2},"default":false},
+        {"name":"ipconf_deleted","type":"bigint","nullable":true,"source":{"file":"0102_alter_table_infra_provider_configs_soft_delete.up.sql","line":4}}
+      ],
+      "relations": [
+        {"foreignKey":"ipconf_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0052_create_cde_tables.up.sql","line":1},
+      "indexes": [
+        {"columns":["ipconf_uid","ipconf_space_id","ipconf_created"],"type":"unique","name":"infra_provider_configs_uid_space_id_created"}
+      ]
+    },
+    {
+      "table": "infra_provider_templates",
+      "columns": [
+        {"name":"iptemp_id","type":"serial","primary":true,"source":{"file":"0052_create_cde_tables.up.sql","line":19},"autoIncrement":true},
+        {"name":"iptemp_uid","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":20}},
+        {"name":"iptemp_infra_provider_config_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":21}},
+        {"name":"iptemp_description","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":22}},
+        {"name":"iptemp_space_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":23}},
+        {"name":"iptemp_data","type":"bytea","source":{"file":"0052_create_cde_tables.up.sql","line":24}},
+        {"name":"iptemp_created","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":25}},
+        {"name":"iptemp_updated","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":26}},
+        {"name":"iptemp_version","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":27}}
+      ],
+      "relations": [
+        {"foreignKey":"iptemp_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"iptemp_infra_provider_config_id","references":"ipconf_id","on":"infra_provider_configs","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"}
+      ],
+      "source": {"file":"0052_create_cde_tables.up.sql","line":17},
+      "indexes": [
+        {"columns":["iptemp_uid","iptemp_space_id"],"type":"unique","name":"infra_provider_templates_uid_space_id"}
+      ]
+    },
+    {
+      "table": "infra_provider_resources",
+      "columns": [
+        {"name":"ipreso_id","type":"serial","primary":true,"source":{"file":"0052_create_cde_tables.up.sql","line":41},"autoIncrement":true},
+        {"name":"ipreso_uid","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":42}},
+        {"name":"ipreso_display_name","type":"text","source":{"file":"0054_alter_cde_tables_change_name_and_indexes.up.sql","line":2}},
+        {"name":"ipreso_infra_provider_config_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":44}},
+        {"name":"ipreso_type","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":45}},
+        {"name":"ipreso_space_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":46}},
+        {"name":"ipreso_created","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":47}},
+        {"name":"ipreso_updated","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":48}},
+        {"name":"ipreso_cpu","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":49}},
+        {"name":"ipreso_memory","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":50}},
+        {"name":"ipreso_disk","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":51}},
+        {"name":"ipreso_network","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":52}},
+        {"name":"ipreso_region","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":53}},
+        {"name":"ipreso_metadata","type":"jsonb","nullable":true,"source":{"file":"0101_alter_table_infra_provider_resources_soft_delete.up.sql","line":2}},
+        {"name":"ipreso_infra_provider_template_id","type":"integer","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":57}},
+        {"name":"ipreso_is_deleted","type":"bool","source":{"file":"0101_alter_table_infra_provider_resources_soft_delete.up.sql","line":4},"default":false},
+        {"name":"ipreso_deleted","type":"bigint","nullable":true,"source":{"file":"0101_alter_table_infra_provider_resources_soft_delete.up.sql","line":6}}
+      ],
+      "relations": [
+        {"foreignKey":"ipreso_infra_provider_template_id","references":"iptemp_id","on":"infra_provider_templates","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"ipreso_infra_provider_config_id","references":"ipconf_id","on":"infra_provider_configs","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"ipreso_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0052_create_cde_tables.up.sql","line":39},
+      "indexes": [
+        {"columns":["ipreso_uid","ipreso_space_id","ipreso_infra_provider_config_id","ipreso_created"],"type":"unique","name":"infra_provider_resources_uid_space_id_config_id_created"}
+      ]
+    },
+    {
+      "table": "gitspace_configs",
+      "columns": [
+        {"name":"gconf_id","type":"serial","primary":true,"source":{"file":"0052_create_cde_tables.up.sql","line":75},"autoIncrement":true},
+        {"name":"gconf_uid","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":76}},
+        {"name":"gconf_display_name","type":"text","source":{"file":"0054_alter_cde_tables_change_name_and_indexes.up.sql","line":3}},
+        {"name":"gconf_ide","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":78}},
+        {"name":"gconf_infra_provider_resource_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":79}},
+        {"name":"gconf_code_auth_type","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":80}},
+        {"name":"gconf_code_auth_id","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":81}},
+        {"name":"gconf_code_repo_type","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":82}},
+        {"name":"gconf_code_repo_is_private","type":"boolean","source":{"file":"0052_create_cde_tables.up.sql","line":83}},
+        {"name":"gconf_code_repo_url","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":84}},
+        {"name":"gconf_devcontainer_path","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":85}},
+        {"name":"gconf_branch","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":86}},
+        {"name":"gconf_user_uid","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":87}},
+        {"name":"gconf_space_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":88}},
+        {"name":"gconf_created","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":89}},
+        {"name":"gconf_updated","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":90}},
+        {"name":"gconf_is_deleted","type":"boolean","source":{"file":"0056_alter_table_gitspace_configs_add_soft_delete.up.sql","line":2},"default":false},
+        {"name":"gconf_code_repo_ref","type":"text","nullable":true,"source":{"file":"0061_alter_cde_tables_gitspace_configs_add_coderef.up.sql","line":1}},
+        {"name":"gconf_ssh_token_identifier","type":"text","nullable":true,"source":{"file":"0065_alter_gitspace_config_add_ssh_identifier.up.sql","line":1},"default":""},
+        {"name":"gconf_created_by","type":"integer","nullable":true,"source":{"file":"0066_alter_gitspace_config_add_created_by.up.sql","line":1}},
+        {"name":"gconf_is_marked_for_deletion","type":"boolean","source":{"file":"0082_alter_table_gitspace_configs_add_is_marked_delete.up.sql","line":2},"default":false},
+        {"name":"gconf_is_marked_for_reset","type":"boolean","source":{"file":"0120_alter_table_gitspace_configs.up.sql","line":2},"default":false},
+        {"name":"gconf_is_marked_for_infra_reset","type":"boolean","source":{"file":"0127_alter_table_gitspace_configs_replace_soft_with_hard_reset.up.sql","line":6},"default":false},
+        {"name":"gconf_ai_agents","type":"text","nullable":true,"source":{"file":"0145_alter_table_gitspace_configs_add_ai_agent_fields.up.sql","line":2}}
+      ],
+      "relations": [
+        {"foreignKey":"gconf_infra_provider_resource_id","references":"ipreso_id","on":"infra_provider_resources","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"gconf_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0052_create_cde_tables.up.sql","line":73},
+      "indexes": [
+        {"columns":["gconf_uid","gconf_space_id"],"type":"unique","name":"gitspace_configs_uid_space_id"}
+      ]
+    },
+    {
+      "table": "infra_provisioned",
+      "columns": [
+        {"name":"iprov_id","type":"serial","primary":true,"source":{"file":"0052_create_cde_tables.up.sql","line":104},"autoIncrement":true},
+        {"name":"iprov_gitspace_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":105}},
+        {"name":"iprov_type","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":106}},
+        {"name":"iprov_infra_provider_resource_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":107}},
+        {"name":"iprov_space_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":108}},
+        {"name":"iprov_created","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":109}},
+        {"name":"iprov_updated","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":110}},
+        {"name":"iprov_response_metadata","type":"bytea","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":111}},
+        {"name":"iprov_opentofu_params","type":"jsonb","source":{"file":"0052_create_cde_tables.up.sql","line":112}},
+        {"name":"iprov_infra_status","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":114}},
+        {"name":"iprov_server_host_ip","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":115}},
+        {"name":"iprov_server_host_port","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":116}},
+        {"name":"iprov_proxy_host","type":"text","nullable":true,"source":{"file":"0058_alter_cde_infraprovisioned_up.sql","line":1},"default":""},
+        {"name":"iprov_proxy_port","type":"integer","nullable":true,"source":{"file":"0058_alter_cde_infraprovisioned_up.sql","line":2},"default":0},
+        {"name":"iprov_gateway_host","type":"text","source":{"file":"0105_alter_table_infra_provisioned_add_column_gateway_host.up.sql","line":2},"default":""}
+      ],
+      "relations": [
+        {"foreignKey":"iprov_infra_provider_resource_id","references":"ipreso_id","on":"infra_provider_resources","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"iprov_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"iprov_gitspace_id","references":"gits_id","on":"gitspaces","type":"many-to-one","onDelete":"no action","onUpdate":"no action"}
+      ],
+      "source": {"file":"0052_create_cde_tables.up.sql","line":102}
+    },
+    {
+      "table": "gitspaces",
+      "columns": [
+        {"name":"gits_id","type":"serial","primary":true,"source":{"file":"0052_create_cde_tables.up.sql","line":130},"autoIncrement":true},
+        {"name":"gits_gitspace_config_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":131}},
+        {"name":"gits_url","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":132}},
+        {"name":"gits_state","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":133}},
+        {"name":"gits_user_uid","type":"text","source":{"file":"0052_create_cde_tables.up.sql","line":134}},
+        {"name":"gits_resource_usage","type":"text","nullable":true,"source":{"file":"0052_create_cde_tables.up.sql","line":135}},
+        {"name":"gits_space_id","type":"integer","source":{"file":"0052_create_cde_tables.up.sql","line":136}},
+        {"name":"gits_created","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":137}},
+        {"name":"gits_updated","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":138}},
+        {"name":"gits_last_used","type":"bigint","nullable":true,"source":{"file":"0077_alter_gitspace_instance_add_heartbeat.up.sql","line":2}},
+        {"name":"gits_total_time_used","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":140}},
+        {"name":"gits_access_type","type":"text","nullable":true,"source":{"file":"0053_alter_cde_tables.up.sql","line":7}},
+        {"name":"gits_machine_user","type":"text","nullable":true,"source":{"file":"0053_alter_cde_tables.up.sql","line":9}},
+        {"name":"gits_uid","type":"text","source":{"file":"0055_alter_cde_tables_events_and_gitspaces.up.sql","line":15}},
+        {"name":"gits_access_key_ref","type":"text","nullable":true,"source":{"file":"0065_alter_gitspace_config_add_ssh_identifier.up.sql","line":2}},
+        {"name":"gits_last_heartbeat","type":"bigint","nullable":true,"source":{"file":"0077_alter_gitspace_instance_add_heartbeat.up.sql","line":1}},
+        {"name":"gits_active_time_started","type":"bigint","nullable":true,"source":{"file":"0078_alter_gitspaces_add_active_time.up.sql","line":1}},
+        {"name":"gits_active_time_ended","type":"bigint","nullable":true,"source":{"file":"0078_alter_gitspaces_add_active_time.up.sql","line":2}},
+        {"name":"gits_has_git_changes","type":"boolean","nullable":true,"source":{"file":"0079_alter_gitspaces_add_has_git_changes.up.sql","line":1}},
+        {"name":"gits_error_message","type":"text","nullable":true,"source":{"file":"0085_alter_gitspaces_add_error_message.up.sql","line":1}},
+        {"name":"gits_ssh_command","type":"text","nullable":true,"source":{"file":"0139_alter_table_gitspaces_add_column_ssh_command.up.sql","line":1}}
+      ],
+      "relations": [
+        {"foreignKey":"gits_gitspace_config_id","references":"gconf_id","on":"gitspace_configs","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"gits_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0052_create_cde_tables.up.sql","line":128},
+      "indexes": [
+        {"columns":["gits_uid","gits_space_id"],"type":"unique","name":"gitspaces_uid_space_id"}
+      ]
+    },
+    {
+      "table": "gitspace_events",
+      "columns": [
+        {"name":"geven_id","type":"serial","primary":true,"source":{"file":"0052_create_cde_tables.up.sql","line":160},"autoIncrement":true},
+        {"name":"geven_event","type":"text","source":{"file":"0053_alter_cde_tables.up.sql","line":1}},
+        {"name":"geven_created","type":"bigint","source":{"file":"0052_create_cde_tables.up.sql","line":163}},
+        {"name":"geven_entity_type","type":"text","source":{"file":"0055_alter_cde_tables_events_and_gitspaces.up.sql","line":4}},
+        {"name":"geven_query_key","type":"text","nullable":true,"source":{"file":"0059_alter_table_gitspace_events_add_timestamp_rename_uid.up.sql","line":1}},
+        {"name":"geven_entity_id","type":"integer","source":{"file":"0055_alter_cde_tables_events_and_gitspaces.up.sql","line":8}},
+        {"name":"geven_timestamp","type":"bigint","source":{"file":"0059_alter_table_gitspace_events_add_timestamp_rename_uid.up.sql","line":4}}
+      ],
+      "relations": [],
+      "source": {"file":"0052_create_cde_tables.up.sql","line":158},
+      "indexes": [
+        {"columns":["geven_entity_id"],"type":"index","name":"gitspace_events_entity_id"}
+      ]
+    },
+    {
+      "table": "labels",
+      "columns": [
+        {"name":"label_id","type":"serial","primary":true,"source":{"file":"0060_create_table_labels.up.sql","line":2},"autoIncrement":true},
+        {"name":"label_space_id","type":"integer","nullable":true,"source":{"file":"0060_create_table_labels.up.sql","line":3},"default":null},
+        {"name":"label_repo_id","type":"integer","nullable":true,"source":{"file":"0060_create_table_labels.up.sql","line":4},"default":null},
+        {"name":"label_scope","type":"integer","nullable":true,"source":{"file":"0060_create_table_labels.up.sql","line":5},"default":0},
+        {"name":"label_key","type":"text","source":{"file":"0060_create_table_labels.up.sql","line":6}},
+        {"name":"label_description","type":"text","source":{"file":"0060_create_table_labels.up.sql","line":7},"default":""},
+        {"name":"label_color","type":"text","source":{"file":"0060_create_table_labels.up.sql","line":8},"default":"black"},
+        {"name":"label_type","type":"text","source":{"file":"0060_create_table_labels.up.sql","line":9},"default":"static"},
+        {"name":"label_created","type":"bigint","source":{"file":"0060_create_table_labels.up.sql","line":10}},
+        {"name":"label_updated","type":"bigint","source":{"file":"0060_create_table_labels.up.sql","line":11}},
+        {"name":"label_created_by","type":"integer","source":{"file":"0060_create_table_labels.up.sql","line":12}},
+        {"name":"label_updated_by","type":"integer","source":{"file":"0060_create_table_labels.up.sql","line":13}},
+        {"name":"label_value_count","type":"integer","nullable":true,"source":{"file":"0060_create_table_labels.up.sql","line":14},"default":0}
+      ],
+      "relations": [
+        {"foreignKey":"label_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"label_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"label_created_by","references":"principal_id","on":"principals","type":"many-to-one"},
+        {"foreignKey":"label_updated_by","references":"principal_id","on":"principals","type":"many-to-one"}
+      ],
+      "source": {"file":"0060_create_table_labels.up.sql","line":1},
+      "indexes": [
+        {"columns":["label_space_id","LOWER(label_key)"],"type":"unique","name":"labels_space_id_key"},
+        {"columns":["label_repo_id","LOWER(label_key)"],"type":"unique","name":"labels_repo_id_key"}
+      ]
+    },
+    {
+      "table": "label_values",
+      "columns": [
+        {"name":"label_value_id","type":"serial","primary":true,"source":{"file":"0060_create_table_labels.up.sql","line":37},"autoIncrement":true},
+        {"name":"label_value_label_id","type":"integer","source":{"file":"0060_create_table_labels.up.sql","line":38}},
+        {"name":"label_value_value","type":"text","source":{"file":"0060_create_table_labels.up.sql","line":39}},
+        {"name":"label_value_color","type":"text","source":{"file":"0060_create_table_labels.up.sql","line":40}},
+        {"name":"label_value_created","type":"bigint","source":{"file":"0060_create_table_labels.up.sql","line":41}},
+        {"name":"label_value_updated","type":"bigint","source":{"file":"0060_create_table_labels.up.sql","line":42}},
+        {"name":"label_value_created_by","type":"integer","source":{"file":"0060_create_table_labels.up.sql","line":43}},
+        {"name":"label_value_updated_by","type":"integer","source":{"file":"0060_create_table_labels.up.sql","line":44}}
+      ],
+      "relations": [
+        {"foreignKey":"label_value_label_id","references":"label_id","on":"labels","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"label_value_created_by","references":"principal_id","on":"principals","type":"many-to-one"},
+        {"foreignKey":"label_value_updated_by","references":"principal_id","on":"principals","type":"many-to-one"}
+      ],
+      "source": {"file":"0060_create_table_labels.up.sql","line":36},
+      "indexes": [
+        {"columns":["label_value_label_id","LOWER(label_value_value)"],"type":"unique","name":"unique_label_value_label_id_value"}
+      ]
+    },
+    {
+      "table": "pullreq_labels",
+      "columns": [
+        {"name":"pullreq_label_pullreq_id","type":"integer","primary":true,"source":{"file":"0060_create_table_labels.up.sql","line":58}},
+        {"name":"pullreq_label_label_id","type":"integer","primary":true,"source":{"file":"0060_create_table_labels.up.sql","line":59}},
+        {"name":"pullreq_label_label_value_id","type":"integer","nullable":true,"source":{"file":"0060_create_table_labels.up.sql","line":60},"default":null},
+        {"name":"pullreq_label_created","type":"bigint","source":{"file":"0060_create_table_labels.up.sql","line":61}},
+        {"name":"pullreq_label_updated","type":"bigint","source":{"file":"0060_create_table_labels.up.sql","line":62}},
+        {"name":"pullreq_label_created_by","type":"integer","source":{"file":"0060_create_table_labels.up.sql","line":63}},
+        {"name":"pullreq_label_updated_by","type":"integer","source":{"file":"0060_create_table_labels.up.sql","line":64}}
+      ],
+      "relations": [
+        {"foreignKey":"pullreq_label_pullreq_id","references":"pullreq_id","on":"pullreqs","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"pullreq_label_label_id","references":"label_id","on":"labels","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"pullreq_label_label_value_id","references":"label_value_id","on":"label_values","type":"many-to-one","onDelete":"set null"},
+        {"foreignKey":"pullreq_label_created_by","references":"principal_id","on":"principals","type":"many-to-one"},
+        {"foreignKey":"pullreq_label_updated_by","references":"principal_id","on":"principals","type":"many-to-one"}
+      ],
+      "source": {"file":"0060_create_table_labels.up.sql","line":57}
+    },
+    {
+      "table": "delegate_provision_details",
+      "columns": [
+        {"name":"dpdeta_id","type":"serial","primary":true,"source":{"file":"0062_create_cde_delegate_provision_tables.up.sql","line":3},"autoIncrement":true},
+        {"name":"dpdeta_task_id","type":"text","source":{"file":"0062_create_cde_delegate_provision_tables.up.sql","line":4}},
+        {"name":"dpdeta_action_type","type":"text","source":{"file":"0062_create_cde_delegate_provision_tables.up.sql","line":5}},
+        {"name":"dpdeta_space_id","type":"integer","source":{"file":"0062_create_cde_delegate_provision_tables.up.sql","line":7}},
+        {"name":"dpdeta_created","type":"bigint","source":{"file":"0062_create_cde_delegate_provision_tables.up.sql","line":9}},
+        {"name":"dpdeta_updated","type":"bigint","source":{"file":"0062_create_cde_delegate_provision_tables.up.sql","line":10}},
+        {"name":"dpdeta_gitspace_instance_identifier","type":"text","source":{"file":"0064_alter_delegate_provision_modify_column.up.sql","line":4}},
+        {"name":"dpdeta_task_details","type":"jsonb","nullable":true,"source":{"file":"0104_alter_table_delegate_provision_details_add_column_task_details.up.sql","line":1}}
+      ],
+      "relations": [
+        {"foreignKey":"dpdeta_space_id","references":"space_id","on":"spaces","type":"many-to-one","onUpdate":"no action"},
+        {"foreignKey":"dpdeta_gitspace_instance_identifier","references":"gits_uid","on":"gitspaces","type":"many-to-one","onUpdate":"no action"},
+        {"foreignKey":"dpdeta_space_id","references":"gits_space_id","on":"gitspaces","type":"many-to-one","onUpdate":"no action"}
+      ],
+      "source": {"file":"0062_create_cde_delegate_provision_tables.up.sql","line":1},
+      "indexes": [
+        {"columns":["dpdeta_task_id","dpdeta_space_id"],"type":"unique","name":"delegate_provision_details_task_id_space_id"}
+      ]
+    },
+    {
+      "table": "registries",
+      "columns": [
+        {"name":"registry_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":3},"autoIncrement":true},
+        {"name":"registry_name","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":4}},
+        {"name":"registry_root_parent_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":7}},
+        {"name":"registry_parent_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":8}},
+        {"name":"registry_description","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":9}},
+        {"name":"registry_type","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":10}},
+        {"name":"registry_package_type","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":11}},
+        {"name":"registry_upstream_proxies","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":12}},
+        {"name":"registry_allowed_pattern","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":13}},
+        {"name":"registry_blocked_pattern","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":14}},
+        {"name":"registry_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":15}},
+        {"name":"registry_updated_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":16}},
+        {"name":"registry_created_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":17}},
+        {"name":"registry_updated_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":18}},
+        {"name":"registry_labels","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":19}},
+        {"name":"registry_uuid","type":"uuid","source":{"file":"0130_update_ar_tables_registries_images_artifacts_add_uuid.up.sql","line":4},"defaultRaw":"uuid_generate_v4()","unique":true},
+        {"name":"registry_config","type":"text","nullable":true,"source":{"file":"0152_alter_table_registries_add_config.up.sql","line":1}}
+      ],
+      "relations": [],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":1},
+      "indexes": [
+        {"columns":["registry_root_parent_id","registry_name"],"type":"unique","name":"unique_registries"},
+        {"columns":["registry_parent_id","registry_name"],"type":"unique","name":"unique_registry_parent_name"},
+        {"columns":["registry_parent_id","registry_package_type"],"type":"index","name":"idx_registries_parent_id_package_type"}
+      ]
+    },
+    {
+      "table": "media_types",
+      "columns": [
+        {"name":"mt_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":27},"autoIncrement":true},
+        {"name":"mt_media_type","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":28},"unique":true},
+        {"name":"mt_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":31},"defaultRaw":"(EXTRACT(EPOCH FROM now()) * 1000)::BIGINT"},
+        {"name":"is_runnable","type":"boolean","source":{"file":"0118_alter_table_media_types.up.sql","line":2},"default":true,"comment":"Indicates whether artifacts with this media type can be pulled using Docker client or similar runtime.\n    If false, scanning will be skipped as the artifact is not runnable via standard Docker tools.\n    Useful for distinguishing signature/attestation media types (e.g., cosign) from executable image layers."}
+      ],
+      "relations": [],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":25}
+    },
+    {
+      "table": "blobs",
+      "columns": [
+        {"name":"blob_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":36},"autoIncrement":true},
+        {"name":"blob_root_parent_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":37}},
+        {"name":"blob_digest","type":"bytea","source":{"file":"0067_create_ar_tables.up.sql","line":38}},
+        {"name":"blob_media_type_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":39}},
+        {"name":"blob_size","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":42}},
+        {"name":"blob_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":43}},
+        {"name":"blob_created_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":44}}
+      ],
+      "relations": [
+        {"foreignKey":"blob_media_type_id","references":"mt_id","on":"media_types","type":"many-to-one"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":34},
+      "indexes": [
+        {"columns":["blob_digest","blob_root_parent_id"],"type":"unique","name":"unique_digest_root_parent_id"},
+        {"columns":["blob_media_type_id"],"type":"index","name":"index_blobs_on_media_type_id"}
+      ]
+    },
+    {
+      "table": "registry_blobs",
+      "columns": [
+        {"name":"rblob_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":53},"autoIncrement":true},
+        {"name":"rblob_registry_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":54}},
+        {"name":"rblob_blob_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":58}},
+        {"name":"rblob_image_name","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":62}},
+        {"name":"rblob_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":65}},
+        {"name":"rblob_updated_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":66}},
+        {"name":"rblob_created_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":67}},
+        {"name":"rblob_updated_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":68}}
+      ],
+      "relations": [
+        {"foreignKey":"rblob_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"rblob_blob_id","references":"blob_id","on":"blobs","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":51},
+      "indexes": [
+        {"columns":["rblob_registry_id","rblob_blob_id","rblob_image_name"],"type":"unique","name":"unique_registry_blobs_registry_id_blob_id_image"},
+        {"columns":["rblob_registry_id"],"type":"index","name":"index_registry_blobs_on_reg_id"},
+        {"columns":["rblob_registry_id","rblob_blob_id"],"type":"index","name":"index_registry_blobs_on_reg_blob_id"}
+      ]
+    },
+    {
+      "table": "manifests",
+      "columns": [
+        {"name":"manifest_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":82},"autoIncrement":true},
+        {"name":"manifest_registry_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":83}},
+        {"name":"manifest_schema_version","type":"smallint","source":{"file":"0067_create_ar_tables.up.sql","line":87}},
+        {"name":"manifest_media_type_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":88}},
+        {"name":"manifest_artifact_media_type","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":91}},
+        {"name":"manifest_total_size","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":92}},
+        {"name":"manifest_configuration_media_type","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":93}},
+        {"name":"manifest_configuration_payload","type":"bytea","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":94}},
+        {"name":"manifest_configuration_blob_id","type":"integer","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":95}},
+        {"name":"manifest_configuration_digest","type":"bytea","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":98}},
+        {"name":"manifest_digest","type":"bytea","source":{"file":"0067_create_ar_tables.up.sql","line":99}},
+        {"name":"manifest_payload","type":"bytea","source":{"file":"0067_create_ar_tables.up.sql","line":100}},
+        {"name":"manifest_non_conformant","type":"boolean","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":101},"default":false},
+        {"name":"manifest_non_distributable_layers","type":"boolean","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":102},"default":false},
+        {"name":"manifest_subject_id","type":"integer","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":103}},
+        {"name":"manifest_subject_digest","type":"bytea","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":104}},
+        {"name":"manifest_annotations","type":"bytea","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":105}},
+        {"name":"manifest_image_name","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":106}},
+        {"name":"manifest_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":109}},
+        {"name":"manifest_created_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":110}},
+        {"name":"manifest_updated_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":111}},
+        {"name":"manifest_updated_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":112}}
+      ],
+      "relations": [
+        {"foreignKey":"manifest_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"manifest_media_type_id","references":"mt_id","on":"media_types","type":"many-to-one"},
+        {"foreignKey":"manifest_configuration_blob_id","references":"blob_id","on":"blobs","type":"many-to-one"},
+        {"foreignKey":"manifest_subject_id","references":"manifest_id","on":"manifests","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":80},
+      "indexes": [
+        {"columns":["manifest_registry_id","manifest_image_name","manifest_digest"],"type":"unique","name":"unique_manifests_registry_id_image_name_and_digest"},
+        {"columns":["manifest_registry_id","manifest_id","manifest_configuration_blob_id"],"type":"unique","name":"unique_manifests_registry_id_id_cfg_blob_id"},
+        {"columns":["manifest_media_type_id"],"type":"index","name":"index_manifests_on_media_type_id"},
+        {"columns":["manifest_configuration_blob_id"],"type":"index","name":"index_manifests_on_configuration_blob_id"},
+        {"columns":["manifest_subject_id"],"type":"index","name":"manifest_manifest_subject_id_idx"},
+        {"columns":["manifest_id","manifest_registry_id","manifest_image_name"],"type":"index","name":"idx_manifests_id_registry_image_name"},
+        {"columns":["manifest_registry_id","manifest_image_name","manifest_created_at"],"type":"index","name":"index_manifest_registry_id_manifest_image_name_manifest_created_at_idx"}
+      ]
+    },
+    {
+      "table": "manifest_references",
+      "columns": [
+        {"name":"manifest_ref_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":130},"autoIncrement":true},
+        {"name":"manifest_ref_registry_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":131}},
+        {"name":"manifest_ref_parent_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":132}},
+        {"name":"manifest_ref_child_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":133}},
+        {"name":"manifest_ref_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":134}},
+        {"name":"manifest_ref_updated_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":135}},
+        {"name":"manifest_ref_created_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":136}},
+        {"name":"manifest_ref_updated_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":137}}
+      ],
+      "relations": [
+        {"foreignKey":"manifest_ref_parent_id","references":"manifest_id","on":"manifests","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"manifest_ref_child_id","references":"manifest_id","on":"manifests","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":128},
+      "indexes": [
+        {"columns":["manifest_ref_registry_id","manifest_ref_parent_id","manifest_ref_child_id"],"type":"unique","name":"unique_manifest_references_prt_id_chd_id"},
+        {"columns":["manifest_ref_registry_id","manifest_ref_child_id"],"type":"index","name":"index_manifest_references_on_rpstry_id_child_id"},
+        {"columns":["manifest_ref_child_id"],"type":"index","name":"manifest_ref_child_id_idx"},
+        {"columns":["manifest_ref_parent_id"],"type":"index","name":"manifest_ref_parent_id_idx"}
+      ]
+    },
+    {
+      "table": "layers",
+      "columns": [
+        {"name":"layer_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":154},"autoIncrement":true},
+        {"name":"layer_registry_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":155}},
+        {"name":"layer_manifest_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":156}},
+        {"name":"layer_media_type_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":157}},
+        {"name":"layer_blob_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":160}},
+        {"name":"layer_size","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":163}},
+        {"name":"layer_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":164}},
+        {"name":"layer_updated_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":165}},
+        {"name":"layer_created_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":166}},
+        {"name":"layer_updated_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":167}}
+      ],
+      "relations": [
+        {"foreignKey":"layer_media_type_id","references":"mt_id","on":"media_types","type":"many-to-one"},
+        {"foreignKey":"layer_blob_id","references":"blob_id","on":"blobs","type":"many-to-one"},
+        {"foreignKey":"layer_manifest_id","references":"manifest_id","on":"manifests","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":152},
+      "indexes": [
+        {"columns":["layer_registry_id","layer_manifest_id","layer_blob_id"],"type":"unique","name":"unique_layer_rpstry_id_and_mnfst_id_and_blob_id"},
+        {"columns":["layer_registry_id","layer_id","layer_blob_id"],"type":"unique","name":"unique_layer_rpstry_id_and_id_and_blob_id"},
+        {"columns":["layer_media_type_id"],"type":"index","name":"index_layer_on_media_type_id"},
+        {"columns":["layer_blob_id"],"type":"index","name":"index_layer_on_blob_id"},
+        {"columns":["layer_manifest_id"],"type":"index","name":"layer_manifest_id_idx"}
+      ]
+    },
+    {
+      "table": "tags",
+      "columns": [
+        {"name":"tag_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":223},"autoIncrement":true},
+        {"name":"tag_name","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":224}},
+        {"name":"tag_image_name","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":227}},
+        {"name":"tag_registry_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":230}},
+        {"name":"tag_manifest_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":231}},
+        {"name":"tag_created_at","type":"bigint","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":232}},
+        {"name":"tag_updated_at","type":"bigint","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":233}},
+        {"name":"tag_created_by","type":"integer","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":234}},
+        {"name":"tag_updated_by","type":"integer","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":235}}
+      ],
+      "relations": [
+        {"foreignKey":"tag_manifest_id","references":"manifest_id","on":"manifests","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":221},
+      "indexes": [
+        {"columns":["tag_registry_id","tag_name","tag_image_name"],"type":"unique","name":"unique_tag_registry_id_and_name_and_image_name"},
+        {"columns":["tag_registry_id","tag_manifest_id"],"type":"index","name":"index_tag_on_rpository_id_and_manifest_id"},
+        {"columns":["tag_manifest_id"],"type":"index","name":"tag_manifest_id_index"},
+        {"columns":["tag_manifest_id","tag_name"],"type":"index","name":"idx_tags_manifest_id_image_name"},
+        {"columns":["tag_registry_id","tag_image_name","tag_updated_at"],"type":"index","name":"idx_tags_registry_id_image_name_updated_at"}
+      ]
+    },
+    {
+      "table": "upstream_proxy_configs",
+      "columns": [
+        {"name":"upstream_proxy_config_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":247},"autoIncrement":true},
+        {"name":"upstream_proxy_config_registry_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":248}},
+        {"name":"upstream_proxy_config_source","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":252}},
+        {"name":"upstream_proxy_config_url","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":253}},
+        {"name":"upstream_proxy_config_auth_type","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":254}},
+        {"name":"upstream_proxy_config_user_name","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":255}},
+        {"name":"upstream_proxy_config_secret_identifier","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":256}},
+        {"name":"upstream_proxy_config_secret_space_id","type":"integer","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":257}},
+        {"name":"upstream_proxy_config_token","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":261}},
+        {"name":"upstream_proxy_config_created_at","type":"bigint","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":262}},
+        {"name":"upstream_proxy_config_updated_at","type":"bigint","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":263}},
+        {"name":"upstream_proxy_config_created_by","type":"integer","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":264}},
+        {"name":"upstream_proxy_config_updated_by","type":"integer","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":265}},
+        {"name":"upstream_proxy_config_user_name_secret_space_id","type":"integer","nullable":true,"source":{"file":"0093_alter_table_upstream_proxy_configs_add_username_secret_identifier.up.sql","line":1}},
+        {"name":"upstream_proxy_config_user_name_secret_identifier","type":"text","nullable":true,"source":{"file":"0093_alter_table_upstream_proxy_configs_add_username_secret_identifier.up.sql","line":2}}
+      ],
+      "relations": [
+        {"foreignKey":"upstream_proxy_config_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":245},
+      "indexes": [
+        {"columns":["upstream_proxy_config_registry_id"],"type":"index","name":"index_upstream_proxy_config_on_registry_id"}
+      ]
+    },
+    {
+      "table": "cleanup_policies",
+      "columns": [
+        {"name":"cp_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":273},"autoIncrement":true},
+        {"name":"cp_registry_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":274}},
+        {"name":"cp_name","type":"text","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":277}},
+        {"name":"cp_expiry_time_ms","type":"bigint","nullable":true,"source":{"file":"0067_create_ar_tables.up.sql","line":278}},
+        {"name":"cp_created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":279}},
+        {"name":"cp_updated_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":280}},
+        {"name":"cp_created_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":281}},
+        {"name":"cp_updated_by","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":282}}
+      ],
+      "relations": [
+        {"foreignKey":"cp_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":271},
+      "indexes": [
+        {"columns":["cp_registry_id"],"type":"index","name":"index_cleanup_policies_on_registry_id"}
+      ]
+    },
+    {
+      "table": "cleanup_policy_prefix_mappings",
+      "columns": [
+        {"name":"cpp_id","type":"serial","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":290},"autoIncrement":true},
+        {"name":"cpp_cleanup_policy_id","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":291}},
+        {"name":"cpp_prefix","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":294}},
+        {"name":"cpp_prefix_type","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":295}}
+      ],
+      "relations": [
+        {"foreignKey":"cpp_cleanup_policy_id","references":"cp_id","on":"cleanup_policies","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":288},
+      "indexes": [
+        {"columns":["cpp_cleanup_policy_id"],"type":"index","name":"index_cleanup_policy_map_on_policy_id"}
+      ]
+    },
+    {
+      "table": "gc_blob_review_queue",
+      "columns": [
+        {"name":"blob_id","type":"integer","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":331}},
+        {"name":"review_after","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":332},"defaultRaw":"(EXTRACT(EPOCH FROM (NOW() + INTERVAL '1 day')))"},
+        {"name":"review_count","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":333},"default":0},
+        {"name":"created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":334},"defaultRaw":"EXTRACT(EPOCH FROM NOW())"},
+        {"name":"event","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":335}}
+      ],
+      "relations": [],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":329},
+      "indexes": [
+        {"columns":["review_after"],"type":"index","name":"index_gc_blob_review_queue_on_review_after"}
+      ]
+    },
+    {
+      "table": "gc_review_after_defaults",
+      "columns": [
+        {"name":"event","type":"text","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":343}},
+        {"name":"value","type":"interval","source":{"file":"0067_create_ar_tables.up.sql","line":344}}
+      ],
+      "relations": [],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":341}
+    },
+    {
+      "table": "gc_manifest_review_queue",
+      "columns": [
+        {"name":"registry_id","type":"integer","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":362}},
+        {"name":"manifest_id","type":"integer","primary":true,"source":{"file":"0067_create_ar_tables.up.sql","line":363}},
+        {"name":"review_after","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":364},"defaultRaw":"(EXTRACT(EPOCH FROM (NOW() + INTERVAL '1 day')))"},
+        {"name":"review_count","type":"integer","source":{"file":"0067_create_ar_tables.up.sql","line":365},"default":0},
+        {"name":"created_at","type":"bigint","source":{"file":"0067_create_ar_tables.up.sql","line":366},"defaultRaw":"EXTRACT(EPOCH FROM NOW())"},
+        {"name":"event","type":"text","source":{"file":"0067_create_ar_tables.up.sql","line":367}}
+      ],
+      "relations": [
+        {"foreignKey":"manifest_id","references":"manifest_id","on":"manifests","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0067_create_ar_tables.up.sql","line":360},
+      "indexes": [
+        {"columns":["review_after"],"type":"index","name":"index_gc_manifest_review_queue_on_review_after"},
+        {"columns":["registry_id","manifest_id","review_after"],"type":"index","name":"index_gc_manifest_review_queue2"},
+        {"columns":["manifest_id"],"type":"index","name":"gc_manifest_id_index"}
+      ]
+    },
+    {
+      "table": "usergroups",
+      "columns": [
+        {"name":"usergroup_id","type":"serial","primary":true,"source":{"file":"0068_create_table_usergroups.up.sql","line":3},"autoIncrement":true},
+        {"name":"usergroup_identifier","type":"text","source":{"file":"0068_create_table_usergroups.up.sql","line":4}},
+        {"name":"usergroup_name","type":"text","source":{"file":"0068_create_table_usergroups.up.sql","line":5}},
+        {"name":"usergroup_description","type":"text","nullable":true,"source":{"file":"0068_create_table_usergroups.up.sql","line":6}},
+        {"name":"usergroup_space_id","type":"integer","source":{"file":"0068_create_table_usergroups.up.sql","line":7}},
+        {"name":"usergroup_created","type":"bigint","nullable":true,"source":{"file":"0068_create_table_usergroups.up.sql","line":8}},
+        {"name":"usergroup_updated","type":"bigint","nullable":true,"source":{"file":"0068_create_table_usergroups.up.sql","line":9}},
+        {"name":"usergroup_scope","type":"integer","nullable":true,"source":{"file":"0094_alter_table_usergroups_add_scope.up.sql","line":2},"default":0}
+      ],
+      "relations": [
+        {"foreignKey":"usergroup_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0068_create_table_usergroups.up.sql","line":1},
+      "indexes": [
+        {"columns":["usergroup_space_id","LOWER(usergroup_identifier)"],"type":"unique","name":"usergroups_space_id_identifier"}
+      ]
+    },
+    {
+      "table": "usergroup_reviewers",
+      "columns": [
+        {"name":"usergroup_reviewer_pullreq_id","type":"integer","primary":true,"source":{"file":"0069_create_table_usergroup_reviewers.up.sql","line":2}},
+        {"name":"usergroup_reviewer_usergroup_id","type":"integer","primary":true,"source":{"file":"0069_create_table_usergroup_reviewers.up.sql","line":3}},
+        {"name":"usergroup_reviewer_created_by","type":"integer","source":{"file":"0069_create_table_usergroup_reviewers.up.sql","line":4}},
+        {"name":"usergroup_reviewer_created","type":"bigint","source":{"file":"0069_create_table_usergroup_reviewers.up.sql","line":5}},
+        {"name":"usergroup_reviewer_updated","type":"bigint","source":{"file":"0069_create_table_usergroup_reviewers.up.sql","line":6}},
+        {"name":"usergroup_reviewer_repo_id","type":"integer","source":{"file":"0069_create_table_usergroup_reviewers.up.sql","line":7}}
+      ],
+      "relations": [
+        {"foreignKey":"usergroup_reviewer_pullreq_id","references":"pullreq_id","on":"pullreqs","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"usergroup_reviewer_usergroup_id","references":"usergroup_id","on":"usergroups","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"usergroup_reviewer_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"usergroup_reviewer_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0069_create_table_usergroup_reviewers.up.sql","line":1}
+    },
+    {
+      "table": "images",
+      "columns": [
+        {"name":"image_id","type":"serial","primary":true,"source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":3},"autoIncrement":true},
+        {"name":"image_name","type":"text","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":4}},
+        {"name":"image_registry_id","type":"integer","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":5}},
+        {"name":"image_labels","type":"text","nullable":true,"source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":8}},
+        {"name":"image_enabled","type":"boolean","nullable":true,"source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":9},"default":false},
+        {"name":"image_created_at","type":"bigint","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":10}},
+        {"name":"image_updated_at","type":"bigint","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":11}},
+        {"name":"image_created_by","type":"integer","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":12}},
+        {"name":"image_updated_by","type":"integer","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":13}},
+        {"name":"image_uuid","type":"uuid","source":{"file":"0130_update_ar_tables_registries_images_artifacts_add_uuid.up.sql","line":7},"defaultRaw":"uuid_generate_v4()","unique":true},
+        {"name":"image_type","type":"image_type_enum","nullable":true,"source":{"file":"0136_alter_images_add_unique_indexes.up.sql","line":4},"values":["model","dataset"]},
+        {"name":"image_node_id","type":"uuid","nullable":true,"source":{"file":"0149_alter_table_images_add_node_id.up.sql","line":1}}
+      ],
+      "relations": [
+        {"foreignKey":"image_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"image_node_id","references":"node_id","on":"nodes","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":1},
+      "indexes": [
+        {"columns":["image_registry_id","image_name","image_type"],"type":"unique","name":"unique_images_with_type"},
+        {"columns":["image_registry_id","image_name"],"type":"unique","name":"unique_images_without_type"},
+        {"columns":["image_node_id"],"type":"index","name":"idx_images_node_id"}
+      ]
+    },
+    {
+      "table": "artifacts",
+      "columns": [
+        {"name":"artifact_id","type":"serial","primary":true,"source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":34},"autoIncrement":true},
+        {"name":"artifact_version","type":"text","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":35}},
+        {"name":"artifact_image_id","type":"integer","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":36}},
+        {"name":"artifact_created_at","type":"bigint","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":39}},
+        {"name":"artifact_updated_at","type":"bigint","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":40}},
+        {"name":"artifact_created_by","type":"integer","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":41}},
+        {"name":"artifact_updated_by","type":"integer","source":{"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":42}},
+        {"name":"artifact_metadata","type":"jsonb","nullable":true,"source":{"file":"0097_update_ar_generic_artifact_tables.up.sql","line":6}},
+        {"name":"artifact_uuid","type":"uuid","source":{"file":"0130_update_ar_tables_registries_images_artifacts_add_uuid.up.sql","line":10},"defaultRaw":"uuid_generate_v4()","unique":true},
+        {"name":"artifact_node_id","type":"uuid","nullable":true,"source":{"file":"0150_alter_table_artifacts_add_node_id.up.sql","line":1}}
+      ],
+      "relations": [
+        {"foreignKey":"artifact_image_id","references":"image_id","on":"images","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"artifact_node_id","references":"node_id","on":"nodes","type":"many-to-one","onDelete":"set null"}
+      ],
+      "source": {"file":"0072_create_ar_table_images_and_alter_table_artifacts.up.sql","line":32},
+      "indexes": [
+        {"columns":["artifact_image_id","artifact_version"],"type":"unique","name":"unique_artifact_image_id_and_version"},
+        {"columns":["artifact_image_id"],"type":"index","name":"idx_artifacts_artifact_image_id"},
+        {"columns":["artifact_node_id"],"type":"index","name":"idx_artifacts_node_id"}
+      ]
+    },
+    {
+      "table": "download_stats",
+      "columns": [
+        {"name":"download_stat_id","type":"serial","primary":true,"source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":3},"autoIncrement":true},
+        {"name":"download_stat_artifact_id","type":"integer","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":4}},
+        {"name":"download_stat_timestamp","type":"bigint","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":7}},
+        {"name":"download_stat_created_at","type":"bigint","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":8}},
+        {"name":"download_stat_updated_at","type":"bigint","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":9}},
+        {"name":"download_stat_created_by","type":"integer","nullable":true,"source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":10}},
+        {"name":"download_stat_updated_by","type":"integer","nullable":true,"source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":11}}
+      ],
+      "relations": [
+        {"foreignKey":"download_stat_artifact_id","references":"artifact_id","on":"artifacts","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":1},
+      "indexes": [
+        {"columns":["download_stat_artifact_id"],"type":"index","name":"download_stat_artifact_id"}
+      ]
+    },
+    {
+      "table": "bandwidth_stats",
+      "columns": [
+        {"name":"bandwidth_stat_id","type":"serial","primary":true,"source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":16},"autoIncrement":true},
+        {"name":"bandwidth_stat_image_id","type":"integer","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":17}},
+        {"name":"bandwidth_stat_timestamp","type":"bigint","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":20}},
+        {"name":"bandwidth_stat_bytes","type":"bigint","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":21}},
+        {"name":"bandwidth_stat_type","type":"text","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":22}},
+        {"name":"bandwidth_stat_created_at","type":"bigint","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":23}},
+        {"name":"bandwidth_stat_updated_at","type":"bigint","source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":24}},
+        {"name":"bandwidth_stat_created_by","type":"integer","nullable":true,"source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":25}},
+        {"name":"bandwidth_stat_updated_by","type":"integer","nullable":true,"source":{"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":26}}
+      ],
+      "relations": [
+        {"foreignKey":"bandwidth_stat_image_id","references":"image_id","on":"images","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0073_create_ar_table_bandwidth_stats_and_download_stats.up.sql","line":14},
+      "indexes": [
+        {"columns":["bandwidth_stat_image_id"],"type":"index","name":"idx_bandwidth_stats_image_id"}
+      ]
+    },
+    {
+      "table": "connectors",
+      "columns": [
+        {"name":"connector_id","type":"serial","primary":true,"source":{"file":"0074_create_table_connectors.up.sql","line":7},"autoIncrement":true},
+        {"name":"connector_identifier","type":"text","source":{"file":"0074_create_table_connectors.up.sql","line":8}},
+        {"name":"connector_description","type":"text","source":{"file":"0074_create_table_connectors.up.sql","line":9}},
+        {"name":"connector_type","type":"text","source":{"file":"0074_create_table_connectors.up.sql","line":10}},
+        {"name":"connector_auth_type","type":"text","source":{"file":"0074_create_table_connectors.up.sql","line":11}},
+        {"name":"connector_created_by","type":"integer","source":{"file":"0074_create_table_connectors.up.sql","line":12}},
+        {"name":"connector_space_id","type":"integer","source":{"file":"0074_create_table_connectors.up.sql","line":13}},
+        {"name":"connector_last_test_attempt","type":"integer","source":{"file":"0074_create_table_connectors.up.sql","line":14}},
+        {"name":"connector_last_test_error_msg","type":"text","source":{"file":"0074_create_table_connectors.up.sql","line":15}},
+        {"name":"connector_last_test_status","type":"text","source":{"file":"0074_create_table_connectors.up.sql","line":16}},
+        {"name":"connector_created","type":"bigint","source":{"file":"0074_create_table_connectors.up.sql","line":17}},
+        {"name":"connector_updated","type":"bigint","source":{"file":"0074_create_table_connectors.up.sql","line":18}},
+        {"name":"connector_version","type":"integer","source":{"file":"0074_create_table_connectors.up.sql","line":19}},
+        {"name":"connector_address","type":"text","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":20}},
+        {"name":"connector_insecure","type":"boolean","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":21}},
+        {"name":"connector_username","type":"text","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":24}},
+        {"name":"connector_github_app_installation_id","type":"text","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":25}},
+        {"name":"connector_github_app_application_id","type":"text","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":26}},
+        {"name":"connector_region","type":"text","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":27}},
+        {"name":"connector_password","type":"integer","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":30}},
+        {"name":"connector_token","type":"integer","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":31}},
+        {"name":"connector_aws_key","type":"integer","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":32}},
+        {"name":"connector_aws_secret","type":"integer","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":33}},
+        {"name":"connector_github_app_private_key","type":"integer","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":34}},
+        {"name":"connector_token_refresh","type":"integer","nullable":true,"source":{"file":"0074_create_table_connectors.up.sql","line":35}}
+      ],
+      "relations": [
+        {"foreignKey":"connector_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"connector_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"connector_password","references":"secret_id","on":"secrets","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"connector_token","references":"secret_id","on":"secrets","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"connector_aws_key","references":"secret_id","on":"secrets","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"connector_aws_secret","references":"secret_id","on":"secrets","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"connector_github_app_private_key","references":"secret_id","on":"secrets","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"},
+        {"foreignKey":"connector_token_refresh","references":"secret_id","on":"secrets","type":"many-to-one","onDelete":"restrict","onUpdate":"no action"}
+      ],
+      "source": {"file":"0074_create_table_connectors.up.sql","line":5},
+      "indexes": [
+        {"columns":["connector_space_id","LOWER(connector_identifier)"],"type":"unique","name":"unique_connector_lowercase_identifier"}
+      ]
+    },
+    {
+      "table": "oci_image_index_mappings",
+      "columns": [
+        {"name":"oci_mapping_id","type":"serial","primary":true,"source":{"file":"0076_oci_image_index_mapping.up.sql","line":3},"autoIncrement":true},
+        {"name":"oci_mapping_parent_manifest_id","type":"bigint","source":{"file":"0076_oci_image_index_mapping.up.sql","line":4}},
+        {"name":"oci_mapping_child_digest","type":"bytea","source":{"file":"0076_oci_image_index_mapping.up.sql","line":5}},
+        {"name":"oci_mapping_created_at","type":"bigint","source":{"file":"0076_oci_image_index_mapping.up.sql","line":6}},
+        {"name":"oci_mapping_updated_at","type":"bigint","source":{"file":"0076_oci_image_index_mapping.up.sql","line":7}},
+        {"name":"oci_mapping_created_by","type":"integer","source":{"file":"0076_oci_image_index_mapping.up.sql","line":8}},
+        {"name":"oci_mapping_updated_by","type":"integer","source":{"file":"0076_oci_image_index_mapping.up.sql","line":9}}
+      ],
+      "relations": [
+        {"foreignKey":"oci_mapping_parent_manifest_id","references":"manifest_id","on":"manifests","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0076_oci_image_index_mapping.up.sql","line":1},
+      "indexes": [
+        {"columns":["oci_mapping_parent_manifest_id","oci_mapping_child_digest"],"type":"unique","name":"unique_oci_mapping_digests"}
+      ]
+    },
+    {
+      "table": "usage_metrics",
+      "columns": [
+        {"name":"usage_metric_space_id","type":"bigint","primary":true,"source":{"file":"0091_create_usage_table.up.sql","line":3}},
+        {"name":"usage_metric_date","type":"bigint","primary":true,"source":{"file":"0091_create_usage_table.up.sql","line":4}},
+        {"name":"usage_metric_created","type":"bigint","source":{"file":"0091_create_usage_table.up.sql","line":5}},
+        {"name":"usage_metric_updated","type":"bigint","nullable":true,"source":{"file":"0091_create_usage_table.up.sql","line":6}},
+        {"name":"usage_metric_bandwidth_out","type":"bigint","source":{"file":"0113_alter_usage_metrics_rename.up.sql","line":5}},
+        {"name":"usage_metric_storage_total","type":"bigint","source":{"file":"0113_alter_usage_metrics_rename.up.sql","line":11}},
+        {"name":"usage_metric_version","type":"bigint","source":{"file":"0091_create_usage_table.up.sql","line":9}},
+        {"name":"usage_metric_pushes","type":"integer","source":{"file":"0109_alter_usage_table_add_pushes.up.sql","line":2},"default":0},
+        {"name":"usage_metric_bandwidth_in","type":"bigint","source":{"file":"0113_alter_usage_metrics_rename.up.sql","line":8},"default":0},
+        {"name":"usage_metric_lfs_storage_total","type":"bigint","source":{"file":"0113_alter_usage_metrics_rename.up.sql","line":14},"default":0}
+      ],
+      "relations": [
+        {"foreignKey":"usage_metric_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0091_create_usage_table.up.sql","line":1}
+    },
+    {
+      "table": "generic_blobs",
+      "columns": [
+        {"name":"generic_blob_id","type":"uuid","primary":true,"source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":5},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"generic_blob_root_parent_id","type":"integer","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":6}},
+        {"name":"generic_blob_sha_1","type":"bytea","nullable":true,"source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":7}},
+        {"name":"generic_blob_sha_256","type":"bytea","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":8}},
+        {"name":"generic_blob_sha_512","type":"bytea","nullable":true,"source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":9}},
+        {"name":"generic_blob_md5","type":"bytea","nullable":true,"source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":10}},
+        {"name":"generic_blob_size","type":"bigint","source":{"file":"0123_alter_table_generic_blobs.up.sql","line":2}},
+        {"name":"generic_blob_created_at","type":"bigint","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":12}},
+        {"name":"generic_blob_created_by","type":"integer","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":13}}
+      ],
+      "relations": [],
+      "source": {"file":"0092_create_ar_file_manager_tables.up.sql","line":3},
+      "indexes": [
+        {"columns":["generic_blob_sha_256","generic_blob_root_parent_id"],"type":"unique","name":"unique_generic_blobs_sha_parent"},
+        {"columns":["generic_blob_sha_256"],"type":"index","name":"idx_generic_blobs_sha256"}
+      ]
+    },
+    {
+      "table": "nodes",
+      "columns": [
+        {"name":"node_id","type":"uuid","primary":true,"source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":21},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"node_name","type":"text","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":22}},
+        {"name":"node_parent_id","type":"uuid","nullable":true,"source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":23}},
+        {"name":"node_registry_id","type":"integer","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":24}},
+        {"name":"node_is_file","type":"boolean","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":25}},
+        {"name":"node_path","type":"text","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":26}},
+        {"name":"node_generic_blob_id","type":"uuid","nullable":true,"source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":27}},
+        {"name":"node_created_at","type":"bigint","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":28}},
+        {"name":"node_created_by","type":"integer","source":{"file":"0092_create_ar_file_manager_tables.up.sql","line":29}}
+      ],
+      "relations": [
+        {"foreignKey":"node_generic_blob_id","references":"generic_blob_id","on":"generic_blobs","type":"many-to-one"},
+        {"foreignKey":"node_parent_id","references":"node_id","on":"nodes","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"node_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0092_create_ar_file_manager_tables.up.sql","line":19},
+      "indexes": [
+        {"columns":["node_parent_id","node_name"],"type":"index","name":"idx_nodes_parent_name"},
+        {"columns":["node_registry_id"],"type":"index","name":"idx_nodes_registry"},
+        {"columns":["node_generic_blob_id"],"type":"index","name":"idx_nodes_blob"},
+        {"columns":["node_registry_id","node_path"],"type":"unique","name":"unique_nodes"}
+      ]
+    },
+    {
+      "table": "registry_webhooks",
+      "columns": [
+        {"name":"registry_webhook_id","type":"serial","primary":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":3},"autoIncrement":true},
+        {"name":"registry_webhook_version","type":"integer","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":4},"default":0},
+        {"name":"registry_webhook_created_by","type":"integer","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":5}},
+        {"name":"registry_webhook_created","type":"bigint","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":6}},
+        {"name":"registry_webhook_updated","type":"bigint","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":7}},
+        {"name":"registry_webhook_space_id","type":"integer","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":8}},
+        {"name":"registry_webhook_registry_id","type":"integer","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":9}},
+        {"name":"registry_webhook_name","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":10}},
+        {"name":"registry_webhook_description","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":11}},
+        {"name":"registry_webhook_url","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":12}},
+        {"name":"registry_webhook_secret_identifier","type":"text","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":13}},
+        {"name":"registry_webhook_secret_space_id","type":"integer","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":14}},
+        {"name":"registry_webhook_enabled","type":"boolean","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":15}},
+        {"name":"registry_webhook_insecure","type":"boolean","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":16}},
+        {"name":"registry_webhook_triggers","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":17}},
+        {"name":"registry_webhook_latest_execution_result","type":"text","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":18}},
+        {"name":"registry_webhook_scope","type":"integer","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":19},"default":0},
+        {"name":"registry_webhook_internal","type":"boolean","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":20}},
+        {"name":"registry_webhook_identifier","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":21}},
+        {"name":"registry_webhook_extra_headers","type":"text","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":22}}
+      ],
+      "relations": [
+        {"foreignKey":"registry_webhook_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"registry_webhook_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0098_create_registry_webhooks_tables.up.sql","line":1},
+      "indexes": [
+        {"columns":["registry_webhook_registry_id","registry_webhook_identifier"],"type":"unique","name":"registry_webhooks_registry_id_identifier"},
+        {"columns":["registry_webhook_space_id","registry_webhook_identifier"],"type":"unique","name":"registry_webhooks_space_id_identifier"}
+      ]
+    },
+    {
+      "table": "registry_webhook_executions",
+      "columns": [
+        {"name":"registry_webhook_execution_id","type":"serial","primary":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":44},"autoIncrement":true},
+        {"name":"registry_webhook_execution_retrigger_of","type":"integer","nullable":true,"source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":45}},
+        {"name":"registry_webhook_execution_retriggerable","type":"boolean","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":46}},
+        {"name":"registry_webhook_execution_webhook_id","type":"integer","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":47}},
+        {"name":"registry_webhook_execution_trigger_type","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":48}},
+        {"name":"registry_webhook_execution_trigger_id","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":49}},
+        {"name":"registry_webhook_execution_result","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":50}},
+        {"name":"registry_webhook_execution_created","type":"bigint","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":51}},
+        {"name":"registry_webhook_execution_duration","type":"bigint","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":52}},
+        {"name":"registry_webhook_execution_error","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":53}},
+        {"name":"registry_webhook_execution_request_url","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":54}},
+        {"name":"registry_webhook_execution_request_headers","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":55}},
+        {"name":"registry_webhook_execution_request_body","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":56}},
+        {"name":"registry_webhook_execution_response_status_code","type":"integer","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":57}},
+        {"name":"registry_webhook_execution_response_status","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":58}},
+        {"name":"registry_webhook_execution_response_headers","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":59}},
+        {"name":"registry_webhook_execution_response_body","type":"text","source":{"file":"0098_create_registry_webhooks_tables.up.sql","line":60}}
+      ],
+      "relations": [],
+      "source": {"file":"0098_create_registry_webhooks_tables.up.sql","line":42}
+    },
+    {
+      "table": "lfs_objects",
+      "columns": [
+        {"name":"lfs_object_id","type":"serial","primary":true,"source":{"file":"0103_create_table_lfs_objects.up.sql","line":2},"autoIncrement":true},
+        {"name":"lfs_object_oid","type":"text","source":{"file":"0103_create_table_lfs_objects.up.sql","line":3}},
+        {"name":"lfs_object_size","type":"bigint","source":{"file":"0103_create_table_lfs_objects.up.sql","line":4}},
+        {"name":"lfs_object_created","type":"bigint","source":{"file":"0103_create_table_lfs_objects.up.sql","line":5}},
+        {"name":"lfs_object_created_by","type":"integer","source":{"file":"0103_create_table_lfs_objects.up.sql","line":6}},
+        {"name":"lfs_object_repo_id","type":"integer","nullable":true,"source":{"file":"0103_create_table_lfs_objects.up.sql","line":7}}
+      ],
+      "relations": [
+        {"foreignKey":"lfs_object_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"set null","onUpdate":"no action"},
+        {"foreignKey":"lfs_object_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"}
+      ],
+      "source": {"file":"0103_create_table_lfs_objects.up.sql","line":1},
+      "indexes": [
+        {"columns":["lfs_object_repo_id","lfs_object_oid"],"type":"unique","name":"lfs_objects_oid"}
+      ]
+    },
+    {
+      "table": "package_tags",
+      "columns": [
+        {"name":"package_tag_id","type":"uuid","primary":true,"source":{"file":"0106_create_ar_package_tag_table.up.sql","line":4},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"package_tag_name","type":"text","source":{"file":"0106_create_ar_package_tag_table.up.sql","line":5}},
+        {"name":"package_tag_artifact_id","type":"bigint","nullable":true,"source":{"file":"0106_create_ar_package_tag_table.up.sql","line":6}},
+        {"name":"package_tag_created_at","type":"bigint","source":{"file":"0106_create_ar_package_tag_table.up.sql","line":7}},
+        {"name":"package_tag_created_by","type":"integer","source":{"file":"0106_create_ar_package_tag_table.up.sql","line":8}},
+        {"name":"package_tag_updated_at","type":"bigint","source":{"file":"0106_create_ar_package_tag_table.up.sql","line":9}},
+        {"name":"package_tag_updated_by","type":"integer","source":{"file":"0106_create_ar_package_tag_table.up.sql","line":10}}
+      ],
+      "relations": [
+        {"foreignKey":"package_tag_artifact_id","references":"artifact_id","on":"artifacts","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0106_create_ar_package_tag_table.up.sql","line":3},
+      "indexes": [
+        {"columns":["package_tag_name","package_tag_artifact_id"],"type":"unique","name":"unique_package_tag"}
+      ]
+    },
+    {
+      "table": "cde_gateways",
+      "columns": [
+        {"name":"cgate_id","type":"bigserial","primary":true,"source":{"file":"0110_create_table_cde_gateways.up.sql","line":3},"autoIncrement":true},
+        {"name":"cgate_name","type":"text","source":{"file":"0110_create_table_cde_gateways.up.sql","line":4}},
+        {"name":"cgate_group_name","type":"text","source":{"file":"0110_create_table_cde_gateways.up.sql","line":5}},
+        {"name":"cgate_region","type":"text","source":{"file":"0110_create_table_cde_gateways.up.sql","line":6}},
+        {"name":"cgate_zone","type":"text","source":{"file":"0110_create_table_cde_gateways.up.sql","line":7}},
+        {"name":"cgate_version","type":"text","source":{"file":"0110_create_table_cde_gateways.up.sql","line":8}},
+        {"name":"cgate_health","type":"text","source":{"file":"0110_create_table_cde_gateways.up.sql","line":9}},
+        {"name":"cgate_space_id","type":"bigint","source":{"file":"0110_create_table_cde_gateways.up.sql","line":10}},
+        {"name":"cgate_infra_provider_config_id","type":"bigint","source":{"file":"0110_create_table_cde_gateways.up.sql","line":11}},
+        {"name":"cgate_envoy_health","type":"text","source":{"file":"0110_create_table_cde_gateways.up.sql","line":12}},
+        {"name":"cgate_created","type":"bigint","source":{"file":"0110_create_table_cde_gateways.up.sql","line":13}},
+        {"name":"cgate_updated","type":"bigint","source":{"file":"0110_create_table_cde_gateways.up.sql","line":14}}
+      ],
+      "relations": [
+        {"foreignKey":"cgate_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"cgate_infra_provider_config_id","references":"ipconf_id","on":"infra_provider_configs","type":"many-to-one","onDelete":"no action","onUpdate":"no action"}
+      ],
+      "source": {"file":"0110_create_table_cde_gateways.up.sql","line":1},
+      "indexes": [
+        {"columns":["cgate_space_id","cgate_infra_provider_config_id","cgate_region","cgate_group_name","cgate_name"],"type":"unique","name":"cde_gateways_space_id_infra_config_id_region_group_name_name"}
+      ]
+    },
+    {
+      "table": "favorite_repos",
+      "columns": [
+        {"name":"favorite_principal_id","type":"integer","primary":true,"source":{"file":"0115_create_table_favorite_repos_up.sql","line":3}},
+        {"name":"favorite_repo_id","type":"integer","primary":true,"source":{"file":"0115_create_table_favorite_repos_up.sql","line":4}},
+        {"name":"favorite_created","type":"bigint","source":{"file":"0115_create_table_favorite_repos_up.sql","line":5}}
+      ],
+      "relations": [
+        {"foreignKey":"favorite_principal_id","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"favorite_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0115_create_table_favorite_repos_up.sql","line":1}
+    },
+    {
+      "table": "branches",
+      "columns": [
+        {"name":"branch_repo_id","type":"integer","primary":true,"source":{"file":"0116_create_table_branches.up.sql","line":2}},
+        {"name":"branch_name","type":"text","primary":true,"source":{"file":"0116_create_table_branches.up.sql","line":3}},
+        {"name":"branch_sha","type":"text","source":{"file":"0116_create_table_branches.up.sql","line":4}},
+        {"name":"branch_created_by","type":"integer","source":{"file":"0116_create_table_branches.up.sql","line":5}},
+        {"name":"branch_created","type":"bigint","source":{"file":"0116_create_table_branches.up.sql","line":6}},
+        {"name":"branch_updated_by","type":"integer","source":{"file":"0116_create_table_branches.up.sql","line":7}},
+        {"name":"branch_updated","type":"bigint","source":{"file":"0116_create_table_branches.up.sql","line":8}},
+        {"name":"branch_last_created_pullreq_id","type":"integer","nullable":true,"source":{"file":"0137_alter_branch_add_last_created_pullreq.up.sql","line":2},"default":null}
+      ],
+      "relations": [
+        {"foreignKey":"branch_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"branch_created_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"branch_updated_by","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"no action","onUpdate":"no action"},
+        {"foreignKey":"branch_last_created_pullreq_id","references":"pullreq_id","on":"pullreqs","type":"many-to-one","onDelete":"set null","onUpdate":"no action"}
+      ],
+      "source": {"file":"0116_create_table_branches.up.sql","line":1},
+      "indexes": [
+        {"columns":["branch_updated_by","branch_updated"],"type":"index","name":"idx_branches_updated_by_updated"}
+      ]
+    },
+    {
+      "table": "public_key_sub_keys",
+      "columns": [
+        {"name":"public_key_sub_key_public_key_id","type":"integer","primary":true,"source":{"file":"0117_create_table_public_key_sub_keys.up.sql","line":3}},
+        {"name":"public_key_sub_key_id","type":"text","primary":true,"source":{"file":"0117_create_table_public_key_sub_keys.up.sql","line":4}}
+      ],
+      "relations": [
+        {"foreignKey":"public_key_sub_key_public_key_id","references":"public_key_id","on":"public_keys","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0117_create_table_public_key_sub_keys.up.sql","line":1},
+      "indexes": [
+        {"columns":["public_key_sub_key_id"],"type":"index","name":"idx_public_key_sub_key_id"}
+      ]
+    },
+    {
+      "table": "registry_tasks",
+      "columns": [
+        {"name":"registry_task_key","type":"text","primary":true,"source":{"file":"0119_add_task_tracking.up.sql","line":4}},
+        {"name":"registry_task_kind","type":"text","source":{"file":"0119_add_task_tracking.up.sql","line":5}},
+        {"name":"registry_task_payload","type":"jsonb","nullable":true,"source":{"file":"0119_add_task_tracking.up.sql","line":6}},
+        {"name":"registry_task_status","type":"registry_task_status","source":{"file":"0119_add_task_tracking.up.sql","line":7},"default":"pending","values":["pending","processing","success","failure"]},
+        {"name":"registry_task_run_again","type":"boolean","source":{"file":"0119_add_task_tracking.up.sql","line":8},"default":false},
+        {"name":"registry_task_updated_at","type":"bigint","source":{"file":"0119_add_task_tracking.up.sql","line":9}}
+      ],
+      "relations": [],
+      "source": {"file":"0119_add_task_tracking.up.sql","line":3},
+      "indexes": [
+        {"columns":["registry_task_status"],"type":"index","name":"idx_registry_tasks_status"}
+      ]
+    },
+    {
+      "table": "registry_task_sources",
+      "columns": [
+        {"name":"registry_task_source_key","type":"text","primary":true,"source":{"file":"0119_add_task_tracking.up.sql","line":13}},
+        {"name":"registry_task_source_type","type":"text","primary":true,"source":{"file":"0119_add_task_tracking.up.sql","line":14}},
+        {"name":"registry_task_source_id","type":"text","primary":true,"source":{"file":"0119_add_task_tracking.up.sql","line":15}},
+        {"name":"registry_task_source_status","type":"registry_task_status","source":{"file":"0119_add_task_tracking.up.sql","line":16},"default":"pending","values":["pending","processing","success","failure"]},
+        {"name":"registry_task_source_run_id","type":"text","nullable":true,"source":{"file":"0119_add_task_tracking.up.sql","line":17}},
+        {"name":"registry_task_source_error","type":"text","nullable":true,"source":{"file":"0119_add_task_tracking.up.sql","line":18}},
+        {"name":"registry_task_source_updated_at","type":"bigint","source":{"file":"0119_add_task_tracking.up.sql","line":19}}
+      ],
+      "relations": [
+        {"foreignKey":"registry_task_source_key","references":"registry_task_key","on":"registry_tasks","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0119_add_task_tracking.up.sql","line":12},
+      "indexes": [
+        {"columns":["registry_task_source_run_id"],"type":"index","name":"idx_registry_task_sources_run_id"},
+        {"columns":["registry_task_source_status"],"type":"index","name":"idx_registry_task_sources_status"}
+      ]
+    },
+    {
+      "table": "registry_task_events",
+      "columns": [
+        {"name":"registry_task_event_id","type":"uuid","primary":true,"source":{"file":"0119_add_task_tracking.up.sql","line":24}},
+        {"name":"registry_task_event_key","type":"text","nullable":true,"source":{"file":"0119_add_task_tracking.up.sql","line":25}},
+        {"name":"registry_task_event_event","type":"text","nullable":true,"source":{"file":"0119_add_task_tracking.up.sql","line":26}},
+        {"name":"registry_task_event_payload","type":"jsonb","nullable":true,"source":{"file":"0119_add_task_tracking.up.sql","line":27}},
+        {"name":"registry_task_event_created_at","type":"bigint","source":{"file":"0119_add_task_tracking.up.sql","line":28}}
+      ],
+      "relations": [],
+      "source": {"file":"0119_add_task_tracking.up.sql","line":23}
+    },
+    {
+      "table": "git_signature_results",
+      "columns": [
+        {"name":"git_signature_result_repo_id","type":"integer","primary":true,"source":{"file":"0122_create_table_git_signature_results.up.sql","line":2}},
+        {"name":"git_signature_result_object_sha","type":"text","primary":true,"source":{"file":"0122_create_table_git_signature_results.up.sql","line":3}},
+        {"name":"git_signature_result_object_time","type":"bigint","source":{"file":"0122_create_table_git_signature_results.up.sql","line":4}},
+        {"name":"git_signature_result_created","type":"bigint","source":{"file":"0122_create_table_git_signature_results.up.sql","line":5}},
+        {"name":"git_signature_result_updated","type":"bigint","source":{"file":"0122_create_table_git_signature_results.up.sql","line":6}},
+        {"name":"git_signature_result_result","type":"text","source":{"file":"0122_create_table_git_signature_results.up.sql","line":7}},
+        {"name":"git_signature_result_principal_id","type":"integer","source":{"file":"0122_create_table_git_signature_results.up.sql","line":8}},
+        {"name":"git_signature_result_key_scheme","type":"text","source":{"file":"0122_create_table_git_signature_results.up.sql","line":9}},
+        {"name":"git_signature_result_key_id","type":"text","source":{"file":"0122_create_table_git_signature_results.up.sql","line":10}},
+        {"name":"git_signature_result_key_fingerprint","type":"text","source":{"file":"0122_create_table_git_signature_results.up.sql","line":11}}
+      ],
+      "relations": [
+        {"foreignKey":"git_signature_result_repo_id","references":"repo_id","on":"repositories","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"git_signature_result_principal_id","references":"principal_id","on":"principals","type":"many-to-one","onDelete":"set null","onUpdate":"no action"}
+      ],
+      "source": {"file":"0122_create_table_git_signature_results.up.sql","line":1},
+      "indexes": [
+        {"columns":["git_signature_result_principal_id"],"type":"index","name":"idx_git_signature_results_principal_id"}
+      ]
+    },
+    {
+      "table": "quarantined_paths",
+      "columns": [
+        {"name":"quarantined_path_id","type":"uuid","primary":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":7},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"quarantined_path_registry_id","type":"integer","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":8}},
+        {"name":"quarantined_path_image_id","type":"integer","nullable":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":9}},
+        {"name":"quarantined_path_artifact_id","type":"integer","nullable":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":10}},
+        {"name":"quarantined_path_node_id","type":"uuid","nullable":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":11}},
+        {"name":"quarantined_path_reason","type":"text","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":12}},
+        {"name":"quarantined_path_created_by","type":"integer","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":13}},
+        {"name":"quarantined_path_created_at","type":"bigint","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":14}}
+      ],
+      "relations": [
+        {"foreignKey":"quarantined_path_image_id","references":"image_id","on":"images","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"quarantined_path_artifact_id","references":"artifact_id","on":"artifacts","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"quarantined_path_node_id","references":"node_id","on":"nodes","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"quarantined_path_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":6},
+      "indexes": [
+        {"columns":["quarantined_path_registry_id","quarantined_path_image_id","quarantined_path_artifact_id","quarantined_path_node_id"],"type":"unique","name":"uq_quarantined_paths_composite"}
+      ]
+    },
+    {
+      "table": "quarantined_events",
+      "columns": [
+        {"name":"quarantined_path_id","type":"text","nullable":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":23}},
+        {"name":"rev_type","type":"integer","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":24}},
+        {"name":"quarantined_event_registry_id","type":"integer","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":25}},
+        {"name":"quarantined_event_image_id","type":"integer","nullable":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":26}},
+        {"name":"quarantined_event_artifact_id","type":"integer","nullable":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":27}},
+        {"name":"quarantined_event_node_id","type":"text","nullable":true,"source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":28}},
+        {"name":"quarantined_event_reason","type":"text","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":29}},
+        {"name":"quarantined_event_created_by","type":"integer","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":30}},
+        {"name":"quarantined_event_created_at","type":"bigint","source":{"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":31}}
+      ],
+      "relations": [
+        {"foreignKey":"quarantined_event_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0124_alter_table_quarantined_paths_node_id.up.sql","line":22}
+    },
+    {
+      "table": "gitspace_settings",
+      "columns": [
+        {"name":"gsett_id","type":"serial","primary":true,"source":{"file":"0126_create_table_gitspace_settings.up.sql","line":2},"autoIncrement":true},
+        {"name":"gsett_space_id","type":"bigint","source":{"file":"0126_create_table_gitspace_settings.up.sql","line":3}},
+        {"name":"gsett_settings_data","type":"jsonb","source":{"file":"0126_create_table_gitspace_settings.up.sql","line":4}},
+        {"name":"gsett_settings_type","type":"text","source":{"file":"0126_create_table_gitspace_settings.up.sql","line":5}},
+        {"name":"gsett_criteria_key","type":"text","source":{"file":"0126_create_table_gitspace_settings.up.sql","line":6}},
+        {"name":"gsett_created","type":"bigint","source":{"file":"0126_create_table_gitspace_settings.up.sql","line":7}},
+        {"name":"gsett_updated","type":"bigint","source":{"file":"0126_create_table_gitspace_settings.up.sql","line":8}}
+      ],
+      "relations": [],
+      "source": {"file":"0126_create_table_gitspace_settings.up.sql","line":1},
+      "indexes": [
+        {"columns":["gsett_space_id","gsett_settings_type","gsett_criteria_key"],"type":"unique"}
+      ]
+    },
+    {
+      "table": "entity_labels",
+      "columns": [
+        {"name":"entity_label_id","type":"uuid","primary":true,"source":{"file":"0131_create_table_entity_labels.up.sql","line":4},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"entity_label_label_id","type":"integer","source":{"file":"0131_create_table_entity_labels.up.sql","line":5}},
+        {"name":"entity_label_label_value_id","type":"integer","nullable":true,"source":{"file":"0131_create_table_entity_labels.up.sql","line":6},"default":null},
+        {"name":"entity_uuid","type":"uuid","source":{"file":"0131_create_table_entity_labels.up.sql","line":7}},
+        {"name":"entity_type","type":"text","source":{"file":"0131_create_table_entity_labels.up.sql","line":8}},
+        {"name":"entity_label_created_at","type":"bigint","source":{"file":"0131_create_table_entity_labels.up.sql","line":9}},
+        {"name":"entity_label_created_by","type":"integer","source":{"file":"0131_create_table_entity_labels.up.sql","line":10}},
+        {"name":"entity_label_updated_at","type":"bigint","source":{"file":"0131_create_table_entity_labels.up.sql","line":11}},
+        {"name":"entity_label_updated_by","type":"integer","source":{"file":"0131_create_table_entity_labels.up.sql","line":12}}
+      ],
+      "relations": [
+        {"foreignKey":"entity_label_label_id","references":"label_id","on":"labels","type":"many-to-one","onDelete":"cascade"},
+        {"foreignKey":"entity_label_label_value_id","references":"label_value_id","on":"label_values","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0131_create_table_entity_labels.up.sql","line":3},
+      "indexes": [
+        {"columns":["entity_label_label_id","entity_uuid","entity_type"],"type":"unique","name":"unique_entity_labels"},
+        {"columns":["entity_uuid","entity_type"],"type":"index","name":"idx_entity_labels_uuid_type"},
+        {"columns":["entity_label_label_value_id"],"type":"index","name":"idx_entity_labels_label_value_id"}
+      ]
+    },
+    {
+      "table": "registry_policies",
+      "columns": [
+        {"name":"registry_policy_id","type":"uuid","primary":true,"source":{"file":"0138_create_table_registry_policies.up.sql","line":2},"defaultRaw":"uuid_generate_v4()"},
+        {"name":"registry_policy_registry_id","type":"integer","source":{"file":"0138_create_table_registry_policies.up.sql","line":3}},
+        {"name":"registry_policy_policy_ref","type":"text","source":{"file":"0138_create_table_registry_policies.up.sql","line":4}},
+        {"name":"registry_policy_created_at","type":"bigint","source":{"file":"0138_create_table_registry_policies.up.sql","line":5}},
+        {"name":"registry_policy_created_by","type":"bigint","source":{"file":"0138_create_table_registry_policies.up.sql","line":6}}
+      ],
+      "relations": [
+        {"foreignKey":"registry_policy_registry_id","references":"registry_id","on":"registries","type":"many-to-one","onDelete":"cascade"}
+      ],
+      "source": {"file":"0138_create_table_registry_policies.up.sql","line":1},
+      "indexes": [
+        {"columns":["registry_policy_registry_id","registry_policy_policy_ref"],"type":"unique","name":"uq_registry_policies_registry_policy"}
+      ]
+    },
+    {
+      "table": "public_access_registry",
+      "columns": [
+        {"name":"public_access_registry_id","type":"integer","primary":true,"source":{"file":"0144_create_table_public_access_registry.up.sql","line":2}}
+      ],
+      "relations": [
+        {"foreignKey":"public_access_registry_id","references":"registry_id","on":"registries","type":"one-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0144_create_table_public_access_registry.up.sql","line":1}
+    },
+    {
+      "table": "ai_tasks",
+      "columns": [
+        {"name":"aitask_id","type":"serial","primary":true,"source":{"file":"0147_create_table_ai_task.up.sql","line":2},"autoIncrement":true},
+        {"name":"aitask_uid","type":"text","source":{"file":"0147_create_table_ai_task.up.sql","line":3}},
+        {"name":"aitask_gitspace_config_id","type":"integer","source":{"file":"0147_create_table_ai_task.up.sql","line":4}},
+        {"name":"aitask_gitspace_instance_id","type":"integer","nullable":true,"source":{"file":"0147_create_table_ai_task.up.sql","line":5}},
+        {"name":"aitask_initial_prompt","type":"text","source":{"file":"0147_create_table_ai_task.up.sql","line":6}},
+        {"name":"aitask_display_name","type":"text","source":{"file":"0147_create_table_ai_task.up.sql","line":7}},
+        {"name":"aitask_user_uid","type":"text","source":{"file":"0147_create_table_ai_task.up.sql","line":8}},
+        {"name":"aitask_space_id","type":"integer","source":{"file":"0147_create_table_ai_task.up.sql","line":9}},
+        {"name":"aitask_created","type":"bigint","source":{"file":"0147_create_table_ai_task.up.sql","line":10}},
+        {"name":"aitask_updated","type":"bigint","source":{"file":"0147_create_table_ai_task.up.sql","line":11}},
+        {"name":"aitask_api_url","type":"text","nullable":true,"source":{"file":"0147_create_table_ai_task.up.sql","line":12}},
+        {"name":"aitask_ai_agent","type":"text","source":{"file":"0147_create_table_ai_task.up.sql","line":13}},
+        {"name":"aitask_state","type":"text","source":{"file":"0147_create_table_ai_task.up.sql","line":14}},
+        {"name":"aitask_output","type":"text","nullable":true,"source":{"file":"0148_alter_table_ai_task_add_output.up.sql","line":1}},
+        {"name":"aitask_error_message","type":"text","nullable":true,"source":{"file":"0151_alter_table_ai_task_add_error_message_output_metadata.up.sql","line":1}},
+        {"name":"aitask_output_metadata","type":"jsonb","nullable":true,"source":{"file":"0151_alter_table_ai_task_add_error_message_output_metadata.up.sql","line":2}}
+      ],
+      "relations": [
+        {"foreignKey":"aitask_gitspace_config_id","references":"gconf_id","on":"gitspace_configs","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"aitask_gitspace_instance_id","references":"gits_id","on":"gitspaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"},
+        {"foreignKey":"aitask_space_id","references":"space_id","on":"spaces","type":"many-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0147_create_table_ai_task.up.sql","line":1},
+      "indexes": [
+        {"columns":["aitask_uid","aitask_space_id"],"type":"unique"},
+        {"columns":["aitask_uid","aitask_space_id"],"type":"unique","name":"ai_tasks_uid_space_id"}
+      ]
+    },
+    {
+      "table": "linked_repositories",
+      "columns": [
+        {"name":"linked_repo_id","type":"integer","primary":true,"source":{"file":"0154_create_linked_repositories.up.sql","line":4}},
+        {"name":"linked_repo_version","type":"integer","source":{"file":"0154_create_linked_repositories.up.sql","line":5}},
+        {"name":"linked_repo_created","type":"bigint","source":{"file":"0154_create_linked_repositories.up.sql","line":6}},
+        {"name":"linked_repo_updated","type":"bigint","source":{"file":"0154_create_linked_repositories.up.sql","line":7}},
+        {"name":"linked_repo_last_full_sync","type":"bigint","source":{"file":"0154_create_linked_repositories.up.sql","line":8}},
+        {"name":"linked_repo_connector_path","type":"text","source":{"file":"0154_create_linked_repositories.up.sql","line":9}},
+        {"name":"linked_repo_connector_identifier","type":"text","source":{"file":"0154_create_linked_repositories.up.sql","line":10}},
+        {"name":"linked_repo_connector_repo","type":"text","source":{"file":"0154_create_linked_repositories.up.sql","line":11}}
+      ],
+      "relations": [
+        {"foreignKey":"linked_repo_id","references":"repo_id","on":"repositories","type":"one-to-one","onDelete":"cascade","onUpdate":"no action"}
+      ],
+      "source": {"file":"0154_create_linked_repositories.up.sql","line":3}
+    }
+  ],
+  "warnings": ["0000_alter_table_migrations.up.sql:2: ALTER TABLE migrations on a table that no file creates: table added."]
+}

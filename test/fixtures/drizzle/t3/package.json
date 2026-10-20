@@ -1,0 +1,9 @@
+{
+  "name": "t3-app",
+  "dependencies": {
+    "drizzle-orm": "^0.41.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.30.5"
+  }
+}

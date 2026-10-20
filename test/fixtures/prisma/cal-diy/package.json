@@ -1,0 +1,8 @@
+{
+  "name": "@calcom/prisma",
+  "private": true,
+  "dependencies": {
+    "@prisma/client": "6.16.1",
+    "prisma": "6.16.1"
+  }
+}

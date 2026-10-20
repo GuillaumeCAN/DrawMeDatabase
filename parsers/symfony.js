@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
 const { createStatusReader, tableStatus } = require('./git');
+const { composerPackages } = require('./composer');
 const {
     skipLiteral,
     stripComments,
@@ -793,6 +794,97 @@ function assignDetails(column, details) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Parser contract (docs/parsers.md)
+
+module.exports.id = 'symfony';
+module.exports.label = 'Symfony';
+
+// For bin/console: 100 with symfony/framework-bundle in the "require" of composer.json, 80 with
+// another symfony/* package except the polyfills (they are pulled by many non-Symfony projects)
+// (ParserError: invalid composer.json)
+module.exports.detect = function (basePath) {
+    const packages = composerPackages(basePath);
+    if (!isFile(path.join(basePath, 'bin', 'console'))) {
+        return 0;
+    }
+    if (packages.includes('symfony/framework-bundle')) {
+        return 100;
+    }
+    return packages.some(name => name.startsWith('symfony/') && !name.startsWith('symfony/polyfill-')) ? 80 : 0;
+};
+
+// The files read: the PHP files of src/Entity and its sub-folders
+function sources(basePath) {
+    return {
+        folders: [{ path: path.resolve(basePath, 'src', 'Entity'), recursive: true }],
+        files: [],
+        extensions: ['.php'],
+    };
+}
+module.exports.sources = sources;
+
+// The databases of the schemes of a Doctrine DATABASE_URL, and of the drivers of doctrine.yaml
+const URL_SCHEMES = new Map([
+    ['postgresql', 'postgresql'], ['postgres', 'postgresql'], ['pgsql', 'postgresql'], ['pdo-pgsql', 'postgresql'],
+    ['mysql', 'mysql'], ['mysql2', 'mysql'], ['mysqli', 'mysql'], ['pdo-mysql', 'mysql'], ['mariadb', 'mariadb'],
+    ['sqlite', 'sqlite'], ['sqlite3', 'sqlite'], ['pdo-sqlite', 'sqlite'],
+    ['sqlsrv', 'sqlserver'], ['mssql', 'sqlserver'], ['pdo-sqlsrv', 'sqlserver'],
+]);
+const DOCTRINE_DRIVERS = new Map([['pdo_pgsql', 'postgresql'], ['pgsql', 'postgresql'], ['pdo_mysql', 'mysql'], ['mysqli', 'mysql'], ['pdo_sqlite', 'sqlite'], ['sqlite3', 'sqlite'], ['pdo_sqlsrv', 'sqlserver'], ['sqlsrv', 'sqlserver']]);
+
+// The last value of a variable in a .env file (the commented lines left out), or undefined
+function envValue(text, name) {
+    let value;
+    for (const match of text.matchAll(new RegExp(`^[ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=[ \\t]*(?:"([^"\\n]*)"|'([^'\\n]*)'|([^\\s#]*))`, 'gm'))) {
+        value = match[1] !== undefined ? match[1] : match[2] !== undefined ? match[2] : match[3];
+    }
+    return value;
+}
+
+// The database of the application (docs/api.md): the scheme of DATABASE_URL in the .env files, as
+// Symfony's Dotenv::loadEnv() reads them (the last one wins: .env, or .env.dist without it, then
+// .env.local, except in the test environment, then .env.<APP_ENV> and .env.<APP_ENV>.local, APP_ENV
+// read from .env, then from .env.local), MariaDB told by its serverVersion; else the driver (and
+// server_version) of config/packages/doctrine.yaml; null when they do not tell (a URL set by the
+// environment)
+module.exports.dialect = function (basePath) {
+    if (typeof basePath !== 'string') {
+        return null;
+    }
+    const read = (...file) => {
+        try {
+            return fs.readFileSync(path.join(basePath, ...file), 'utf8');
+        } catch {
+            return '';
+        }
+    };
+    const mariadb = (text) => /mariadb/i.test(text);
+    const base = !isFile(path.join(basePath, '.env')) && isFile(path.join(basePath, '.env.dist')) ? '.env.dist' : '.env';
+    let appEnv = envValue(read(base), 'APP_ENV') || 'dev';
+    const loaded = [base];
+    if (appEnv !== 'test') {
+        loaded.push('.env.local');
+        appEnv = envValue(read('.env.local'), 'APP_ENV') || appEnv;
+    }
+    if (appEnv !== 'local' && /^[\w-]+$/.test(appEnv)) {
+        loaded.push(`.env.${appEnv}`, `.env.${appEnv}.local`);
+    }
+    for (const file of loaded.reverse()) {
+        const url = envValue(read(file), 'DATABASE_URL');
+        if (url !== undefined) {
+            const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(url);
+            const dialect = scheme ? URL_SCHEMES.get(scheme[1].toLowerCase()) || null : null;
+            return dialect === 'mysql' && /[?&]serverVersion=[^&]*mariadb/i.test(url) ? 'mariadb' : dialect;
+        }
+    }
+    const doctrine = read('config', 'packages', 'doctrine.yaml').replace(/#.*$/gm, '');
+    const driver = /^[ \t]+driver[ \t]*:[ \t]*["']?(\w+)/m.exec(doctrine);
+    const dialect = driver ? DOCTRINE_DRIVERS.get(driver[1].toLowerCase()) || null : null;
+    const version = /^[ \t]+server_version[ \t]*:[ \t]*["']?([^"'\n]+)/m.exec(doctrine);
+    return dialect === 'mysql' && version && mariadb(version[1]) ? 'mariadb' : dialect;
+};
+
+// ---------------------------------------------------------------------------------------------
 // Tables
 
 // Returns { tables, warnings }. Options:
@@ -964,7 +1056,7 @@ module.exports.parse = function (basePath, options = {}) {
     }
 
     // Git status (and unsaved changes) of lines of the file declaring `cls`, null when unknown
-    const reader = createStatusReader(entityDir, { git: options.git !== false, overrides: options.overrides, cache: options.gitCache });
+    const reader = createStatusReader(sources(basePath), { git: options.git !== false, overrides: options.overrides, cache: options.gitCache });
     if (reader.warning) {
         warnings.push(reader.warning);
     }

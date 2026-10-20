@@ -167,6 +167,26 @@ suite('DrawMeDatabase extension', () => {
         assert.equal(await settledTabCount(), 1);
     });
 
+    test('the parsers: the stacks of the API, their sources, and the DrawMeDatabase.framework setting', () => {
+        const api = vscode.extensions.getExtension(EXTENSION_ID).exports;
+        assert.equal(api.apiVersion, 4);
+        assert.deepEqual(api.getFrameworks(), [{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }, { id: 'drizzle', label: 'Drizzle' }, { id: 'sql', label: 'SQL' }]);
+        const schema = api.getSchema();
+        assert.equal(schema.framework, 'laravel');
+        assert.deepEqual(api.getSources(schema.basePath, schema.framework),
+            { folders: [{ path: path.join(schema.basePath, 'database', 'migrations'), recursive: false }], files: [], extensions: ['.php'] });
+        // Version 4: the migrations in the order of php artisan migrate; no connection, no dialect
+        assert.deepEqual(api.getMigrations(schema.basePath, schema.framework).migrations.map(migration => [migration.id, migration.time]), [
+            ['2024_01_01_000000_create_users_table.php', Date.UTC(2024, 0, 1) / 1000],
+            ['2024_01_02_000000_create_posts_table.php', Date.UTC(2024, 0, 2) / 1000],
+        ]);
+        assert.equal(schema.dialect, null);
+        // VS Code knows the setting, per workspace folder
+        const setting = vscode.workspace.getConfiguration('DrawMeDatabase', vscode.workspace.workspaceFolders[0].uri).inspect('framework');
+        assert.equal(setting.defaultValue, 'auto');
+        assert.equal(setting.workspaceFolderValue, undefined);
+    });
+
     test('a new migration refreshes the open diagram (DrawMeDatabase.autoRefresh)', async function () {
         this.timeout(60000);
         const extension = vscode.extensions.getExtension(EXTENSION_ID);

@@ -1,0 +1,134 @@
+// Hand-made edge cases of the Prisma parser of DrawMeDatabase. The tables, columns, keys,
+// indexes and defaults were checked with `prisma migrate diff --from-empty --script` (7.10.1).
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated"
+  previewFeatures = ["views"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Users: table and column names, scalar types, native types, lists, defaults
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique @db.VarChar(255)
+  name      String?  @map("display_name")
+  role      Role     @default(ADMIN)
+  roles     Role[]
+  tags      String[] @default([])
+  balance   Decimal  @default(0.5) @db.Decimal(12, 2)
+  big       BigInt   @default(9007199254740993)
+  ratio     Float    @default(-1.5)
+  active    Boolean  @default(true)
+  settings  Json     @default("{\"theme\": \"dark\"}")
+  avatar    Bytes?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  location  Unsupported("\"public\".geography")?
+  legacy    Int?     @ignore // still a column of the database
+  // Relations: no columns, the foreign keys are on the other side
+  profile   Profile?
+  posts     Post[]   @relation("author")
+  edited    Post[]   @relation("editor")
+  managerId Int?     @map("manager_id")
+  manager   User?    @relation("team", fields: [managerId], references: [id])
+  reports   User[]   @relation("team")
+  followers User[]   @relation("follows")
+  following User[]   @relation("follows")
+  groups    Group[]
+
+  @@index([name, createdAt(sort: Desc)])
+  @@map("users")
+}
+
+model Profile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId Int    @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio    String @default("it's \"quoted\" // not a comment") @db.Text
+}
+
+model Post {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug        String
+  authorId    Int
+  author      User    @relation("author", fields: [authorId], references: [id])
+  editorId    Int?
+  editor      User?   @relation("editor", fields: [editorId], references: [id], onDelete: NoAction, onUpdate: Restrict)
+  successorId String? @unique @db.Uuid
+  successor   Post?   @relation("history", fields: [successorId], references: [id])
+  predecessor Post?   @relation("history")
+  tags        Tag[]
+  status      Status  @default(DRAFT)
+
+  @@unique([authorId, slug], map: "post_author_slug")
+}
+
+model Tag {
+  name  String @id
+  code  String
+  posts Post[]
+
+  @@unique([code])
+}
+
+model Group {
+  id    Int    @id
+  users User[]
+}
+
+/* Composite primary key, composite foreign keys, and a one-to-one on a composite unique */
+model Order {
+  tenantId Int
+  number   Int
+  lines    OrderLine[]
+  invoice  Invoice?
+
+  @@id([tenantId, number])
+}
+
+model OrderLine {
+  id          Int   @id
+  orderTenant Int
+  orderNumber Int
+  order       Order @relation(fields: [orderTenant, orderNumber], references: [tenantId, number], onDelete: Cascade)
+
+  @@index(orderTenant)
+}
+
+model Invoice {
+  id          Int   @id
+  orderTenant Int
+  orderNumber Int
+  order       Order @relation(fields: [orderTenant, orderNumber], references: [tenantId, number])
+
+  @@unique([orderTenant, orderNumber])
+}
+
+// Ignored by Prisma Client, created in the database all the same
+model AuditLog {
+  id      Int  @id
+  payload Json
+
+  @@ignore
+}
+
+enum Role {
+  MEMBER
+  ADMIN  @map("admin")
+
+  @@map("user_role")
+}
+
+enum Status {
+  DRAFT
+  PUBLISHED
+}
+
+view UserStats {
+  id    Int @unique
+  posts Int
+}

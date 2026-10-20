@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const exporters = require('../../views/exporters');
 
 const SOURCE = 'erDiagram\n  users\n';
-const PROJECT = { name: 'blog-app', framework: 'laravel' };
+const PROJECT = { name: 'blog-app', framework: 'laravel', frameworkLabel: 'Laravel' };
 
 test('the Mermaid file has the title and the layout in its front matter', () => {
     assert.equal(exporters.mermaidFile(SOURCE, { project: PROJECT, layout: 'elk' }),
