@@ -20,6 +20,13 @@
 
     const DIRECTIONS = ['TB', 'BT', 'LR', 'RL'];
 
+    // Git status of the tables (CSS classes of their node) and of the columns (attribute comment)
+    const GIT_CLASSES = { untracked: 'gitNew', modified: 'gitModified', unsaved: 'gitUnsaved' };
+    const GIT_LABELS = { untracked: 'new', modified: 'modified', unsaved: 'unsaved' };
+    const DOT = String.fromCharCode(0x25cf);
+    const gitLabel = (status) => `${DOT} ${GIT_LABELS[status]}`;
+    const gitStatus = (value) => (Object.prototype.hasOwnProperty.call(GIT_LABELS, value) ? value : null);
+
     // Words the erDiagram lexer reads as keywords, so they cannot be entity ids (compared in
     // lower case). Ids are only used as is when they are plain ASCII words outside this list.
     const RESERVED_IDS = new Set([
@@ -89,7 +96,7 @@
             }
             const name = asText(table.table);
             if (!merged.has(name)) {
-                merged.set(name, { name, columns: [], relations: [] });
+                merged.set(name, { name, columns: [], relations: [], git: gitStatus(table.git) });
             }
             const entry = merged.get(name);
             asArray(table.columns).forEach(column => {
@@ -133,7 +140,8 @@
     }
 
     // The diagram and its entities: { source, entities: [{ id, table, declared }] }. Options:
-    // direction ('TB', 'LR'...), highlight (table names drawn as matches, the others dimmed).
+    // direction ('TB', 'LR'...), highlight (table names drawn as matches, the others dimmed),
+    // git (true: the tables get the class of their git status, uncommitted columns a comment).
     function buildDiagram(tables, options) {
         const settings = options || {};
         const merged = mergeTables(tables);
@@ -179,7 +187,9 @@
                     keys.push('FK');
                 }
                 const attribute = `${typeWord(column.type, column.nullable === true)} ${attributeWord(column.name, 'unnamed')}`;
-                lines.push(`    ${keys.length ? `${attribute} ${keys.join(', ')}` : attribute}`);
+                const status = settings.git ? gitStatus(column.git) : null;
+                const comment = status ? ` "${gitLabel(status)}"` : '';
+                lines.push(`    ${keys.length ? `${attribute} ${keys.join(', ')}` : attribute}${comment}`);
             });
             lines.push('  }');
         });
@@ -217,6 +227,15 @@
             }
         }
 
+        if (settings.git) {
+            for (const [status, className] of Object.entries(GIT_CLASSES)) {
+                const changed = entries.filter(entry => entry.git === status).map(entry => entityId(entry.name));
+                if (changed.length > 0) {
+                    lines.push(`  class ${changed.join(',')} ${className}`);
+                }
+            }
+        }
+
         return {
             source: lines.join('\n') + '\n',
             entities: names.map(name => ({ id: entityId(name), table: name, declared: merged.has(name) })),
@@ -227,7 +246,7 @@
         return buildDiagram(tables, options).source;
     }
 
-    const api = { generateMermaidER, buildDiagram };
+    const api = { generateMermaidER, buildDiagram, gitLabel, GIT_CLASSES };
     if (typeof module === 'object' && module.exports) {
         module.exports = api;
     } else {

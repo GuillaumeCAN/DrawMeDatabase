@@ -128,7 +128,11 @@
                 return;
             }
             drag = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: view.x, y: view.y, moved: false };
-            viewport.setPointerCapture(event.pointerId);
+            try {
+                viewport.setPointerCapture(event.pointerId);
+            } catch {
+                // No active pointer (synthetic event): the drag still works inside the viewport
+            }
         });
         viewport.addEventListener('pointermove', event => {
             if (!drag || drag.id !== event.pointerId) {

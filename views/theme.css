@@ -1,5 +1,9 @@
 /* Colors come from the VS Code theme (light, dark and high contrast) */
 :root {
+    /* Git status, like the git decorations of the explorer; unsaved like an editor being edited */
+    --dmdb-git-new: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+    --dmdb-git-modified: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+    --dmdb-git-unsaved: var(--vscode-editorInfo-foreground, #3794ff);
     --dmdb-border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
     --dmdb-hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
     --dmdb-active: var(--vscode-toolbar-activeBackground, rgba(128, 128, 128, 0.3));
@@ -391,10 +395,72 @@ main {
     opacity: 0.55;
 }
 
-.stage .node.match rect,
-.stage .node.match path {
+/* Outline of the table only (not the lines of the rows) */
+.stage .node.match .outer-path path {
     stroke: var(--vscode-focusBorder) !important;
     stroke-width: 2px !important;
+}
+
+/* Git status: outline and tinted header of the tables (the rows cover the rest of the outline),
+   comment of the columns */
+.stage .node.gitNew .outer-path path {
+    stroke: var(--dmdb-git-new) !important;
+    stroke-width: 2px !important;
+    fill: color-mix(in srgb, var(--dmdb-git-new) 28%, var(--vscode-editorWidget-background, transparent)) !important;
+}
+
+.stage .node.gitModified .outer-path path {
+    stroke: var(--dmdb-git-modified) !important;
+    stroke-width: 2px !important;
+    fill: color-mix(in srgb, var(--dmdb-git-modified) 28%, var(--vscode-editorWidget-background, transparent)) !important;
+}
+
+.stage .node.gitUnsaved .outer-path path {
+    stroke: var(--dmdb-git-unsaved) !important;
+    stroke-width: 2px !important;
+    stroke-dasharray: 6 3;
+    fill: color-mix(in srgb, var(--dmdb-git-unsaved) 28%, var(--vscode-editorWidget-background, transparent)) !important;
+}
+
+.stage text.git-untracked,
+.legend .git-untracked::before {
+    fill: var(--dmdb-git-new) !important;
+    color: var(--dmdb-git-new);
+}
+
+.stage text.git-modified,
+.legend .git-modified::before {
+    fill: var(--dmdb-git-modified) !important;
+    color: var(--dmdb-git-modified);
+}
+
+.stage text.git-unsaved,
+.legend .git-unsaved::before {
+    fill: var(--dmdb-git-unsaved) !important;
+    color: var(--dmdb-git-unsaved);
+}
+
+#git-button[aria-pressed="false"] {
+    opacity: 0.5;
+}
+
+.legend {
+    position: absolute;
+    left: 12px;
+    bottom: 8px;
+    display: flex;
+    gap: 12px;
+    padding: 4px 10px;
+    border: 1px solid var(--dmdb-border);
+    border-radius: 4px;
+    background-color: var(--vscode-editorWidget-background);
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+}
+
+.legend-item::before {
+    content: '\25CF';
+    margin-right: 4px;
 }
 
 /* Tables with a source file: a click opens it */
@@ -402,8 +468,7 @@ main {
     cursor: pointer;
 }
 
-.stage .node.openable:hover rect,
-.stage .node.openable:hover path {
+.stage .node.openable:hover .outer-path path {
     stroke: var(--vscode-focusBorder) !important;
 }
 

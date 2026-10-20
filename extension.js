@@ -26,6 +26,7 @@ const FRAMEWORK_LABELS = { laravel: 'Laravel', symfony: 'Symfony' };
 const SETTINGS = {
     layout: ['elk', 'dagre'],
     direction: ['TB', 'LR'],
+    showGitStatus: [true, false],
 };
 
 // Files the panel can export
@@ -54,15 +55,26 @@ function activate(context) {
     let lastFolder;
     // The schema on screen: its folder, framework root and tables (source files of the tables)
     let current = null;
+    // git status by folder, kept while only unsaved editors change (see parsers/git.js)
+    const gitCache = new Map();
 
     // Parses the schema of the folder and shows it: returns the parsed tables. auto: refresh
     // after a change of the code, without messages and without closing the panel on an error
     // (the code may be in the middle of an edit), nor bringing the panel to the front.
     const draw = (folder, { auto = false } = {}) => {
         let schema;
+        if (!auto) {
+            gitCache.clear();
+        }
         if (folder) {
             lastFolder = folder;
-            schema = readSchema(folder, output, { notify: !auto });
+            schema = readSchema(folder, output, {
+                notify: !auto,
+                // What the developer sees: the text of the editors not saved yet
+                overrides: unsavedEditors(),
+                gitCache,
+                git: vscode.workspace.getConfiguration('DrawMeDatabase').get('showGitStatus', true) !== false,
+            });
         } else if (!auto) {
             vscode.window.showErrorMessage("No project opened in the current workspace. Unable to draw the schema.");
         }
@@ -122,13 +134,46 @@ function activate(context) {
         });
     };
 
-    // Refreshes the open diagram after the migrations or entities change
-    const watcher = createWatcher(() => {
+    // Refreshes the open diagram after the migrations or entities change: on disk (and in git,
+    // after a commit or a checkout) the git status is read again, while typing it is not
+    const watcher = createWatcher(({ disk }) => {
+        if (disk) {
+            gitCache.clear();
+        }
         if (current && viewer.isOpen()) {
             draw(current.folder, { auto: true });
         }
     });
     context.subscriptions.push(watcher);
+
+    // Text of the unsaved editors of the watched migrations or entities (absolute path → text)
+    const unsavedEditors = () => {
+        const overrides = new Map();
+        for (const document of vscode.workspace.textDocuments) {
+            if (document.isDirty && document.uri.scheme === 'file' && watcher.covers(document.uri.fsPath)) {
+                overrides.set(path.resolve(document.uri.fsPath), document.getText());
+            }
+        }
+        return overrides;
+    };
+
+    // Live diagram: an edit of a migration or an entity, before it is saved
+    const onEditor = (document, disk) => {
+        if (document.uri.scheme === 'file' && watcher.covers(document.uri.fsPath)) {
+            watcher.schedule({ disk });
+        }
+    };
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument(event => {
+            if (event.contentChanges.length > 0) {
+                onEditor(event.document, false);
+            }
+        }),
+        // A save may change the git status; closing an unsaved editor drops its changes
+        vscode.workspace.onDidSaveTextDocument(document => onEditor(document, true)),
+        vscode.workspace.onDidCloseTextDocument(document => onEditor(document, false)),
+        watchGitRepositories(() => watcher.schedule({ disk: true })),
+    );
 
     const viewer = createViewer(context, output, {
         refresh: () => draw(getWorkspaceFolder(lastFolder)),
@@ -166,9 +211,13 @@ function activate(context) {
             if (event.affectsConfiguration('DrawMeDatabase.autoRefresh')) {
                 watcher.watch(current);
             }
+            // The git status is read again when it is shown again
+            if (event.affectsConfiguration('DrawMeDatabase.showGitStatus')) {
+                watcher.schedule({ disk: true });
+            }
             // Another framework folder: draw it (after a pause, the setting may be typed)
             if (event.affectsConfiguration('DrawMeDatabase.frameworkPath')) {
-                watcher.schedule();
+                watcher.schedule({ disk: true });
             }
         }),
     );
@@ -183,8 +232,8 @@ function activate(context) {
 
 // Detects the framework and parses the schema: returns { tables, warnings (count), framework,
 // basePath }, or undefined after an error (already shown to the user). notify: false writes the
-// messages to the output only (automatic refresh).
-function readSchema(folder, output, { notify = true } = {}) {
+// messages to the output only (automatic refresh); overrides, gitCache and git go to the parser.
+function readSchema(folder, output, { notify = true, overrides = null, gitCache = null, git = true } = {}) {
     const tell = (show, text, ...items) => (notify ? show(text, ...items) : output.appendLine(text));
     const showError = (text) => tell(vscode.window.showErrorMessage, text);
 
@@ -214,7 +263,7 @@ function readSchema(folder, output, { notify = true } = {}) {
         }
 
         // Parsing
-        result = PARSERS[framework]().parse(basePath);
+        result = PARSERS[framework]().parse(basePath, { overrides, gitCache, git });
     } catch (err) {
         if (err instanceof ParserError) {
             output.appendLine(`Error: ${err.message}`);
@@ -298,15 +347,27 @@ function reportWarnings(output, count) {
 }
 
 // Watches the migrations (Laravel) or the entities (Symfony) of the schema on screen, while
-// DrawMeDatabase.autoRefresh is on: onChange runs once the changes pause for half a second
+// DrawMeDatabase.autoRefresh is on. onChange({ disk }) runs once the changes pause: 300 ms after
+// an edit in an editor, 500 ms after a change on disk (disk: true, the git status may change too).
 function createWatcher(onChange) {
     let watcher;
     let watched = '';
+    let folder = '';
+    let framework = '';
     let timer;
+    let disk = false;
 
-    const schedule = () => {
+    const schedule = ({ disk: changedOnDisk = true } = {}) => {
+        if (!watched) {
+            return;
+        }
         clearTimeout(timer);
-        timer = setTimeout(onChange, 500);
+        disk = disk || changedOnDisk;
+        timer = setTimeout(() => {
+            const reason = { disk };
+            disk = false;
+            onChange(reason);
+        }, disk ? 500 : 300);
     };
 
     const stop = () => {
@@ -316,14 +377,15 @@ function createWatcher(onChange) {
         }
         watcher = undefined;
         watched = '';
+        disk = false;
     };
 
     return {
-        watch({ basePath, framework }) {
+        watch({ basePath, framework: newFramework }) {
             const enabled = vscode.workspace.getConfiguration('DrawMeDatabase').get('autoRefresh', true) !== false;
-            const folder = framework === 'laravel' ? path.join(basePath, 'database', 'migrations')
-                : framework === 'symfony' ? path.join(basePath, 'src', 'Entity') : '';
-            const target = enabled && folder ? `${framework}:${folder}` : '';
+            const newFolder = newFramework === 'laravel' ? path.join(basePath, 'database', 'migrations')
+                : newFramework === 'symfony' ? path.join(basePath, 'src', 'Entity') : '';
+            const target = enabled && newFolder ? `${newFramework}:${newFolder}` : '';
             if (target === watched) {
                 return;
             }
@@ -332,16 +394,51 @@ function createWatcher(onChange) {
                 return;
             }
             watched = target;
+            folder = path.resolve(newFolder);
+            framework = newFramework;
             // Laravel reads the files of database/migrations only, Symfony its sub-folders too
             watcher = vscode.workspace.createFileSystemWatcher(
-                new vscode.RelativePattern(vscode.Uri.file(folder), framework === 'laravel' ? '*.php' : '**/*.php'));
-            watcher.onDidChange(schedule);
-            watcher.onDidCreate(schedule);
-            watcher.onDidDelete(schedule);
+                new vscode.RelativePattern(vscode.Uri.file(newFolder), framework === 'laravel' ? '*.php' : '**/*.php'));
+            watcher.onDidChange(() => schedule({ disk: true }));
+            watcher.onDidCreate(() => schedule({ disk: true }));
+            watcher.onDidDelete(() => schedule({ disk: true }));
+        },
+        // Whether the file is one of the migrations or entities watched
+        covers(filePath) {
+            if (!watched || !filePath.endsWith('.php')) {
+                return false;
+            }
+            const file = path.resolve(filePath);
+            return framework === 'laravel' ? path.dirname(file) === folder : file.startsWith(folder + path.sep);
         },
         schedule,
         stop,
         dispose: stop,
+    };
+}
+
+// Calls onChange when a git repository of the workspace changes (commit, checkout, stage...),
+// through the API of the built-in Git extension, when it is enabled
+function watchGitRepositories(onChange) {
+    const subscriptions = [];
+    let disposed = false;
+    const extension = vscode.extensions && vscode.extensions.getExtension('vscode.git');
+    if (extension) {
+        Promise.resolve(extension.isActive ? extension.exports : extension.activate()).then(exports => {
+            if (disposed || !exports || !exports.enabled) {
+                return;
+            }
+            const api = exports.getAPI(1);
+            const track = (repository) => subscriptions.push(repository.state.onDidChange(onChange));
+            api.repositories.forEach(track);
+            subscriptions.push(api.onDidOpenRepository(track));
+        }).catch(() => {});
+    }
+    return {
+        dispose() {
+            disposed = true;
+            subscriptions.forEach(subscription => subscription.dispose());
+        },
     };
 }
 
@@ -495,13 +592,18 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
     return {
         // reveal: bring the panel to the front (not after an automatic refresh)
         show(newSchema, { reveal = true } = {}) {
-            schema = { type: 'schema', ...newSchema };
+            const next = { type: 'schema', ...newSchema };
+            // An automatic refresh that changes nothing (an edit outside the schema) is not posted
+            const same = schema !== null && JSON.stringify(schema) === JSON.stringify(next);
+            schema = next;
             emptyText = '';
             if (panel) {
                 if (reveal) {
                     panel.reveal();
                 }
-                post(schema);
+                if (!same || reveal) {
+                    post(schema);
+                }
                 return;
             }
             setup(vscode.window.createWebviewPanel(VIEW_TYPE, 'DrawMeDatabase', vscode.ViewColumn.One, {

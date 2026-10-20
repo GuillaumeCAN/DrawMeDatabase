@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ParserError } = require('./errors');
+const { createStatusReader, tableStatus } = require('./git');
 const {
     skipLiteral,
     stripComments,
@@ -381,6 +382,7 @@ function addColumn(table, column, change) {
         existing.nullable = column.nullable;
         existing.primary = existing.primary || column.primary;
         existing.unique = existing.unique || column.unique;
+        existing.origin = column.origin;
     } else {
         table.columns[index] = column;
     }
@@ -412,6 +414,7 @@ function renameColumn(ctx, table, from, to, index) {
         return;
     }
     column.name = to;
+    column.origin = ctx.origin;
     for (const relation of table.relations) {
         if (relation.foreignKey === from) {
             relation.foreignKey = to;
@@ -624,6 +627,8 @@ function applyStatement(ctx, blueprint, chain, index) {
     const [head, ...modifiers] = chain.calls;
     const method = canonical(head.method);
     const { args } = head;
+    // Lines of the statement, for the git status of the columns it creates, changes or renames
+    ctx.origin = { path: ctx.path, first: ctx.lineAt(index), last: ctx.lineAt(Math.max(index, chain.end - 1)) };
 
     if (COLUMN_SET.has(method) || HELPER_SET.has(method)) {
         const columns = columnsFor(ctx, method, args, index);
@@ -632,6 +637,7 @@ function applyStatement(ctx, blueprint, chain, index) {
             applyModifiers(columns[0], modifiers);
         }
         for (const column of columns) {
+            column.origin = ctx.origin;
             addColumn(table, column, change);
             if (!change) {
                 blueprint.added.add(column.name);
@@ -855,7 +861,13 @@ function applySchemaCall(ctx, method, from, to, index) {
             }
             if (!table) {
                 // The migration that creates the table, opened by a click in the diagram
-                table = { name, columns: [], relations: [], source: { file: `database/migrations/${ctx.file}`, line: ctx.lineAt(index) } };
+                table = {
+                    name,
+                    columns: [],
+                    relations: [],
+                    source: { file: `database/migrations/${ctx.file}`, line: ctx.lineAt(index) },
+                    origin: { path: ctx.path, first: ctx.lineAt(index), last: ctx.lineAt(to) },
+                };
                 state.tables.push(table);
             }
             applyBlueprint(ctx, table, from, to, index);
@@ -985,9 +997,9 @@ function findMethodBody(ctx, name) {
     return null;
 }
 
-function applyMigration(state, file, source) {
+function applyMigration(state, file, filePath, source) {
     const code = stripComments(source);
-    const ctx = { state, file, code, mask: literalMask(code), lineAt: createLineLocator(code) };
+    const ctx = { state, file, path: filePath, code, mask: literalMask(code), lineAt: createLineLocator(code) };
     const up = findMethodBody(ctx, 'up');
     if (!up) {
         warn(ctx, 0, 'no up() method found, file skipped');
@@ -998,19 +1010,25 @@ function applyMigration(state, file, source) {
 }
 
 // Internal table state to the pivot format (docs/pivot-format.md)
-function toPivot(table) {
+function toPivot(table, statusOf) {
+    const status = (origin) => (origin ? statusOf(origin.path)(origin.first, origin.last) : null);
+    const columnStatuses = table.columns.map(c => status(c.origin));
+    const tableGit = tableStatus(status(table.origin), columnStatuses);
     const primaryCount = table.columns.filter(c => c.primary).length;
     const isUnique = (name) => table.columns.some(c => c.name === name && (c.unique || (c.primary && primaryCount === 1)));
 
     return {
         table: table.name,
-        columns: table.columns.map(c => {
+        columns: table.columns.map((c, index) => {
             const column = { name: c.name, type: c.type };
             if (c.primary) {
                 column.primary = true;
             }
             if (c.nullable) {
                 column.nullable = true;
+            }
+            if (columnStatuses[index]) {
+                column.git = columnStatuses[index];
             }
             return column;
         }),
@@ -1021,6 +1039,7 @@ function toPivot(table) {
             type: isUnique(r.foreignKey) ? 'one-to-one' : 'many-to-one',
         })),
         ...(table.source ? { source: table.source } : {}),
+        ...(tableGit ? { git: tableGit } : {}),
     };
 }
 
@@ -1033,7 +1052,11 @@ function stat(file) {
     }
 }
 
-module.exports.parse = function (basePath) {
+// Returns { tables, warnings }. Options:
+// - git: false skips the git status of the tables and columns
+// - overrides: Map of absolute file path → text of an unsaved editor, read instead of the file
+// - gitCache: Map kept between parses, to run git again only once it is cleared
+module.exports.parse = function (basePath, options = {}) {
     const migrationsPath = path.join(basePath, 'database', 'migrations');
     const folder = stat(migrationsPath);
     if (!folder || !folder.isDirectory()) {
@@ -1050,9 +1073,17 @@ module.exports.parse = function (basePath) {
     }
 
     const state = { tables: [], warnings: [] };
+    const overrides = options.overrides || null;
     for (const file of files) {
-        applyMigration(state, file, fs.readFileSync(path.join(migrationsPath, file), 'utf8'));
+        const filePath = path.join(migrationsPath, file);
+        const text = overrides && overrides.has(filePath) ? overrides.get(filePath) : fs.readFileSync(filePath, 'utf8');
+        applyMigration(state, file, filePath, text);
     }
 
-    return { tables: state.tables.map(toPivot), warnings: state.warnings };
+    // Git status (and unsaved changes) of the lines that create and change each table and column
+    const reader = createStatusReader(migrationsPath, { git: options.git !== false, overrides, cache: options.gitCache });
+    if (reader.warning) {
+        state.warnings.push(reader.warning);
+    }
+    return { tables: state.tables.map(table => toPivot(table, reader.statusOf)), warnings: state.warnings };
 };

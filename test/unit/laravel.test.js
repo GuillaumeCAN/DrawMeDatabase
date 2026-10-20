@@ -6,14 +6,16 @@ const path = require('node:path');
 
 const parser = require('../../parsers/laravel');
 
-// The tables without their source location (file and line of the table, tested on their own)
+// The tables without their source location (file and line of the table) and git status, tested
+// on their own; git is off unless a test asks for it
 const withoutSource = (table) => {
     const copy = { ...table };
     delete copy.source;
+    delete copy.git;
     return copy;
 };
 const withoutSources = (result) => ({ ...result, tables: result.tables.map(withoutSource) });
-const parse = (...args) => withoutSources(parser.parse(...args));
+const parse = (basePath, options = {}) => withoutSources(parser.parse(basePath, { git: false, ...options }));
 const { ParserError } = require('../../parsers/errors');
 
 const fixture = (name) => path.join(__dirname, '..', 'fixtures', 'laravel', name);

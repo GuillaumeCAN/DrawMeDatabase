@@ -10,8 +10,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const childProcess = require('child_process');
 const { ParserError } = require('./errors');
+const { createStatusReader, tableStatus } = require('./git');
 const {
     skipLiteral,
     stripComments,
@@ -58,18 +58,6 @@ const BUILTIN_TYPES = new Set(['mixed', 'object', 'iterable', 'callable', 'true'
 const PROPERTY = /^\s*((?:(?:(?:public|protected|private)(?:\(set\))?|static|readonly|var|final|abstract)\s+(?!\s))+)((?:[\w\\?|&()]+(?:\s+[\w\\?|&()]+)*)?)\s*(?:&\s*)?(?:\.\.\.\s*)?\$([A-Za-z_]\w*)/i;
 // `function` keyword, but not a property named $function
 const METHOD = /(?<![$\w])function\s+(?:&\s*)?([A-Za-z_]\w*)\s*\(/i;
-
-// Options that keep git output stable whatever the user or repository config says
-const GIT_OPTIONS = [
-    '-c', 'core.quotepath=off',
-    '-c', 'color.ui=never',
-    '-c', 'core.fsmonitor=',
-    '-c', 'diff.interHunkContext=0',
-    '-c', 'diff.submodule=short',
-    '-c', 'diff.suppressBlankEmpty=false',
-    '--no-optional-locks',
-    '--literal-pathspecs',
-];
 
 // Symfony's default naming strategy (underscore_number_aware): createdAt → created_at
 const underscore = (name) => name.replace(/(?<=[a-z0-9])([A-Z])/g, '_$1').toLowerCase();
@@ -397,9 +385,11 @@ function readScope(unit, start, end, namespace, classes) {
 }
 
 // Classes declared in one PHP file
-function readFile(file, warnings) {
-    // A BOM is replaced (not removed) so that offsets and lines don't move
-    const source = fs.readFileSync(file.path, 'utf8').replace(/^\uFEFF/, ' ');
+function readFile(file, warnings, overrides) {
+    // The text of an unsaved editor, else the file. A BOM is replaced (not removed) so that offsets
+    // and lines don't move.
+    const text = overrides && overrides.has(file.path) ? overrides.get(file.path) : fs.readFileSync(file.path, 'utf8');
+    const source = text.replace(/^\uFEFF/, ' ');
     const code = stripComments(source, { keepDocComments: true });
     const { mask, docs } = maskCode(code);
     const unit = { file, code, mask, docs, line: createLineLocator(code) };
@@ -589,190 +579,12 @@ function joinColumns(mappings, joinTable) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Git status
-
-function git(cwd, args) {
-    // Without the variables that change the diff output (context lines, external diff tool)
-    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_(DIFF_OPTS|EXTERNAL_DIFF)$/i.test(key)));
-    return childProcess.execFileSync('git', [...GIT_OPTIONS, ...args], {
-        cwd,
-        // English messages, for gitErrorReason
-        env: { ...env, LC_ALL: 'C' },
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        maxBuffer: 64 * 1024 * 1024,
-        timeout: 15000,
-        windowsHide: true,
-    });
-}
-
-// Path of a '+++ ' diff header: git adds a tab after names with spaces and C-quotes special names
-function diffPath(text) {
-    const value = text.replace(/\t$/, '');
-    if (!(value.length > 1 && value.startsWith('"') && value.endsWith('"'))) {
-        return value;
-    }
-    const escapes = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 };
-    const raw = Buffer.from(value.slice(1, -1), 'utf8');
-    const bytes = [];
-    for (let i = 0; i < raw.length; i++) {
-        if (raw[i] !== 0x5c) {
-            bytes.push(raw[i]);
-            continue;
-        }
-        const next = raw[++i];
-        if (next >= 0x30 && next <= 0x37) {
-            bytes.push(parseInt(raw.toString('latin1', i, i + 3), 8));
-            i += 2;
-        } else {
-            bytes.push(escapes[String.fromCharCode(next)] || next);
-        }
-    }
-    return Buffer.from(bytes).toString('utf8');
-}
-
-// Changed lines per file of a `git diff --unified=0`: { isNew, lines: Set, deletions: [] }.
-// Only '+' and '-' lines count: context lines, if git prints any, are not changes.
-function parseDiff(output) {
-    const files = new Map();
-    let current = null;
-    let inHeader = false;
-    let isNew = false;
-    let lineNumber = 0;
-
-    for (const line of output.split('\n')) {
-        if (line.startsWith('diff --git ')) {
-            current = null;
-            inHeader = true;
-            isNew = false;
-            continue;
-        }
-        if (inHeader && line.startsWith('--- ')) {
-            isNew = line === '--- /dev/null';
-            continue;
-        }
-        if (inHeader && line.startsWith('+++ ')) {
-            const target = diffPath(line.slice(4));
-            if (target !== '/dev/null') {
-                current = { isNew, lines: new Set(), deletions: [] };
-                files.set(target.replace(/^b\//, ''), current);
-            }
-            continue;
-        }
-
-        const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
-        if (hunk) {
-            inHeader = false;
-            // Number of the next new line (an empty new side gives the line before the removal)
-            lineNumber = parseInt(hunk[1], 10) + (hunk[2] === '0' ? 1 : 0);
-        } else if (current && !inHeader && line[0] === '+') {
-            current.lines.add(lineNumber++);
-        } else if (current && !inHeader && line[0] === '-') {
-            // Line removed after line `lineNumber - 1`
-            current.deletions.push(lineNumber - 1);
-        } else if (line[0] === ' ') {
-            lineNumber++;
-        }
-    }
-    return files;
-}
-
-// Reads into `state` the files under `relDir` of the repository at `root` that are not in HEAD
-// (untracked, ignored, staged-new) and the changed lines of the others, as paths from `root` prefixed
-// with `prefix`. A changed submodule is read the same way, against its own HEAD.
-function readRepository(root, relDir, prefix, hasHead, state) {
-    const entries = git(root, ['status', '--porcelain=v1', '-z', '-uall', '--ignored', '--ignore-submodules=none', '--', relDir]).split('\0');
-    for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
-        if (entry.length < 4) {
-            continue;
-        }
-        const xy = entry.slice(0, 2);
-        const file = entry.slice(3);
-        if (xy === '??' || xy === '!!' || 'ARC'.includes(xy[0]) || xy[1] === 'A') {
-            state.notInHead.add(prefix + file);
-        } else if (xy.includes('M') && fs.existsSync(path.join(root, file, '.git'))) {
-            readRepository(path.join(root, file), '.', `${prefix}${file}/`, true, state);
-        }
-        if (xy[0] === 'R' || xy[0] === 'C') {
-            i++; // the original path follows
-        }
-    }
-
-    if (hasHead) {
-        const diff = git(root, ['diff', 'HEAD', '--no-ext-diff', '--no-textconv', '--no-color', '--no-renames', '--text',
-            '--unified=0', '--src-prefix=a/', '--dst-prefix=b/', '--', relDir]);
-        for (const [file, change] of parseDiff(diff)) {
-            state.changes.set(prefix + file, change);
-        }
-    }
-}
-
-// Returns a function (filePath) → (firstLine, lastLine) → 'committed' | 'modified' | 'untracked'.
-// Throws when git is not usable for this folder.
-function readGitStatus(entityDir) {
-    const dir = fs.realpathSync(entityDir);
-    const root = git(dir, ['rev-parse', '--show-toplevel']).trim();
-    if (!root) {
-        throw new Error('no work tree');
-    }
-    const relDir = toPosix(path.relative(root, dir)) || '.';
-    if (relDir.startsWith('..')) {
-        throw new Error('the entity folder is outside of the repository');
-    }
-
-    let hasHead = true;
-    try {
-        git(root, ['rev-parse', '--verify', '--quiet', 'HEAD']);
-    } catch {
-        hasHead = false;
-    }
-
-    const notInHead = new Set();
-    const changes = new Map();
-    readRepository(root, relDir, '', hasHead, { notInHead, changes });
-
-    return (filePath) => {
-        const rel = toPosix(path.relative(root, fs.realpathSync(filePath)));
-        const change = changes.get(rel);
-        const isNew = !hasHead || notInHead.has(rel) || Boolean(change && change.isNew);
-
-        return (first, last) => {
-            if (isNew) {
-                return 'untracked';
-            }
-            if (change) {
-                for (let line = first; line <= last; line++) {
-                    if (change.lines.has(line)) {
-                        return 'modified';
-                    }
-                }
-                // Lines removed inside the declaration
-                if (change.deletions.some(line => line >= first && line < last)) {
-                    return 'modified';
-                }
-            }
-            return 'committed';
-        };
-    };
-}
-
-function gitErrorReason(error) {
-    if (error.code === 'ENOENT') {
-        return 'git is not installed';
-    }
-    const stderr = String(error.stderr || '');
-    if (/not a git repository/i.test(stderr)) {
-        return 'not a git repository';
-    }
-    const firstLine = (stderr.trim() || error.message || '').split('\n')[0];
-    return firstLine.replace(/^fatal:\s*/, '') || 'git failed';
-}
-
-// ---------------------------------------------------------------------------------------------
 // Tables
 
-// Returns { tables, warnings }. `options.git: false` skips the git status (e.g. untrusted workspace).
+// Returns { tables, warnings }. Options:
+// - git: false skips the git status (e.g. untrusted workspace)
+// - overrides: Map of absolute file path → text of an unsaved editor, read instead of the file
+// - gitCache: Map kept between parses, to run git again only once it is cleared
 module.exports.parse = function (basePath, options = {}) {
     const entityDir = path.join(basePath, 'src', 'Entity');
     if (!isDirectory(entityDir)) {
@@ -786,7 +598,7 @@ module.exports.parse = function (basePath, options = {}) {
     const warnings = [];
     const classes = [];
     for (const file of files) {
-        classes.push(...readFile(file, warnings));
+        classes.push(...readFile(file, warnings, options.overrides));
     }
 
     // Enum backing types, used for enum columns
@@ -928,26 +740,16 @@ module.exports.parse = function (basePath, options = {}) {
         }
     }
 
-    let gitStatus = null;
-    if (options.git !== false) {
-        try {
-            gitStatus = readGitStatus(entityDir);
-        } catch (error) {
-            // Outside a repository there is simply no git status: only real failures are reported
-            const reason = gitErrorReason(error);
-            if (reason !== 'not a git repository') {
-                warnings.push(`Git status is not shown: ${reason}.`);
-            }
-        }
+    // Git status (and unsaved changes) of lines of the file declaring `cls`, null when unknown
+    const reader = createStatusReader(entityDir, { git: options.git !== false, overrides: options.overrides, cache: options.gitCache });
+    if (reader.warning) {
+        warnings.push(reader.warning);
     }
-
-    // Git status of lines of the file declaring `cls`
-    const statusByFile = new Map();
-    const statusOf = (cls, first, last) => {
-        if (!statusByFile.has(cls.file.path)) {
-            statusByFile.set(cls.file.path, gitStatus(cls.file.path));
+    const statusOf = (cls, first, last) => reader.statusOf(cls.file.path)(first, last);
+    const setStatus = (target, status) => {
+        if (status) {
+            target.git = status;
         }
-        return statusByFile.get(cls.file.path)(first, last);
     };
 
     const foreignKeys = [];
@@ -961,9 +763,7 @@ module.exports.parse = function (basePath, options = {}) {
             if (table.columns.some(c => c.name === column.name)) {
                 return false;
             }
-            if (gitStatus) {
-                column.git = statusOf(owner, property.lines[0], property.lines[1]);
-            }
+            setStatus(column, statusOf(owner, property.lines[0], property.lines[1]));
             table.columns.push(column);
             return true;
         };
@@ -1073,9 +873,7 @@ module.exports.parse = function (basePath, options = {}) {
             // No PHP type: the explicit type, else Doctrine's default (string)
             type: columnType(mapping, { type: '' }, root.cls.ctx, enums),
         };
-        if (gitStatus) {
-            column.git = statusOf(root.cls, ...root.cls.lines);
-        }
+        setStatus(column, statusOf(root.cls, ...root.cls.lines));
         root.output.columns.push(column);
     }
     for (const entity of entities.filter(e => e.root && e.root !== e)) {
@@ -1092,9 +890,7 @@ module.exports.parse = function (basePath, options = {}) {
         // The copied keys belong to the child table: the child class declaration gives their git status
         const keys = root.output.columns.filter(c => c.primary).map(c => {
             const key = { ...c, type: null };
-            if (gitStatus) {
-                key.git = statusOf(entity.cls, ...entity.cls.lines);
-            }
+            setStatus(key, statusOf(entity.cls, ...entity.cls.lines));
             return key;
         });
         entity.output.columns.unshift(...keys);
@@ -1122,5 +918,10 @@ module.exports.parse = function (basePath, options = {}) {
         fk.column.type = 'integer';
     }
 
-    return { tables: entities.filter(e => !e.singleTable).map(e => e.output), warnings };
+    // Status of each table: its class declaration and its columns
+    const tables = entities.filter(e => !e.singleTable);
+    for (const entity of tables) {
+        setStatus(entity.output, tableStatus(statusOf(entity.cls, ...entity.cls.lines), entity.output.columns.map(c => c.git)));
+    }
+    return { tables: tables.map(e => e.output), warnings };
 };
