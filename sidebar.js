@@ -70,7 +70,7 @@ const BUILT_IN_EXPORTS = [
 ];
 
 const LICENSE_ICONS = { free: 'info', trial: 'watch', expired: 'warning', licensed: 'verified-filled', development: 'beaker' };
-const LICENSE_ACTION_ICONS = { buy: 'credit-card', enter: 'key', manage: 'gear', discover: 'link-external' };
+const LICENSE_ACTION_ICONS = { buy: 'credit-card', enter: 'key', manage: 'gear', remove: 'trash', discover: 'link-external' };
 
 // The colors (theme colors) and letters of the labels: the git status like the Explorer, the
 // unsaved color of the diagram (theme.css), and greyed features

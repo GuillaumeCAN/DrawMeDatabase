@@ -40,8 +40,8 @@ Appearance, Settings), with a button that opens the sidebar for the tools, expor
 
 Each view is built from the same registries as the options panel of 1.6.0, so nothing changes for
 DrawMeDatabase Pro or for other extensions: a tool added with `registerTool()` shows in the Tools
-view, an export added with `registerExporter()` in the Exports view, and `setLicenseStatus()` fills
-the License view.
+view, an export added with `registerExporter()` in the Exports view, and the license of
+DrawMeDatabase Pro (read from its exports, see `connectPro()` in api.md) fills the License view.
 
 ### Schema (`DMDB.schema`)
 
@@ -86,9 +86,9 @@ the License view.
 
 ### License (`DMDB.license`)
 
-- Shown only once DrawMeDatabase Pro is installed (it calls `setLicenseStatus()`): without Pro, the
+- Shown only once DrawMeDatabase Pro is installed (it calls `connectPro()`): without Pro, the
   free extension shows no license view, the greyed tools and exports are the only sign of Pro.
-- The state of DrawMeDatabase Pro and its buttons, from `setLicenseStatus()`:
+- The state of DrawMeDatabase Pro and its buttons, from the exports of Pro:
   - trial: *Pro trial: N days left*, *Buy a license*, *Enter a license key*;
   - expired: *Your Pro trial has ended*, *Buy a license*, *Enter a license key*;
   - licensed: *DrawMeDatabase Pro* and *License* (manage);

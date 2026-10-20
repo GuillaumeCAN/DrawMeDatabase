@@ -175,6 +175,10 @@ describe('sidebar: Tools, Exports and License views', () => {
         assert.deepEqual(labels({ kind: 'trial', daysLeft: 1, actions: ['buy', 'enter'] }), ['Pro trial: 1 day left', 'Buy a license', 'Enter a license key']);
         assert.deepEqual(labels({ kind: 'expired', actions: ['buy', 'bogus'] }), ['Your Pro trial has ended', 'Buy a license']);
         assert.deepEqual(labels({ kind: 'licensed', actions: ['manage'] }), ['DrawMeDatabase Pro', 'License']);
+        assert.deepEqual(labels({ kind: 'licensed', actions: ['manage', 'remove'] }), ['DrawMeDatabase Pro', 'License', 'Remove the license key']);
+        const remove = sidebar.licenseNodes({ kind: 'licensed', actions: ['remove'] }, fr)[1];
+        assert.deepEqual({ label: remove.label, icon: remove.icon, command: remove.command },
+            { label: 'Retirer la clé de licence', icon: 'trash', command: { id: 'DMDB.licenseAction', args: ['remove'] } });
         assert.deepEqual(labels({ kind: 'development', actions: [] }), ['DrawMeDatabase Pro (development)']);
         assert.deepEqual(labels(null), ['Free version']);
         const [status, buy] = sidebar.licenseNodes({ kind: 'trial', daysLeft: 9, actions: ['buy'] }, fr);
