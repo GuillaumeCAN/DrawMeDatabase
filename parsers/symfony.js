@@ -823,6 +823,57 @@ function sources(basePath) {
 }
 module.exports.sources = sources;
 
+// The databases of the schemes of a Doctrine DATABASE_URL, and of the drivers of doctrine.yaml
+const URL_SCHEMES = new Map([
+    ['postgresql', 'postgresql'], ['postgres', 'postgresql'], ['pgsql', 'postgresql'], ['pdo-pgsql', 'postgresql'],
+    ['mysql', 'mysql'], ['mysql2', 'mysql'], ['mysqli', 'mysql'], ['pdo-mysql', 'mysql'], ['mariadb', 'mariadb'],
+    ['sqlite', 'sqlite'], ['sqlite3', 'sqlite'], ['pdo-sqlite', 'sqlite'],
+    ['sqlsrv', 'sqlserver'], ['mssql', 'sqlserver'], ['pdo-sqlsrv', 'sqlserver'],
+]);
+const DOCTRINE_DRIVERS = new Map([['pdo_pgsql', 'postgresql'], ['pgsql', 'postgresql'], ['pdo_mysql', 'mysql'], ['mysqli', 'mysql'], ['pdo_sqlite', 'sqlite'], ['sqlite3', 'sqlite'], ['pdo_sqlsrv', 'sqlserver'], ['sqlsrv', 'sqlserver']]);
+
+// The last value of a variable in a .env file (the commented lines left out), or undefined
+function envValue(text, name) {
+    let value;
+    for (const match of text.matchAll(new RegExp(`^[ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=[ \\t]*(?:"([^"\\n]*)"|'([^'\\n]*)'|([^\\s#]*))`, 'gm'))) {
+        value = match[1] !== undefined ? match[1] : match[2] !== undefined ? match[2] : match[3];
+    }
+    return value;
+}
+
+// The database of the application (docs/api.md): the scheme of DATABASE_URL in the .env files, in
+// the order Symfony reads them (.env.<APP_ENV>.local, .env.<APP_ENV>, .env.local, .env), MariaDB
+// told by its serverVersion; else the driver (and server_version) of
+// config/packages/doctrine.yaml; null when they do not tell (a URL set by the environment)
+module.exports.dialect = function (basePath) {
+    if (typeof basePath !== 'string') {
+        return null;
+    }
+    const read = (...file) => {
+        try {
+            return fs.readFileSync(path.join(basePath, ...file), 'utf8');
+        } catch {
+            return '';
+        }
+    };
+    const mariadb = (text) => /mariadb/i.test(text);
+    const appEnv = envValue(read('.env.local'), 'APP_ENV') || envValue(read('.env'), 'APP_ENV') || 'dev';
+    const files = /^[\w-]+$/.test(appEnv) ? [`.env.${appEnv}.local`, `.env.${appEnv}`, '.env.local', '.env'] : ['.env.local', '.env'];
+    for (const file of files) {
+        const url = envValue(read(file), 'DATABASE_URL');
+        if (url !== undefined) {
+            const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(url);
+            const dialect = scheme ? URL_SCHEMES.get(scheme[1].toLowerCase()) || null : null;
+            return dialect === 'mysql' && /[?&]serverVersion=[^&]*mariadb/i.test(url) ? 'mariadb' : dialect;
+        }
+    }
+    const doctrine = read('config', 'packages', 'doctrine.yaml').replace(/#.*$/gm, '');
+    const driver = /^[ \t]+driver[ \t]*:[ \t]*["']?(\w+)/m.exec(doctrine);
+    const dialect = driver ? DOCTRINE_DRIVERS.get(driver[1].toLowerCase()) || null : null;
+    const version = /^[ \t]+server_version[ \t]*:[ \t]*["']?([^"'\n]+)/m.exec(doctrine);
+    return dialect === 'mysql' && version && mariadb(version[1]) ? 'mariadb' : dialect;
+};
+
 // ---------------------------------------------------------------------------------------------
 // Tables
 

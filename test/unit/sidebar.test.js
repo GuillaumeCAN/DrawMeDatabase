@@ -170,6 +170,30 @@ describe('sidebar: Tools, Exports and License views', () => {
         assert.deepEqual(sidebar.toolNodes({}, t), []);
     });
 
+    it('a tool that does not apply to the project: greyed, "not for this project", its reason as its extension gives it after the hint of DrawMeDatabase', () => {
+        const tools = [
+            { id: 'pro.models', label: 'Models', hint: 'theirs', pro: true, state: 'unavailable', reason: 'Eloquent models are for Laravel projects: they are not available for Prisma projects.' },
+            { id: 'acme.lint', label: 'Lint', hint: 'Lint the schema', icon: 'checks', pro: false, state: 'unavailable', reason: 'Needs a Laravel project' },
+            { id: 'acme.empty', label: 'Empty', pro: false, state: 'unavailable' },
+        ];
+        const [models, lint, empty] = sidebar.toolNodes({ tools }, t);
+        assert.deepEqual(models, {
+            id: 'tool:pro.models',
+            label: 'Generate Eloquent models',
+            description: 'not for this project',
+            tooltip: 'With their relationships (Laravel)\nEloquent models are for Laravel projects: they are not available for Prisma projects.',
+            icon: 'symbol-class',
+            muted: true,
+            decoration: { state: 'unavailable' },
+            contextValue: 'tool.unavailable',
+            command: { id: 'DMDB.runTool', args: ['pro.models'] },
+        });
+        assert.deepEqual({ tooltip: lint.tooltip, icon: lint.icon }, { tooltip: 'Lint the schema\nNeeds a Laravel project', icon: 'checklist' });
+        assert.equal(empty.tooltip, '');
+        assert.equal(sidebar.toolNodes({ tools }, fr)[0].description, 'pas pour ce projet');
+        assert.match(sidebar.toolNodes({ tools }, fr)[0].tooltip, /\nEloquent models are for Laravel projects/, 'never translated');
+    });
+
     it('lists the exports of the diagram, then the ones of the extensions', () => {
         const nodes = sidebar.exportNodes(features, t);
         assert.deepEqual(nodes.map(node => node.id), [

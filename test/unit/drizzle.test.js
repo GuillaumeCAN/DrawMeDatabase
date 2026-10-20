@@ -380,6 +380,48 @@ describe('drizzle parser: where the schema is', () => {
 
 // ---------------------------------------------------------------------------------------------
 
+describe('drizzle parser: the dialect and the migrations of a project (API version 4)', () => {
+    const JOURNAL = (tags, dialect = 'postgresql') => JSON.stringify({ version: '7', dialect, entries: tags.map((tag, idx) => ({ idx, version: '7', when: 1704110400000 + idx * 1000, tag, breakpoints: true })) });
+
+    it('the dialect: the one of drizzle.config.ts (turso is SQLite), its driver before drizzle-kit 0.21, else the module of drizzle-orm the schema files import', () => {
+        const dialect = (files) => parser.dialect(project({ 'package.json': PACKAGE, 'src/db/schema.ts': PG + USERS, ...files }));
+        assert.equal(dialect({ 'drizzle.config.ts': "import { defineConfig } from 'drizzle-kit';\nexport default defineConfig({ dialect: 'mysql', schema: './src/db/schema.ts' });\n" }), 'mysql');
+        assert.equal(dialect({ 'drizzle.config.ts': "export default { dialect: 'turso', schema: './src/db/schema.ts' };\n" }), 'sqlite');
+        assert.equal(dialect({ 'drizzle.config.ts': "export default { dialect: 'singlestore', schema: './src/db/schema.ts' };\n" }), 'singlestore');
+        assert.equal(dialect({ 'drizzle.config.ts': "export default { dialect: 'gel', schema: './src/db/schema.ts' };\n" }), null, 'none of the API');
+        assert.equal(dialect({ 'drizzle.config.json': JSON.stringify({ dialect: 'sqlite', schema: './src/db/schema.ts' }) }), 'sqlite');
+        assert.equal(dialect({ 'drizzle.config.ts': "export default { driver: 'mysql2', schema: './src/db/schema.ts' };\n" }), 'mysql', 'drizzle-kit before 0.21');
+        assert.equal(dialect({ 'drizzle.config.ts': "const dialect = 'postgresql';\nexport default { dialect, schema: './src/db/schema.ts' };\n" }), 'postgresql', 'the shorthand of a constant');
+        assert.equal(dialect({ 'drizzle.config.ts': "export default { dialect: process.env.DIALECT, schema: './src/db/schema.ts' };\n" }), 'postgresql', 'computed: the module of the schema');
+        assert.equal(dialect({}), 'postgresql', 'without a config: drizzle-orm/pg-core');
+        assert.equal(parser.dialect(project({ 'package.json': PACKAGE, 'src/db/schema.ts': SQLITE + "export const t = sqliteTable('t', { id: integer() });\n" })), 'sqlite');
+        assert.equal(parser.dialect(project({ 'package.json': PACKAGE, 'src/db/schema/a.ts': PG + USERS, 'src/db/schema/b.ts': MYSQL + "export const t = mysqlTable('t', { id: int() });\n" })), null, 'two modules');
+        assert.equal(parser.dialect(project({ 'package.json': PACKAGE })), null);
+        assert.equal(registry.getDialect('drizzle', project({ 'package.json': PACKAGE, 'src/db/schema.ts': MYSQL })), 'mysql');
+    });
+
+    it('the migrations: the SQL of the out folder of drizzle.config.ts (drizzle/ by default) in the order of its journal, read by the SQL reader from the folder where it finds them', () => {
+        const files = { 'package.json': PACKAGE, 'src/db/schema.ts': PG + USERS, 'drizzle/0000_users.sql': 'CREATE TABLE "users" ("id" serial PRIMARY KEY);\n', 'drizzle/0001_email.sql': 'ALTER TABLE "users" ADD COLUMN "email" varchar(255) NOT NULL;\n', 'drizzle/meta/_journal.json': JOURNAL(['0000_users', '0001_email']) };
+        const dir = project({ ...files, 'drizzle.config.ts': "export default { dialect: 'postgresql', schema: './src/db/schema.ts' };\n" });
+        const result = registry.getMigrations('drizzle', dir);
+        assert.deepEqual(result, { root: dir, framework: 'sql', migrations: [
+            { id: '0000_users.sql', file: path.join(dir, 'drizzle', '0000_users.sql'), time: 1704110400 },
+            { id: '0001_email.sql', file: path.join(dir, 'drizzle', '0001_email.sql'), time: 1704110401 },
+        ] });
+        assert.deepEqual(registry.getParser(result.framework).parse(result.root, { git: false, until: result.migrations[0].id }).tables.map(t => [t.table, t.columns.map(c => c.name)]), [['users', ['id']]]);
+        // Another out folder, outside of the usual ones, and next to supabase/migrations
+        const out = project({ 'package.json': PACKAGE, 'src/db/schema.ts': PG + USERS, 'drizzle.config.ts': "export default { dialect: 'postgresql', schema: './src/db/schema.ts', out: './db/history' };\n", 'db/history/0000_users.sql': files['drizzle/0000_users.sql'], 'db/history/meta/_journal.json': JOURNAL(['0000_users']), 'supabase/migrations/20240101000000_other.sql': 'create table other (id int);\n' });
+        const moved = registry.getMigrations('drizzle', out);
+        assert.equal(moved.root, path.join(out, 'db', 'history'));
+        assert.deepEqual(moved.migrations.map(m => m.id), ['0000_users.sql']);
+        assert.deepEqual(registry.getParser('sql').parse(moved.root, { git: false, until: '0000_users.sql' }).tables.map(t => t.table), ['users']);
+        const supabase = project({ 'package.json': PACKAGE, 'src/db/schema.ts': PG + USERS, 'drizzle.config.ts': "export default { dialect: 'postgresql', schema: './src/db/schema.ts', out: './supabase/migrations' };\n", 'supabase/migrations/0000_users.sql': files['drizzle/0000_users.sql'], 'supabase/migrations/meta/_journal.json': JOURNAL(['0000_users']) });
+        assert.equal(registry.getMigrations('drizzle', supabase).root, path.join(supabase, 'supabase'), 'the journal of drizzle-kit, not the order of Supabase');
+        assert.equal(registry.getMigrations('drizzle', project({ 'package.json': PACKAGE, 'src/db/schema.ts': PG + USERS })), null, 'no migrations yet');
+        assert.equal(registry.getMigrations('drizzle', project({ 'package.json': PACKAGE, 'src/db/schema.ts': PG + USERS, 'drizzle.config.ts': "export default { out: './missing' };\n", ...files })), null, 'not where the config says');
+    });
+});
+
 describe('drizzle parser: tables and columns', () => {
     it('table functions: pgTable, mysqlTable, sqliteTable, singlestoreTable, a pgSchema, the prefix of a table creator, in the order of the files and of the code', () => {
         const dir = project({
@@ -488,6 +530,23 @@ describe('drizzle parser: tables and columns', () => {
         ]);
     });
 
+    it('spreads of columns: a chain of objects or helpers that spread the one before twice is cut after 5000 spreads, quickly, with one warning per spread that cannot be read', () => {
+        const objects = Array.from({ length: 24 }, (_, i) => `const c${i + 1} = { ...c${i}, ...c${i} };\n`).join('');
+        const helpers = Array.from({ length: 14 }, (_, i) => `const f${i + 1} = () => ({ ...f${i}(), ...f${i}() });\n`).join('');
+        const deep = Array.from({ length: 40 }, (_, i) => `const g${i + 1} = () => ({ ...g${i}(), ...g${i}() });\n`).join('');
+        const started = Date.now();
+        const result = parseSchema(`const c0 = {};\n${objects}const f0 = () => ({ note: text('note') });\n${helpers}const g0 = () => ({});\n${deep}export const a = pgTable('a', { id: serial('id'), ...c24 });\nexport const b = pgTable('b', { id: serial('id'), ...f14() });\nexport const c = pgTable('c', { id: serial('id'), ...g40() });\n`);
+        assert.ok(Date.now() - started < 2000, `${Date.now() - started} ms`);
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.map(c => c.name)]), [['a', ['id']], ['b', ['id', 'note']], ['c', ['id']]]);
+        // g40() is too deep to read (the depth of the helpers inlined): told once, not once per spread
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:83: a: the columns spread more than 5000 objects, the others are skipped.',
+            'src/db/schema.ts:84: b: the columns spread more than 5000 objects, the others are skipped.',
+            'src/db/schema.ts:68: c: ...g25() cannot be read, its columns are skipped.',
+            'src/db/schema.ts:85: c: the columns spread more than 5000 objects, the others are skipped.',
+        ]);
+    });
+
     it('helpers of columns: a function that returns a builder (its arguments and their defaults), a shared builder, an object of builders', () => {
         const columns = columnsOf("const id = () => integer().primaryKey().generatedByDefaultAsIdentity();\nconst code = (name: string, length = 8) => varchar(name, { length }).notNull();\nfunction fk(name?: string) {\n  return integer(name ?? 'parent_id');\n}\nconst createdAt = timestamp('created_at').defaultNow();\nconst cols = { email: () => varchar({ length: 320 }) };\nexport const t = pgTable('t', {\n  id: id(),\n  code: code('code_value'),\n  short: code('short', 2).unique(),\n  parent: fk(),\n  other: fk('other_id'),\n  createdAt,\n  email: cols.email().notNull(),\n});\n");
         assert.deepEqual(columns, [
@@ -569,6 +628,62 @@ describe('drizzle parser: tables and columns', () => {
             ['logs', ['b_by:varchar(32)']],
         ]);
         assert.deepEqual(result.warnings, []);
+    });
+
+    it('a default nested in a destructured parameter, and the default of a parameter computed from the ones before it (len * 2), as drizzle-kit runs them', () => {
+        const body = "const nested = ({ name, opts: { length = 12 } = {} }: any) => varchar(name, { length });\nconst inner = ({ name, opts: { length: size = 7, scale } = { scale: 1 } }: any) => numeric(name, { precision: size, scale });\nconst later = ({ name, len = 8 }: any, extra = len * 2) => varchar(name, { length: extra });\nconst math = (name: string, base = 10, extra = (base - 4) / 2 + base % 3 + 2 ** 3) => varchar(name, { length: extra });\nexport const items = pgTable('items', {\n  a: nested({ name: 'a' }),\n  b: nested({ name: 'b', opts: { length: 30 } }),\n  c: inner({ name: 'c' }),\n  d: inner({ name: 'd', opts: {} }),\n  e: later({ name: 'e' }),\n  f: later({ name: 'f', len: 20 }),\n  g: later({ name: 'g' }, 5),\n  h: math('h'),\n});\n";
+        const result = parseSchema(`import { numeric } from 'drizzle-orm/pg-core';\n${body}`, { details: true });
+        assert.deepEqual(result.tables[0].columns.map(c => `${c.name}:${c.type}(${[c.length, c.precision, c.scale].filter(v => v !== undefined).join(',')})`), ['a:varchar(12)', 'b:varchar(30)', 'c:numeric(7,1)', 'd:numeric(7)', 'e:varchar(16)', 'f:varchar(40)', 'g:varchar(5)', 'h:varchar(12)']);
+        assert.deepEqual(result.warnings, []);
+    });
+
+    it('a function or a block of a helper that declares a variable of the name of one of its locals changes its own variable, not the local', () => {
+        const body = `function shadowParam() {
+  const cols: any = { h0: text('h0') };
+  const add = (cols: any) => { cols.other = text('other'); };
+  const addAll = cols => cols.more = text('more');
+  return cols;
+}
+function shadowFn() {
+  const list: any = { f0: text('f0') };
+  function helper(list: any[]) { list.push(1); return list; }
+  const o = { method(list: any) { list.x = 1; } };
+  return list;
+}
+function shadowLocal() {
+  const cols: any = { l0: text('l0') };
+  const make = () => { const cols: any = {}; cols.z = text('z'); return cols; };
+  { let cols: any = {}; cols.w = 1; }
+  for (const cols of [{}] as any[]) { cols.k = 1; }
+  try { JSON.parse('x'); } catch (cols) { (cols as any).m = 1; }
+  return cols;
+}
+function destructured() {
+  const cols: any = { d0: text('d0') };
+  const add = ({ cols }: any) => { cols.x = 1; };
+  const rename = ({ k: cols }: any) => { cols.y = 1; };
+  return cols;
+}
+function notShadowed() {
+  const cols: any = { n0: text('n0') };
+  const add = (other: any) => { cols.n1 = text('n1'); };
+  return cols;
+}
+function inDefault() {
+  const cols: any = { p0: text('p0') };
+  const add = (x = cols.p1 = text('p1')) => x;
+  return cols;
+}
+export const t = pgTable('t', { id: serial('id').primaryKey(), ...shadowParam(), ...shadowFn(), ...shadowLocal(), ...destructured() });
+export const u = pgTable('u', { id: serial('id').primaryKey(), ...notShadowed(), ...inDefault() });
+`;
+        const result = parseSchema(body);
+        // As drizzle-kit 0.31 creates them: the nested functions are never called
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.map(c => c.name)]), [['t', ['id', 'h0', 'f0', 'l0', 'd0']], ['u', ['id']]]);
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:39: u: ...notShadowed() cannot be read, its columns are skipped.',
+            'src/db/schema.ts:39: u: ...inDefault() cannot be read, its columns are skipped.',
+        ]);
     });
 
     it('the locals of a helper changed by its statements before the return (assigned again, a property set, Object.assign(), push()) are read as they are then; a change that cannot be read is told', () => {
@@ -708,13 +823,27 @@ describe('drizzle parser: relations', () => {
         const started = Date.now();
         const result = parseSchema(body, { details: true });
         assert.ok(Date.now() - started < 2000, `${Date.now() - started} ms`);
-        assert.deepEqual(result.tables.map(t => [t.table, (t.indexes || []).length]), [['a', 0], ['b', 1], ['c', 1], ['d', 0], ['e', 1001]]);
+        assert.deepEqual(result.tables.map(t => [t.table, (t.indexes || []).length]), [['a', 0], ['b', 1], ['c', 1], ['d', 0], ['e', 1000]]);
         assert.deepEqual(result.warnings, [
             'src/db/schema.ts:2: a: ...x(t) spreads itself without end, its keys and indexes are skipped.',
             'src/db/schema.ts:4: b: ...y(t) spreads itself without end, its keys and indexes are skipped.',
             'src/db/schema.ts:5: c: ...o(t) spreads itself without end, its keys and indexes are skipped.',
             'src/db/schema.ts:40: d: ...l spreads itself without end, its keys and indexes are skipped.',
             'src/db/schema.ts:41: e: the extra config gives more than 1000 keys and indexes, the others are skipped.',
+        ]);
+    });
+
+    it('the extra config: a chain of helpers that spread an empty one twice is cut after 5000 spreads, quickly, with a warning; the object form keeps the last value of a key written again', () => {
+        const levels = Array.from({ length: 30 }, (_, i) => `const h${i + 1} = (t: any): any[] => [...h${i}(t), ...h${i}(t)];\n`).join('');
+        const objects = Array.from({ length: 14 }, (_, i) => `const o${i + 1} = (t: any): any => ({ ...o${i}(t), ...o${i}(t) });\n`).join('');
+        const body = `const h0 = (t: any): any[] => [];\n${levels}const o0 = (t: any): any => ({ i: index('o0').on(t.a) });\n${objects}export const a = pgTable('a', { a: integer() }, (t) => [...h30(t), index('x').on(t.a)]);\nexport const b = pgTable('b', { a: integer() }, (t) => o14(t));\nexport const c = pgTable('c', { a: integer(), b: integer() }, (t) => ({ ...o0(t), i: index('o9').on(t.b), j: index('j').on(t.a), ...{ j: index('j2').on(t.b) } }));\n`;
+        const started = Date.now();
+        const result = parseSchema(body, { details: true });
+        assert.ok(Date.now() - started < 2000, `${Date.now() - started} ms`);
+        assert.deepEqual(result.tables.map(t => [t.table, (t.indexes || []).map(i => i.name)]), [['a', ['x']], ['b', ['o0']], ['c', ['o9', 'j2']]]);
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:48: a: the extra config spreads more than 5000 arrays and objects, the others are skipped.',
+            'src/db/schema.ts:49: b: the extra config gives more than 1000 keys and indexes, the others are skipped.',
         ]);
     });
 

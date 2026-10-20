@@ -1088,6 +1088,11 @@ function moveTable(state, table, ref) {
         if (refKey(state, fk.target) === oldKey) {
             fk.target = ref;
         }
+        // MySQL renames the foreign keys named <table>_ibfk_... after the table
+        const ibfk = `${table.ref.name}_ibfk_`;
+        if (state.dialect === 'mysql' && fk.name && fk.name.startsWith(ibfk)) {
+            fk.name = `${ref.name}_ibfk_${fk.name.slice(ibfk.length)}`;
+        }
     }
     table.ref = ref;
     state.tables.set(refKey(state, ref), table);
@@ -1518,7 +1523,7 @@ function readColumn(ctx, c, end, origin) {
     while (c.i < end) {
         const t = tokens[c.i];
         if (accept(c, 'CONSTRAINT')) {
-            const parts = readName(c);
+            const parts = unnamedConstraint(c) ? null : readName(c);
             constraintName = parts ? fold(state, parts[parts.length - 1]) : null;
             continue;
         }
@@ -1659,17 +1664,35 @@ function indexItem(ctx, tokens, from, to) {
 // The reserved words of an expression, never the name of a column unless quoted (PostgreSQL)
 const EXPRESSION_KEYWORDS = new Set(['ALL', 'AND', 'ANY', 'ARRAY', 'AS', 'ASC', 'ASYMMETRIC', 'BETWEEN', 'BOTH', 'CASE', 'CAST', 'COLLATE', 'CURRENT_CATALOG', 'CURRENT_DATE', 'CURRENT_ROLE', 'CURRENT_SCHEMA', 'CURRENT_TIME', 'CURRENT_TIMESTAMP', 'CURRENT_USER', 'DEFAULT', 'DESC', 'DISTINCT', 'ELSE', 'END', 'FALSE', 'FOR', 'FROM', 'ILIKE', 'IN', 'IS', 'ISNULL', 'LEADING', 'LIKE', 'LOCALTIME', 'LOCALTIMESTAMP', 'NOT', 'NOTNULL', 'NULL', 'ON', 'ONLY', 'OR', 'OVERLAPS', 'PLACING', 'SESSION_USER', 'SIMILAR', 'SOME', 'SYMMETRIC', 'THEN', 'TRAILING', 'TRUE', 'USER', 'USING', 'WHEN', 'WHERE', 'WITH', 'WITHOUT']);
 
+// The normalization forms of Unicode (IS NFC NORMALIZED, normalize(name, NFKC))
+const NORMAL_FORMS = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+
 // The names of tokens [from, to) of an expression that may be columns, folded. Not: the functions
 // (a name before '('), the types (after '::' or AS, before a string: date '2024-01-01', their
 // words: character varying, with time zone), the qualifiers (before '.'), the reserved words, the
 // field of EXTRACT(year FROM ...), AT TIME ZONE, the unit of an interval (INTERVAL 1 DAY), a
-// collation, IS UNKNOWN
+// collation, IS UNKNOWN, IS [NOT] JSON [OBJECT...] [WITH UNIQUE KEYS], IS DOCUMENT, IS [NFC]
+// NORMALIZED and the form of normalize(), the DOCUMENT or CONTENT of xmlparse() and xmlserialize()
 function namesIn(state, tokens, from, to) {
     const names = [];
     const word = (k, ...words) => k >= from && k < to && isWord(tokens[k], ...words);
     const timeZone = (k) => word(k, 'TIME') && word(k + 1, 'ZONE');
     // The unit of an interval at k: INTERVAL '1' DAY, INTERVAL 1 DAY, '1-2' YEAR TO MONTH
     const unitAt = (k) => k - 2 >= from && word(k - 2, 'INTERVAL') && ['string', 'number'].includes(tokens[k - 1].type);
+    // The word at k follows IS or IS NOT
+    const afterIs = (k) => word(k - 1, 'IS') || (word(k - 1, 'NOT') && word(k - 2, 'IS'));
+    const isJson = (k) => word(k, 'JSON') && afterIs(k);
+    // The function whose parentheses hold the token at k: the word before its '(', or null
+    const enclosing = (k) => {
+        for (let depth = 0, j = k - 1; j >= from; j--) {
+            if (isPunct(tokens[j], ')')) {
+                depth++;
+            } else if (isPunct(tokens[j], '(') && depth-- === 0) {
+                return j > from && isWord(tokens[j - 1]) ? tokens[j - 1].upper : null;
+            }
+        }
+        return null;
+    };
     for (let k = from; k < to; k++) {
         const t = tokens[k];
         if (!isName(t) || isPunct(tokens[k + 1], '(') || isPunct(tokens[k + 1], '.') || (k > from && (isPunct(tokens[k - 1], '::') || isWord(tokens[k - 1], 'AS', 'COLLATE')))) {
@@ -1683,7 +1706,12 @@ function namesIn(state, tokens, from, to) {
             || (word(k + 1, 'FROM') && isPunct(tokens[k - 1], '(') && word(k - 2, 'EXTRACT'))
             || (word(k, 'VARYING') && word(k - 1, 'CHARACTER', 'CHAR', 'BIT', 'NATIONAL')) || (word(k, 'PRECISION') && word(k - 1, 'DOUBLE'))
             || unitAt(k) || (word(k - 1, 'TO') && unitAt(k - 2))
-            || (word(k, 'UNKNOWN') && (word(k - 1, 'IS') || (word(k - 1, 'NOT') && word(k - 2, 'IS')))))) {
+            || (word(k, 'UNKNOWN') && afterIs(k))
+            || isJson(k) || (word(k, 'VALUE', 'OBJECT', 'SCALAR') && isJson(k - 1)) || (word(k, 'KEYS') && word(k - 1, 'UNIQUE'))
+            || (word(k, 'DOCUMENT') && afterIs(k))
+            || (word(k, ...NORMAL_FORMS) && ((word(k + 1, 'NORMALIZED') && afterIs(k)) || (isPunct(tokens[k - 1], ',') && enclosing(k) === 'NORMALIZE')))
+            || (word(k, 'NORMALIZED') && (afterIs(k) || (word(k - 1, ...NORMAL_FORMS) && afterIs(k - 1))))
+            || (word(k, 'DOCUMENT', 'CONTENT') && isPunct(tokens[k - 1], '(') && word(k - 2, 'XMLPARSE', 'XMLSERIALIZE')))) {
             continue;
         }
         names.push(fold(state, { value: t.value, quoted: t.type === 'ident' }));
@@ -1733,12 +1761,24 @@ function isConstraintItem(c) {
     return false;
 }
 
+// Whether the words after CONSTRAINT are the constraint itself, without a name (MySQL: CONSTRAINT
+// FOREIGN KEY (x) REFERENCES ..., CONSTRAINT UNIQUE (x), CONSTRAINT CHECK (...)): these words are
+// reserved, a constraint of that name would be quoted
+function unnamedConstraint(c) {
+    const next = peek(c, 1);
+    return (isWord(peek(c), 'FOREIGN', 'PRIMARY') && isWord(next, 'KEY'))
+        || (isWord(peek(c), 'UNIQUE') && (isWord(next, 'KEY', 'INDEX') || isPunct(next, '(') || (isName(next) && !isWord(next, 'USING', 'NULLS'))))
+        || (isWord(peek(c), 'CHECK') && isPunct(next, '('))
+        || (isWord(peek(c), 'NOT') && isWord(next, 'NULL'))
+        || isWord(peek(c), 'NULL', 'REFERENCES', 'DEFAULT');
+}
+
 // A table constraint or index (in a CREATE TABLE, or after ALTER TABLE ... ADD) from the cursor up
 // to `end`. Returns false when it is not understood.
 function applyConstraint(ctx, table, c, end, origin) {
     const { state } = ctx;
     let name = null;
-    if (accept(c, 'CONSTRAINT')) {
+    if (accept(c, 'CONSTRAINT') && !unnamedConstraint(c)) {
         const parts = readName(c);
         name = parts ? fold(state, parts[parts.length - 1]) : null;
     }
@@ -1783,8 +1823,10 @@ function applyConstraint(ctx, table, c, end, origin) {
     }
     if (accept(c, 'FOREIGN', 'KEY')) {
         if (isName(peek(c))) {
+            // FOREIGN KEY index_name (...): the name of the key on MariaDB, as on MySQL before
+            // 8.0.16; MySQL 8.4 names it <table>_ibfk_<n>
             const parts = readName(c);
-            name = name || fold(state, parts[parts.length - 1]);
+            name = name || (state.dialect === 'mysql' && !state.mariadb ? null : fold(state, parts[parts.length - 1]));
         }
         const columns = readColumnList(ctx, c);
         if (!columns || !accept(c, 'REFERENCES')) {
@@ -1914,7 +1956,8 @@ function addForeignKey(state, table, fk, order = 0) {
     // before it (from 1 in a CREATE TABLE, whatever the names it gives)
     const ibfk = `${table.ref.name}_ibfk_`;
     if (state.dialect === 'mysql' && (!table.ibfk || table.ibfk.statement !== state.statement)) {
-        const highest = Math.max(0, ...table.foreignKeys.map(other => (other.name && other.name.toLowerCase().startsWith(ibfk.toLowerCase()) && /^\d+$/.test(other.name.slice(ibfk.length)) ? Number(other.name.slice(ibfk.length)) : 0)));
+        // The prefix as MySQL compares it, case-sensitively (A_IBFK_3 is not one of a_ibfk_)
+        const highest = Math.max(0, ...table.foreignKeys.map(other => (other.name && other.name.startsWith(ibfk) && /^\d+$/.test(other.name.slice(ibfk.length)) ? Number(other.name.slice(ibfk.length)) : 0)));
         table.ibfk = { statement: state.statement, highest, generated: [] };
     }
     const name = fk.name || (state.dialect === 'mysql' ? `${ibfk}${table.ibfk.highest + table.ibfk.generated.length + 1}` : chooseName(state, table, fk.columns, 'fkey'));
@@ -2398,11 +2441,16 @@ const childrenOf = (state, table) => (table.children || []).filter(child => stat
 // A change of the columns of a table passed on to the tables that inherit it, and theirs, as
 // PostgreSQL does without ONLY: an added column (unless they have one of this name), a dropped one
 // (unless they declare it too), a renamed or altered one. action: done.column of alterAction(); c:
-// the action.
-function inheritAction(ctx, table, action, c, range, seen = new Set([table])) {
+// the action. As PostgreSQL, an added or dropped column goes down each line of inheritance: a table
+// that inherits two tables of the same parent (a diamond) counts it once per parent, and is
+// reached from each of them (path: the tables of the line, against a loop), its own children only
+// once it gets or loses the column; a renamed or altered column changes each table that inherits it
+// once (seen).
+function inheritAction(ctx, table, action, c, range, seen = new Set([table]), path = [table]) {
     const { state } = ctx;
+    const counted = action.kind === 'add' || action.kind === 'drop';
     for (const child of childrenOf(state, table)) {
-        if (seen.has(child)) {
+        if (counted ? path.includes(child) : seen.has(child)) {
             continue;
         }
         seen.add(child);
@@ -2432,7 +2480,7 @@ function inheritAction(ctx, table, action, c, range, seen = new Set([table])) {
             }
         }
         touchTable(child, range);
-        inheritAction(ctx, child, action, c, range, seen);
+        inheritAction(ctx, child, action, c, range, seen, [...path, child]);
     }
 }
 
@@ -3471,9 +3519,10 @@ function byFlywayVersion(a, b) {
 
 const MIGRATION_FOLDERS = ['migrations', 'db/migrations', 'database/migrations', 'sql/migrations', 'sql/schema', 'db/schema'];
 // The layouts read, in this order: the first one with files wins. folders: where the tool keeps
-// them ('.': the framework folder itself); file: the names of its migrations (in the folder, or in
-// its sub-folders with `recursive`); nested: the file of a migration that has a folder of its own;
-// marker: the sections a file must have (dbmate, goose); stack: the ORM whose output it is.
+// them ('.': the framework folder itself, the folder of the migrations of prisma migrate or
+// drizzle-kit too, with its lock file or journal); file: the names of its migrations (in the folder,
+// or in its sub-folders with `recursive`); nested: the file of a migration that has a folder of its
+// own; marker: the sections a file must have (dbmate, goose); stack: the ORM whose output it is.
 const LAYOUTS = [
     { id: 'supabase', folders: ['supabase/migrations'], file: /^\d+_.*\.sql$/, order: byName, dialect: 'postgresql' },
     { id: 'flyway', folders: ['src/main/resources/db/migration', 'db/migration', 'sql', 'flyway/sql', 'migrations', '.'], recursive: true, file: /^V\d+(?:[._]\d+)*__.*\.sql$/, order: byFlywayVersion },
@@ -3481,8 +3530,8 @@ const LAYOUTS = [
     { id: 'golang-migrate', folders: [...MIGRATION_FOLDERS, '.'], file: /^\d+_.*[._]up\.sql$/, order: byVersion },
     { id: 'goose', folders: [...MIGRATION_FOLDERS, '.'], file: /^\d+_.*\.sql$/, marker: 'goose', order: byVersion },
     { id: 'diesel', folders: ['migrations'], nested: 'up.sql', order: byName },
-    { id: 'prisma', folders: ['prisma/migrations', 'prisma/schema/migrations', 'migrations'], nested: 'migration.sql', lock: 'migration_lock.toml', order: byName, stack: 'prisma' },
-    { id: 'drizzle', folders: ['drizzle', 'migrations', 'drizzle/migrations', 'src/db/migrations', 'src/drizzle', 'db/migrations', 'src/migrations'], journal: 'meta/_journal.json', order: byName, stack: 'drizzle' },
+    { id: 'prisma', folders: ['prisma/migrations', 'prisma/schema/migrations', 'migrations', '.'], nested: 'migration.sql', lock: 'migration_lock.toml', order: byName, stack: 'prisma' },
+    { id: 'drizzle', folders: ['drizzle', 'migrations', 'drizzle/migrations', 'src/db/migrations', 'src/drizzle', 'db/migrations', 'src/migrations', '.'], journal: 'meta/_journal.json', order: byName, stack: 'drizzle' },
     { id: 'migrations', folders: [...MIGRATION_FOLDERS, 'sql', '.'], file: /^\d+[_.-].*\.sql$/, exclude: /[._-](?:down|undo|rollback|revert)\.sql$/i, order: byVersion },
     { id: 'rails', files: ['db/structure.sql'] },
     { id: 'dump', files: ['schema.sql', 'structure.sql', 'database.sql', 'dump.sql', 'db.sql', 'init.sql', 'db/schema.sql', 'db/database.sql', 'db/dump.sql', 'db/init.sql', 'sql/schema.sql'] },
@@ -3498,8 +3547,9 @@ function readJson(filePath, overrides) {
 }
 
 // The migrations of drizzle-kit in a folder: those of its journal (meta/_journal.json), in its
-// order; else drizzle-kit 1.0's folders (<timestamp>_<name>/migration.sql with its snapshot.json);
-// else, in its default folder (drizzle), the 0000_name.sql files
+// order (when: the time it gives, in milliseconds); else drizzle-kit 1.0's folders
+// (<timestamp>_<name>/migration.sql with its snapshot.json); else, in its default folder (drizzle),
+// the 0000_name.sql files
 function drizzleFiles(folder, isDefault, overrides) {
     const journal = path.join(folder, 'meta', '_journal.json');
     if (isFile(journal)) {
@@ -3508,7 +3558,7 @@ function drizzleFiles(folder, isDefault, overrides) {
         return entries
             .filter(entry => entry && typeof entry.tag === 'string' && !entry.tag.includes('/') && !entry.tag.includes('\\'))
             .sort((a, b) => (Number(a.idx) || 0) - (Number(b.idx) || 0))
-            .map(entry => ({ path: path.join(folder, `${entry.tag}.sql`), name: `${entry.tag}.sql` }))
+            .map(entry => ({ path: path.join(folder, `${entry.tag}.sql`), name: `${entry.tag}.sql`, when: entry.when }))
             .filter(file => isFile(file.path));
     }
     const nested = list(folder)
@@ -3573,19 +3623,23 @@ function layoutFiles(layout, folderName, folder, overrides, quick) {
 }
 
 // The dialect that the output of an ORM tells: the provider of prisma migrate's lock file, the
-// dialect of drizzle-kit's journal or snapshot
-function stackDialect(layout, folder, files, overrides) {
+// dialect of drizzle-kit's journal or snapshot. raw: as the tool writes it (cockroachdb, turso...),
+// else the dialect of the SQL (postgresql, mysql, sqlite)
+function stackDialect(layout, folder, files, overrides, raw = false) {
+    let told = null;
     if (layout.lock) {
         const provider = /^\s*provider\s*=\s*"([^"]+)"/m.exec(readText(path.join(folder, layout.lock), overrides) || '');
-        return provider ? DIALECTS[provider[1]] || null : null;
-    }
-    if (layout.journal) {
+        told = provider ? provider[1] : null;
+    } else if (layout.journal) {
         const journal = readJson(path.join(folder, layout.journal), overrides);
         const snapshot = journal ? null : files.length > 0 && readJson(path.join(path.dirname(files[0].path), 'snapshot.json'), overrides);
         const dialect = (journal || snapshot || {}).dialect;
-        return typeof dialect === 'string' ? DIALECTS[dialect] || null : null;
+        told = typeof dialect === 'string' ? dialect : null;
     }
-    return null;
+    if (raw) {
+        return told;
+    }
+    return told !== null && Object.prototype.hasOwnProperty.call(DIALECTS, told) ? DIALECTS[told] : null;
 }
 
 // The SQL files of basePath: { layout, folder, recursive, files: [{ path, name }], dialect, score },
@@ -3619,7 +3673,7 @@ function locate(basePath, options = {}) {
             return {
                 layout,
                 folder,
-                recursive: Boolean((layout.recursive || layout.nested || layout.journal) && name !== '.'),
+                recursive: Boolean((layout.recursive && name !== '.') || layout.nested || layout.journal),
                 files,
                 dialect: layout.dialect || stackDialect(layout, folder, files, overrides),
                 score: name === '.' ? SCORE_DUMP : SCORE_MIGRATIONS,
@@ -3776,6 +3830,136 @@ module.exports.parse = function (basePath, options = {}) {
     return { tables: toPivot(state, basePath, reader, options), warnings: state.warnings };
 };
 
+// The time of a migration from its name, in seconds since 1970: the timestamp that starts it, as
+// most tools write it (20240101120000_init of prisma migrate, Supabase, dbmate, goose and drizzle-kit
+// 1.0, 2024-01-01-120000_init of diesel, V20240101120000__init.sql of Flyway, 2024_01_01_120000_init
+// of Laravel), read as UTC; undefined when it tells none (V1__init.sql, 0001_init.sql)
+function migrationTime(name) {
+    const stamp = /^V?(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})(\d{2})(\d{2})(?!\d)/.exec(typeof name === 'string' ? name : '');
+    if (!stamp) {
+        return undefined;
+    }
+    const [year, month, day, hour, minute, second] = stamp.slice(1).map(Number);
+    if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 60) {
+        return undefined;
+    }
+    return Date.UTC(year, month - 1, day, hour, minute, second) / 1000;
+}
+
+// golang-migrate names its migrations after the Unix time by default (1704110400_init.up.sql)
+const UNIX_TIMES = [946684800, 4102444800];
+
+// The migrations of a location as getMigrations() gives them: { root, framework: 'sql', migrations:
+// [{ id, file, time? }] } in the order of their tool (id: the name `until` takes), null for a dump
+function migrationsOf(root, location) {
+    if (!location || location.layout.files || location.files.length === 0) {
+        return null;
+    }
+    const timeOf = (file) => {
+        if (Number.isFinite(file.when) && file.when >= 1000) {
+            // drizzle-kit's journal: milliseconds
+            return Math.floor(file.when / 1000);
+        }
+        const unix = location.layout.id === 'golang-migrate' ? /^(\d{10})_/.exec(file.name) : null;
+        if (unix && Number(unix[1]) >= UNIX_TIMES[0] && Number(unix[1]) < UNIX_TIMES[1]) {
+            return Number(unix[1]);
+        }
+        return migrationTime(file.name);
+    };
+    return {
+        root: path.resolve(root),
+        framework: 'sql',
+        migrations: location.files.map(file => {
+            const time = timeOf(file);
+            return { id: file.name, file: file.path, ...(time !== undefined ? { time } : {}) };
+        }),
+    };
+}
+
+// The migrations of the folder of an ORM's migrations (the migrations of prisma migrate, the out
+// folder of drizzle-kit), stack: its layout ('prisma', 'drizzle'), as the SQL reader replays them
+// (getMigrations()): from the first root where the reader finds that folder with that layout:
+// basePath, the folders down to it, its parent, the folder itself. null when it has none.
+function stackMigrations(basePath, folder, stack, overrides = null) {
+    const target = path.resolve(folder);
+    if (!isDirectory(target)) {
+        return null;
+    }
+    const roots = [path.resolve(basePath)];
+    const relative = path.relative(roots[0], target);
+    if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+        const parts = relative.split(path.sep);
+        parts.forEach((part, i) => roots.push(path.join(roots[0], ...parts.slice(0, i + 1))));
+    }
+    roots.push(path.dirname(target), target);
+    for (const root of [...new Set(roots)]) {
+        const location = isDirectory(root) ? locate(root, { overrides, any: true }) : null;
+        if (location && location.folder && path.resolve(location.folder) === target && location.layout.id === stack) {
+            return migrationsOf(root, location);
+        }
+    }
+    return null;
+}
+
+// The first characters of each file (SNIFF_SAMPLE at most in all), enough to tell their dialect
+function readHeads(files, overrides) {
+    const heads = [];
+    let left = SNIFF_SAMPLE;
+    for (const file of files) {
+        if (left <= 0) {
+            break;
+        }
+        let text = null;
+        if (overrides && overrides.has(file.path)) {
+            text = overrides.get(file.path).slice(0, left);
+        } else {
+            let fd = null;
+            try {
+                fd = fs.openSync(file.path, 'r');
+                const buffer = Buffer.alloc(Math.min(left, Math.max(0, stat(file.path)?.size || 0)));
+                text = buffer.subarray(0, fs.readSync(fd, buffer, 0, buffer.length, 0)).toString('utf8');
+            } catch {
+                text = null;
+            } finally {
+                if (fd !== null) {
+                    fs.closeSync(fd);
+                }
+            }
+        }
+        if (text !== null) {
+            heads.push(text);
+            left -= text.length;
+        }
+    }
+    return heads;
+}
+
+// The dialects as the API tells them (docs/api.md), from what an ORM writes
+const TOLD_DIALECTS = { postgresql: 'postgresql', postgres: 'postgresql', cockroachdb: 'cockroachdb', mysql: 'mysql', singlestore: 'singlestore', sqlite: 'sqlite', turso: 'sqlite', sqlserver: 'sqlserver' };
+
+// The dialect of the SQL of a location, as replay() reads it: the one its tool tells (Supabase, the
+// lock file of prisma migrate, the journal of drizzle-kit), else what only one dialect writes, else
+// the names of its folders; MariaDB told by a mariadb folder or the header of a dump. One of the API
+// (postgresql, mysql, mariadb, sqlite, cockroachdb, singlestore, sqlserver), or null.
+function locationDialect(location, overrides) {
+    const told = location.layout.lock || location.layout.journal ? stackDialect(location.layout, location.folder, location.files, overrides, true) : null;
+    if (told !== null && Object.prototype.hasOwnProperty.call(TOLD_DIALECTS, told) && TOLD_DIALECTS[told] !== 'mysql') {
+        return TOLD_DIALECTS[told];
+    }
+    let heads = null;
+    let dialect = location.dialect;
+    if (!dialect) {
+        heads = readHeads(location.files, overrides);
+        const sniffed = sniffDialect(heads);
+        dialect = sniffed === 'unknown' ? pathDialect(location) : sniffed;
+    }
+    if (dialect === 'mysql') {
+        heads = heads || readHeads(location.files, overrides);
+        return namesMariadb(locationNames(location)) || heads.some(text => /^-- MariaDB dump\b|\/\*M!/m.test(text.slice(0, 4096))) ? 'mariadb' : 'mysql';
+    }
+    return dialect || null;
+}
+
 // A schema dump read for another parser (the database/schema/<connection>-schema.sql of Laravel):
 // { tables (see tableModels()), rows (of the table `collect`: [{ column: value }] or [[value]]),
 // warnings, dialect }. file: { path, rel, text }; options: skip (names of tables not drawn, lower
@@ -3792,11 +3976,35 @@ function readDump(file, options = {}) {
     return { tables: tableModels(state), rows: state.rows ? state.rows.values : [], warnings: state.warnings, dialect: state.dialect };
 }
 
+// The migrations of the SQL files of basePath (docs/api.md, getMigrations()): the files of the
+// layout the diagram reads, in the order of their tool; null for a dump (schema.sql, Rails'
+// db/structure.sql) or without SQL files
+module.exports.migrations = function (basePath, options = {}) {
+    if (typeof basePath !== 'string' || !isDirectory(basePath)) {
+        return null;
+    }
+    return migrationsOf(basePath, locate(basePath, { overrides: (options && options.overrides) || null, any: true }));
+};
+
+// The database the SQL of basePath is written for: the dialect the reader reads it in (docs/api.md),
+// or null when it cannot tell (SQL that only one dialect would not write)
+module.exports.dialect = function (basePath, options = {}) {
+    if (typeof basePath !== 'string' || !isDirectory(basePath)) {
+        return null;
+    }
+    const overrides = (options && options.overrides) || null;
+    const location = locate(basePath, { overrides, any: true });
+    return location ? locationDialect(location, overrides) : null;
+};
+
 // For the other parsers and the tests: the statements of SQL text, the replay of SQL files, their
-// tables, where the SQL files of a project are, and a schema dump read for another parser
+// tables, where the SQL files of a project are, and a schema dump read for another parser; the
+// migrations of the output of an ORM, the time of a migration from its name
 module.exports.scanStatements = scanStatements;
 module.exports.sniffDialect = sniffDialect;
 module.exports.replay = replay;
 module.exports.toPivot = toPivot;
 module.exports.locate = locate;
 module.exports.readDump = readDump;
+module.exports.stackMigrations = stackMigrations;
+module.exports.migrationTime = migrationTime;

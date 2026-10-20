@@ -1265,26 +1265,51 @@ function stat(file) {
 // ---------------------------------------------------------------------------------------------
 // Schema dumps (php artisan schema:dump)
 
+// A file of the application (path segments from basePath), the text of its unsaved editor first;
+// '' when it cannot be read
+function readAppFile(basePath, overrides, file) {
+    const filePath = path.join(basePath, ...file);
+    if (overrides && overrides.has(filePath)) {
+        return overrides.get(filePath);
+    }
+    try {
+        return fs.readFileSync(filePath, 'utf8');
+    } catch {
+        return '';
+    }
+}
+
 // The default connection of the application: DB_CONNECTION of .env, else the default of
 // config/database.php (`'default' => env('DB_CONNECTION', 'mysql')`), else null
 function defaultConnection(basePath, overrides) {
-    const read = (file) => {
-        const filePath = path.join(basePath, ...file);
-        if (overrides && overrides.has(filePath)) {
-            return overrides.get(filePath);
-        }
-        try {
-            return fs.readFileSync(filePath, 'utf8');
-        } catch {
-            return '';
-        }
-    };
+    const read = (file) => readAppFile(basePath, overrides, file);
     const env = /^[ \t]*DB_CONNECTION[ \t]*=[ \t]*["']?([\w-]+)/m.exec(read(['.env']));
     if (env) {
         return env[1];
     }
     const config = /['"]default['"]\s*=>\s*(?:env\(\s*['"]DB_CONNECTION['"]\s*,\s*)?['"]([\w-]+)['"]/.exec(stripComments(read(['config', 'database.php'])));
     return config ? config[1] : null;
+}
+
+// The databases of the drivers of Laravel's connections (config/database.php)
+const DRIVERS = { mysql: 'mysql', mariadb: 'mariadb', pgsql: 'postgresql', sqlite: 'sqlite', sqlsrv: 'sqlserver' };
+
+// The database of the default connection (docs/api.md): the driver of the connection in
+// config/database.php ('driver' => 'pgsql'), else the connection named after a driver (the
+// connections of Laravel's config: mysql, mariadb, pgsql, sqlite, sqlsrv); without a known
+// connection, the connection of the only schema dump. null when it cannot be told.
+function connectionDialect(basePath, overrides) {
+    const dump = findSchemaDump(basePath, overrides);
+    const connection = defaultConnection(basePath, overrides) || (dump ? dump.name.replace(/-schema\.\w+$/, '') : null);
+    if (!connection) {
+        return null;
+    }
+    const config = stripComments(readAppFile(basePath, overrides, ['config', 'database.php']));
+    const name = connection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const entry = new RegExp(`['"]${name}['"]\\s*=>\\s*(?:\\[|array\\s*\\()`).exec(config);
+    const driver = entry ? /['"]driver['"]\s*=>\s*(?:env\(\s*['"]\w+['"]\s*,\s*)?['"](\w+)['"]/.exec(config.slice(entry.index + entry[0].length)) : null;
+    const id = driver ? driver[1] : connection;
+    return Object.prototype.hasOwnProperty.call(DRIVERS, id) ? DRIVERS[id] : null;
 }
 
 // The schema dump that `php artisan migrate` loads: database/schema/<connection>-schema.dump, else
@@ -1380,6 +1405,46 @@ function sources(basePath) {
 }
 module.exports.sources = sources;
 
+// The migration files that `php artisan migrate` runs, in its order: by name (glob '*_*.php', so no
+// dotfile), not the sub-folders (an error for a folder that cannot be read)
+function migrationFiles(migrationsPath) {
+    return fs.readdirSync(migrationsPath)
+        .filter(file => !file.startsWith('.') && file.includes('_') && file.endsWith('.php'))
+        .filter(file => stat(path.join(migrationsPath, file))?.isFile())
+        .sort();
+}
+
+// The migrations of the application (docs/api.md, getMigrations()): the files of
+// database/migrations in the order of `php artisan migrate` (id: the file name, which `until`
+// takes; time: the timestamp of its name), the ones a schema dump lists included (`until` replays
+// them without the dump); null without migration files
+module.exports.migrations = function (basePath) {
+    const migrationsPath = path.resolve(basePath, 'database', 'migrations');
+    let files = [];
+    try {
+        files = migrationFiles(migrationsPath);
+    } catch {
+        return null;
+    }
+    if (files.length === 0) {
+        return null;
+    }
+    const { migrationTime } = require('./sql');
+    return {
+        root: path.resolve(basePath),
+        framework: 'laravel',
+        migrations: files.map(file => {
+            const time = migrationTime(file);
+            return { id: file, file: path.join(migrationsPath, file), ...(time !== undefined ? { time } : {}) };
+        }),
+    };
+};
+
+// The database of the default connection (docs/api.md): pgsql gives postgresql, sqlsrv sqlserver
+module.exports.dialect = function (basePath, options = {}) {
+    return typeof basePath === 'string' ? connectionDialect(basePath, (options && options.overrides) || null) : null;
+};
+
 // Returns { tables, warnings }. Options:
 // - git: false skips the git status of the tables and columns
 // - overrides: Map of absolute file path → text of an unsaved editor, read instead of the file
@@ -1419,11 +1484,8 @@ module.exports.parse = function (basePath, options = {}) {
         throw new ParserError(`Laravel migrations folder not found: ${migrationsPath}`);
     }
 
-    // Same files as `php artisan migrate` (glob '*_*.php', so no dotfile), in the same order: by name
-    const files = (folder && folder.isDirectory() ? fs.readdirSync(migrationsPath) : [])
-        .filter(file => !file.startsWith('.') && file.includes('_') && file.endsWith('.php'))
-        .filter(file => stat(path.join(migrationsPath, file))?.isFile())
-        .sort()
+    // Same files as `php artisan migrate`, in the same order
+    const files = (folder && folder.isDirectory() ? migrationFiles(migrationsPath) : [])
         .filter(file => typeof options.until !== 'string' || file <= options.until)
         .filter(file => !loaded || !loaded.ran.has(file.replace(/\.php$/, '')));
     if (files.length === 0 && typeof options.until === 'string' && !loaded) {

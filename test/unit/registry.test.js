@@ -536,3 +536,55 @@ test('watchPatterns(): a glob per folder (its sub-folders when recursive) and pe
     assert.deepEqual(watchPatterns({ folders: [{ path: path.join(base, 'sql'), recursive: false }], files: [], extensions: [] }), [{ base: path.join(base, 'sql'), pattern: '*' }]);
     assert.deepEqual(watchPatterns(undefined), []);
 });
+
+test('getDialect(): the dialect() of a parser when it is a database of DIALECTS, null otherwise (none, unknown, an error); the unsaved editors given', () => {
+    assert.deepEqual(registry.DIALECTS, ['postgresql', 'mysql', 'mariadb', 'sqlite', 'sqlserver', 'cockroachdb', 'singlestore', 'mongodb']);
+    const received = [];
+    const parsers = createRegistry([
+        fake('pg', 1, { dialect: (basePath, options) => (received.push(options), 'postgresql') }),
+        fake('odd', 1, { dialect: () => 'oracle' }),
+        fake('broken', 1, { dialect: () => { throw new Error('unreadable'); } }),
+        fake('none', 1),
+    ]);
+    const overrides = new Map([[path.join(tmpRoot, 'schema'), 'x']]);
+    assert.equal(parsers.getDialect('pg', tmpRoot, { overrides }), 'postgresql');
+    assert.equal(received[0].overrides, overrides);
+    assert.equal(parsers.getDialect('pg', tmpRoot), 'postgresql');
+    assert.deepEqual(received[1], { overrides: null });
+    assert.equal(parsers.getDialect('odd', tmpRoot), null);
+    assert.equal(parsers.getDialect('broken', tmpRoot), null);
+    assert.equal(parsers.getDialect('none', tmpRoot), null);
+    assert.equal(parsers.getDialect('rails', tmpRoot), null);
+    assert.equal(parsers.getDialect('pg', ''), null);
+    // Every parser of DrawMeDatabase tells one, null for an empty folder
+    const empty = fs.mkdtempSync(path.join(tmpRoot, 'empty-'));
+    for (const parser of registry.getParsers()) {
+        assert.equal(typeof parser.dialect, 'function', parser.id);
+        assert.equal(registry.getDialect(parser.id, empty), null, parser.id);
+    }
+});
+
+test('getMigrations(): the migrations() of a parser, cleaned (absolute paths, an integer time when given), or null', () => {
+    const parsers = createRegistry([
+        fake('steps', 1, { migrations: () => ({ root: 'rel', framework: 'steps', migrations: [{ id: 'a', file: 'a.sql', time: 1704110400.7 }, { id: 'b', file: path.join(tmpRoot, 'b.sql'), time: 'soon' }, { id: '', file: 'c.sql' }, { id: 'd' }, null] }) }),
+        fake('other', 1, { migrations: () => ({ root: tmpRoot, framework: 'rails', migrations: [{ id: 'a', file: 'a' }] }) }),
+        fake('empty', 1, { migrations: () => ({ root: tmpRoot, framework: 'empty', migrations: [] }) }),
+        fake('none', 1),
+    ]);
+    assert.deepEqual(parsers.getMigrations('steps', tmpRoot), { root: path.resolve('rel'), framework: 'steps', migrations: [
+        { id: 'a', file: path.resolve('rel', 'a.sql'), time: 1704110400 },
+        { id: 'b', file: path.join(tmpRoot, 'b.sql') },
+    ] });
+    assert.equal(parsers.getMigrations('other', tmpRoot), null, 'a framework the registry does not know');
+    assert.equal(parsers.getMigrations('empty', tmpRoot), null);
+    assert.equal(parsers.getMigrations('none', tmpRoot), null);
+    assert.equal(parsers.getMigrations('rails', tmpRoot), null);
+    assert.equal(parsers.getMigrations('steps', ''), null);
+    // Symfony replays no migrations; the others tell where theirs are
+    assert.equal(registry.getParser('symfony').migrations, undefined);
+    const empty = fs.mkdtempSync(path.join(tmpRoot, 'empty-'));
+    for (const id of ['laravel', 'prisma', 'drizzle', 'sql']) {
+        assert.equal(typeof registry.getParser(id).migrations, 'function', id);
+        assert.equal(registry.getMigrations(id, empty), null, id);
+    }
+});

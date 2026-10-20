@@ -168,9 +168,9 @@ function scriptPath(expression, configDir) {
     return call[1] === 'resolve' ? path.resolve(configDir, ...values) : path.join(...values);
 }
 
-// A `schema` key of an object literal (`schema:`, `'schema':`, `"schema":`, or the shorthand
-// `schema,`), at the start of a property
-const SCHEMA_KEY = /(?:schema|'schema'|"schema")\s*(:|,|\})/y;
+// A key of an object literal (`schema:`, `'schema':`, `"schema":`, or the shorthand `schema,`), at
+// the start of a property
+const keyPattern = (key) => new RegExp(`(?:${key}|'${key}'|"${key}")\\s*(:|,|\\})`, 'y');
 
 // The end of the expression of code from `from`: the next `,` or closing bracket outside of
 // brackets and strings
@@ -222,11 +222,12 @@ function configObject(code) {
     return -1;
 }
 
-// The `schema` property of the object literal at code[open] = '{', not the ones of the objects and
-// functions nested in it (the options of a driver adapter): { value } with the expression as
-// written (null for a shorthand property without its `const schema = ...`), or null when the object
-// has no schema
-function schemaProperty(code, open) {
+// The property `key` of the object literal at code[open] = '{', not the ones of the objects and
+// functions nested in it (the options of a driver adapter): { value, at } with the expression as
+// written and its offset (value null for a shorthand property without its `const key = ...`), or
+// null when the object has no such property
+function objectProperty(code, open, key) {
+    const KEY = keyPattern(key);
     let depth = 0;
     let quote = null;
     // At the start of a property: after the `{` or a `,` of the object
@@ -243,16 +244,16 @@ function schemaProperty(code, open) {
         }
         if (depth === 0 && start && !/\s/.test(c)) {
             start = false;
-            SCHEMA_KEY.lastIndex = i;
-            const key = SCHEMA_KEY.exec(code);
-            if (key && key[1] === ':') {
-                const from = i + key[0].length;
-                return { value: code.slice(from, expressionEnd(code, from)) };
+            KEY.lastIndex = i;
+            const found = KEY.exec(code);
+            if (found && found[1] === ':') {
+                const from = i + found[0].length;
+                return { value: code.slice(from, expressionEnd(code, from)), at: from };
             }
-            if (key) {
-                // Shorthand property: the value of `const schema = ...` in the same file
-                const declaration = /\b(?:const|let|var)\s+schema\s*=\s*([^;\n]+)/.exec(code);
-                return { value: declaration ? declaration[1] : null };
+            if (found) {
+                // Shorthand property: the value of `const key = ...` in the same file
+                const declaration = new RegExp(`\\b(?:const|let|var)\\s+${key}\\s*=\\s*([^;\\n]+)`).exec(code);
+                return { value: declaration ? declaration[1] : null, at: declaration ? declaration.index + declaration[0].length - declaration[1].length : -1 };
             }
         }
         if (c === '"' || c === '\'' || c === '`') {
@@ -282,12 +283,29 @@ function configSchema(configFile, text) {
         // A config built by code: a schema key somewhere cannot be read without running it
         return /(?:^|[{,\s])(?:schema|'schema'|"schema")\s*[:,}]/.test(code) ? { computed: true } : null;
     }
-    const property = schemaProperty(code, open);
+    const property = objectProperty(code, open, 'schema');
     if (!property) {
         return null;
     }
     const resolved = property.value === null ? null : scriptPath(property.value, configDir);
     return resolved === null ? { computed: true } : { path: path.resolve(configDir, resolved) };
+}
+
+// The folder of the migrations set in a Prisma config file (`migrations: { path: 'db/migrations' }`,
+// relative to the folder of the config file, as Prisma reads it): an absolute path, or null when it
+// sets none or cannot be read without running it
+function configMigrations(configFile, text) {
+    const code = stripScriptComments(text);
+    const configDir = path.dirname(configFile);
+    const open = configObject(code);
+    const migrations = open === -1 ? null : objectProperty(code, open, 'migrations');
+    if (!migrations || migrations.value === null) {
+        return null;
+    }
+    const brace = migrations.at + (migrations.value.length - migrations.value.trimStart().length);
+    const folder = code[brace] === '{' ? objectProperty(code, brace, 'path') : null;
+    const resolved = folder && folder.value !== null ? scriptPath(folder.value, configDir) : null;
+    return resolved === null ? null : path.resolve(configDir, resolved);
 }
 
 // The major version of a range of package.json ('^7.10.1', '~6.19', '>=7', 'workspace:^7.0.0'),
@@ -703,6 +721,21 @@ function readBlocks(file, rel, text, warnings) {
     return blocks;
 }
 
+// The datasource block of the blocks of a schema (several datasource blocks are an error for
+// Prisma: the first one) and its provider: { datasource, provider }
+function datasourceOf(blocks) {
+    const datasource = blocks.find(block => block.kind === 'datasource');
+    const settings = new Map();
+    for (const line of datasource ? datasource.lines : []) {
+        const setting = /^([A-Za-z_]\w*)[ \t]*=/.exec(line.mask);
+        const value = setting && readValue(line.code, setting[0].length);
+        if (value) {
+            settings.set(setting[1], value.value);
+        }
+    }
+    return { datasource, provider: stringOf(settings.get('provider')) };
+}
+
 // A field of a model: { name, type, list, optional, native (Unsupported), attributes, line }, or
 // null when the line is not a field
 function readField(line) {
@@ -767,6 +800,47 @@ function sources(basePath, options = {}) {
 }
 module.exports.sources = sources;
 
+// The databases of the providers of a datasource
+const PROVIDERS = { postgresql: 'postgresql', postgres: 'postgresql', mysql: 'mysql', sqlite: 'sqlite', sqlserver: 'sqlserver', cockroachdb: 'cockroachdb', mongodb: 'mongodb' };
+
+// The database of the schema (docs/api.md): the provider of its datasource, or null
+module.exports.dialect = function (basePath, options = {}) {
+    const overrides = (options && options.overrides) || null;
+    const location = typeof basePath === 'string' ? locateSchema(basePath, overrides) : null;
+    if (!location || !location.path || !location.exists) {
+        return null;
+    }
+    const blocks = [];
+    for (const file of location.folder ? listSchemaFiles(location.path) : [location.path]) {
+        const text = readText(file, overrides);
+        if (text !== null) {
+            blocks.push(...readBlocks(file, toPosix(path.relative(basePath, file)), text, []));
+        }
+    }
+    const { provider } = datasourceOf(blocks);
+    return provider && Object.prototype.hasOwnProperty.call(PROVIDERS, provider) ? PROVIDERS[provider] : null;
+};
+
+// The migrations of prisma migrate (docs/api.md, getMigrations()): the SQL of the folder set in the
+// config file (migrations.path), else of the migrations folder next to the schema (prisma/migrations
+// for prisma/schema.prisma; for a schema folder, its migrations sub-folder, else the one next to
+// it), as the SQL reader replays them, in their order (framework: 'sql'); null without migrations
+module.exports.migrations = function (basePath, options = {}) {
+    if (typeof basePath !== 'string' || !isDirectory(basePath)) {
+        return null;
+    }
+    const overrides = (options && options.overrides) || null;
+    const location = locateSchema(basePath, overrides);
+    const text = location.configFile ? readText(location.configFile, overrides) : null;
+    const configured = text === null ? null : configMigrations(location.configFile, text);
+    const folders = configured ? [configured]
+        : location.path && location.exists && location.folder ? [path.join(location.path, 'migrations'), path.join(path.dirname(location.path), 'migrations')]
+            : location.path && location.exists ? [path.join(path.dirname(location.path), 'migrations')]
+                : [path.resolve(basePath, 'prisma', 'migrations')];
+    const folder = folders.find(isDirectory);
+    return folder ? require('./sql').stackMigrations(basePath, folder, 'prisma', overrides) : null;
+};
+
 // ---------------------------------------------------------------------------------------------
 // Tables
 
@@ -802,16 +876,7 @@ module.exports.parse = function (basePath, options = {}) {
     const at = (block, line) => `${block.rel}:${line}`;
 
     // Datasource: the provider (several datasource blocks are an error for Prisma: the first one)
-    const datasource = blocks.find(block => block.kind === 'datasource');
-    const settings = new Map();
-    for (const line of datasource ? datasource.lines : []) {
-        const setting = /^([A-Za-z_]\w*)[ \t]*=/.exec(line.mask);
-        const value = setting && readValue(line.code, setting[0].length);
-        if (value) {
-            settings.set(setting[1], value.value);
-        }
-    }
-    const provider = stringOf(settings.get('provider'));
+    const { datasource, provider } = datasourceOf(blocks);
     // The native types are prefixed with the name of the datasource (@db.VarChar for `datasource db`)
     const nativePrefix = `${datasource ? datasource.name : 'db'}.`;
     if (provider === 'mongodb') {

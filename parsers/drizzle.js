@@ -72,9 +72,14 @@ const DEFAULT_SCHEMAS = new Map([['pg', 'public']]);
 const DETAIL_KEYS = ['length', 'precision', 'scale', 'unsigned', 'default', 'defaultRaw', 'onUpdateCurrent', 'values', 'unique', 'autoIncrement', 'nativeType'];
 // Depth of the helpers inlined, of the aliases followed and of the values computed
 const MAX_DEPTH = 32;
+// The arithmetic of numbers computed in constant values, besides +
+const ARITHMETIC = new Map([['-', (a, b) => a - b], ['*', (a, b) => a * b], ['/', (a, b) => a / b], ['%', (a, b) => a % b], ['**', (a, b) => a ** b]]);
 // The keys and indexes an extra config may give, its spreads read (a helper that spreads another
 // one twice, and so on, gives twice as many at each level)
 const MAX_EXTRA_ITEMS = 1000;
+// The spreads read at most for the columns of a table, or for its extra config, even when they give
+// nothing (a chain of helpers that each spread the one before twice: 2^n spreads)
+const MAX_SPREADS = 5000;
 // Files read at most for one schema (imports followed)
 const MAX_FILES = 2000;
 
@@ -430,10 +435,13 @@ function configObject(scan) {
 }
 
 // The settings of a config file that DrawMeDatabase reads: { schema: [paths] | null, computed,
-// casing, casingComputed }. computed: the schema is set but cannot be read without running the
-// file; casingComputed: the casing neither.
+// casing, casingComputed, out, dialect, driver }. computed: the schema is set but cannot be read
+// without running the file; casingComputed: the casing neither; out: the folder of the migrations;
+// dialect and driver (drizzle-kit before 0.21): as written. out, dialect and driver: undefined when
+// they are not set or cannot be read.
 function readConfig(configFile, text) {
     const configDir = path.dirname(configFile);
+    const word = (value) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
     if (configFile.endsWith('.json')) {
         let json;
         try {
@@ -441,8 +449,11 @@ function readConfig(configFile, text) {
         } catch {
             return { schema: null, computed: true, casing: undefined };
         }
+        if (!json || typeof json !== 'object') {
+            json = {};
+        }
         const schema = typeof json.schema === 'string' ? [json.schema] : Array.isArray(json.schema) && json.schema.every(item => typeof item === 'string') ? json.schema : null;
-        return { schema, computed: json.schema !== undefined && !schema, casing: CASINGS.has(json.casing) ? json.casing : undefined, casingComputed: json.casing !== undefined && !CASINGS.has(json.casing) };
+        return { schema, computed: json.schema !== undefined && !schema, casing: CASINGS.has(json.casing) ? json.casing : undefined, casingComputed: json.casing !== undefined && !CASINGS.has(json.casing), out: word(json.out), dialect: word(json.dialect), driver: word(json.driver) };
     }
     const scan = scanText(configFile, text);
     const properties = configObject(scan);
@@ -454,7 +465,8 @@ function readConfig(configFile, text) {
     const schema = typeof value === 'string' ? [value] : Array.isArray(value) ? value : null;
     const casingNode = properties.get('casing');
     const casing = casingNode ? configValue(scan, casingNode, configDir) : undefined;
-    return { schema, computed: properties.has('schema') && !schema, casing: CASINGS.has(casing) ? casing : undefined, casingComputed: Boolean(casingNode) && !CASINGS.has(casing) };
+    const setting = (key) => (properties.has(key) ? word(configValue(scan, properties.get(key), configDir)) : undefined);
+    return { schema, computed: properties.has('schema') && !schema, casing: CASINGS.has(casing) ? casing : undefined, casingComputed: Boolean(casingNode) && !CASINGS.has(casing), out: setting('out'), dialect: setting('dialect'), driver: setting('driver') };
 }
 
 // A glob segment as a regular expression (`*.ts`, `{a,b}.ts`, `[ab]*`)
@@ -995,13 +1007,18 @@ function createProgram(basePath, overrides, resolver) {
                     }
                     return (node.operator === '??' ? left.value === null || left.value === undefined : !left.value) ? sub(node.right) : left;
                 }
-                if (node.operator !== '+') {
+                const arithmetic = ARITHMETIC.get(node.operator);
+                if (node.operator !== '+' && !arithmetic) {
                     return undefined;
                 }
                 const left = sub(node.left);
                 const right = sub(node.right);
                 if (!left || !right || [left.value, right.value].some(v => typeof v === 'object' && v !== null)) {
                     return undefined;
+                }
+                if (arithmetic) {
+                    // Numbers only (a length computed from another one: len * 2)
+                    return typeof left.value === 'number' && typeof right.value === 'number' && !left.bigint && !right.bigint ? { value: arithmetic(left.value, right.value) } : undefined;
                 }
                 return { value: left.value + right.value };
             }
@@ -1186,6 +1203,23 @@ function createProgram(basePath, overrides, resolver) {
     // the locals of its block
     const bind = (value, args) => {
         const env = new Map();
+        // A destructured parameter ({ name, length = 64 }): the properties of the argument, or
+        // their default value when the argument has no such property; a nested pattern ({ opts: {
+        // length = 12 } = {} }) the same way, from the property or its default
+        const destructure = (names, arg, depth) => {
+            const object = names.some(name => name.default || name.pattern) ? resolve(arg) : null;
+            for (const { key, local, default: fallback, pattern } of names) {
+                const missing = hasProperty(object, key) === false;
+                const property = { module: arg.module, node: { type: 'Member', object: arg.node, property: key, start: arg.node.start, end: arg.node.end }, env: arg.env };
+                if (pattern && depth < MAX_DEPTH) {
+                    destructure(pattern.names, missing && pattern.default ? { module: value.module, node: pattern.default, env } : property, depth + 1);
+                } else if (local !== undefined) {
+                    env.set(local, fallback && missing ? { module: value.module, node: fallback, env } : property);
+                }
+            }
+        };
+        // The names of a pattern, nested ones included
+        const locals = (names) => names.flatMap(name => (name.pattern ? locals(name.pattern.names) : name.local !== undefined ? [name.local] : []));
         value.node.params.forEach((param, i) => {
             let arg = args[i] && args[i].node && args[i].node.type !== 'Spread' ? args[i] : null;
             if (param.names && !arg && param.default) {
@@ -1195,24 +1229,16 @@ function createProgram(basePath, overrides, resolver) {
             if (param.name && arg) {
                 env.set(param.name, arg);
             } else if (param.name && param.default) {
-                env.set(param.name, { module: value.module, node: param.default, env: value.env });
+                // The default value sees the parameters before it: (len = 8, extra = len * 2)
+                env.set(param.name, { module: value.module, node: param.default, env });
             } else if (param.name) {
                 // A missing argument is undefined
                 env.set(param.name, { module: value.module, node: { type: 'Literal', value: undefined, start: 0, end: 0 }, env: null });
             } else if (param.names && arg) {
-                // A destructured parameter ({ name, length = 64 }): the properties of the argument,
-                // or their default value when the argument has no such property
-                const object = param.names.some(name => name.default) ? resolve(arg) : null;
-                for (const { key, local, default: fallback } of param.names) {
-                    if (fallback && hasProperty(object, key) === false) {
-                        env.set(local, { module: value.module, node: fallback, env });
-                    } else {
-                        env.set(local, { module: arg.module, node: { type: 'Member', object: arg.node, property: key, start: arg.node.start, end: arg.node.end }, env: arg.env });
-                    }
-                }
+                destructure(param.names, arg, 0);
             } else if (param.names || param.rest) {
                 // Without its argument, or a rest parameter: names that cannot be read
-                for (const name of param.names ? param.names.map(item => item.local) : [param.rest]) {
+                for (const name of param.names ? locals(param.names) : [param.rest]) {
                     env.set(name, { kind: 'local', name });
                 }
             }
@@ -1252,6 +1278,55 @@ const isSqlTag = (value) => externalName(value) === 'sql';
 
 module.exports.id = 'drizzle';
 module.exports.label = 'Drizzle';
+
+// The settings of the config file of basePath (readConfig()), or null without one
+function configOf(basePath, overrides) {
+    const configFile = findConfigFile(basePath);
+    const text = configFile ? readText(configFile, overrides) : null;
+    return text === null ? null : readConfig(configFile, text);
+}
+
+// The databases of the dialects of drizzle.config.ts, of its driver before drizzle-kit 0.21 (pg,
+// mysql2...), and of the modules of drizzle-orm (pg-core...)
+const CONFIG_DIALECTS = new Map([['postgresql', 'postgresql'], ['mysql', 'mysql'], ['sqlite', 'sqlite'], ['turso', 'sqlite'], ['singlestore', 'singlestore']]);
+const DRIVER_DIALECTS = new Map([['pg', 'postgresql'], ['mysql2', 'mysql'], ['better-sqlite', 'sqlite'], ['libsql', 'sqlite'], ['turso', 'sqlite'], ['d1', 'sqlite']]);
+const MODULE_DIALECTS = new Map([['pg', 'postgresql'], ['mysql', 'mysql'], ['sqlite', 'sqlite'], ['singlestore', 'singlestore']]);
+
+// The database of the project (docs/api.md): the dialect of drizzle.config.ts (turso is SQLite;
+// gel is none of the API), else its driver of drizzle-kit before 0.21, else the module of
+// drizzle-orm that all its schema files import (drizzle-orm/pg-core), else null
+module.exports.dialect = function (basePath, options = {}) {
+    if (typeof basePath !== 'string' || !isDirectory(basePath)) {
+        return null;
+    }
+    const overrides = (options && options.overrides) || null;
+    const config = configOf(basePath, overrides);
+    if (config && config.dialect) {
+        return CONFIG_DIALECTS.get(config.dialect) || null;
+    }
+    if (config && config.driver && DRIVER_DIALECTS.has(config.driver)) {
+        return DRIVER_DIALECTS.get(config.driver);
+    }
+    const found = new Set();
+    for (const file of locateSchema(basePath, overrides).files.slice(0, MAX_FILES)) {
+        for (const match of (readText(file, overrides) || '').matchAll(/['"`]drizzle-orm\/(pg|mysql|sqlite|singlestore)-core['"`]/g)) {
+            found.add(MODULE_DIALECTS.get(match[1]));
+        }
+    }
+    return found.size === 1 ? [...found][0] : null;
+};
+
+// The migrations of drizzle-kit (docs/api.md, getMigrations()): the SQL of the `out` folder of
+// drizzle.config.ts (drizzle/ by default), in the order of its journal, as the SQL reader replays
+// them (framework: 'sql'); null without migrations
+module.exports.migrations = function (basePath, options = {}) {
+    if (typeof basePath !== 'string' || !isDirectory(basePath)) {
+        return null;
+    }
+    const overrides = (options && options.overrides) || null;
+    const config = configOf(basePath, overrides);
+    return require('./sql').stackMigrations(basePath, path.resolve(basePath, (config && config.out) || 'drizzle'), 'drizzle', overrides);
+};
 
 // 100 for a Drizzle config file whose schema files exist, or for a schema at a usual location with
 // drizzle-orm or drizzle-kit in package.json; 50 for a config file whose schema is missing (parse()
@@ -1513,6 +1588,16 @@ module.exports.parse = function (basePath, options = {}) {
         // keeps the place of the first one and takes the last value.
         const entries = new Map();
         const visiting = new Set();
+        // Each warning once (a helper spread twice that cannot be read is told once), and the
+        // spreads read
+        const toldOnce = new Set();
+        const tell = (warning) => {
+            if (!toldOnce.has(warning)) {
+                toldOnce.add(warning);
+                warnings.push(warning);
+            }
+        };
+        let spreads = 0;
         const collect = (ref, depth) => {
             const object = resolve(ref, depth + 1);
             if (depth > MAX_DEPTH || object.kind !== 'node' || visiting.has(object.node)) {
@@ -1525,7 +1610,7 @@ module.exports.parse = function (basePath, options = {}) {
                 if (param && param.name) {
                     env.set(param.name, { kind: 'builders' });
                 } else if (param && param.names) {
-                    param.names.forEach(({ key: builder, local }) => env.set(local, { kind: 'builder', name: builder }));
+                    param.names.filter(name => name.local !== undefined).forEach(({ key: builder, local }) => env.set(local, { kind: 'builder', name: builder }));
                 }
                 bindLocals(object, env);
                 for (const [name, bound] of object.env || []) {
@@ -1550,11 +1635,13 @@ module.exports.parse = function (basePath, options = {}) {
                 if (property.kind === 'init' && !property.computed) {
                     entries.set(property.key, { key: property.key, ref: { module: object.module, node: property.value, env: object.env }, module: object.module, start: property.start, end: property.end });
                 } else if (property.kind === 'spread') {
-                    if (!collect({ module: object.module, node: property.value, env: object.env }, depth + 1)) {
-                        warnings.push(`${at(object.module, property.start)}: ${model.table}: ...${sourceText(object.module, property.value)} cannot be read, its columns are skipped.`);
+                    if (++spreads > MAX_SPREADS) {
+                        tell(`${location}: ${model.table}: the columns spread more than ${MAX_SPREADS} objects, the others are skipped.`);
+                    } else if (!collect({ module: object.module, node: property.value, env: object.env }, depth + 1)) {
+                        tell(`${at(object.module, property.start)}: ${model.table}: ...${sourceText(object.module, property.value)} cannot be read, its columns are skipped.`);
                     }
                 } else if (property.kind !== 'method') {
-                    warnings.push(`${at(object.module, property.start)}: ${model.table}: a computed column key cannot be read, column skipped.`);
+                    tell(`${at(object.module, property.start)}: ${model.table}: a computed column key cannot be read, column skipped.`);
                 }
             }
             visiting.delete(object.node);
@@ -1998,11 +2085,17 @@ module.exports.parse = function (basePath, options = {}) {
             }
         };
         // The code outside of the declaration that the extra config is made of (a helper of
-        // another file, its locals), for the git status of the table
+        // another file, its locals), for the git status of the table: each piece of code once (a
+        // helper spread 2^20 times by a chain of helpers is one source)
+        const tracked = new Set();
         const track = (value) => {
             if (value && value.kind === 'node' && value.module && value.node.end > value.node.start
                 && !(value.module === model.module && value.node.start >= model.decl.start && value.node.end <= model.decl.end)) {
-                model.extraSources.push({ module: value.module, start: value.node.start, end: value.node.end });
+                const key = `${value.module.file}\0${value.node.start}\0${value.node.end}`;
+                if (!tracked.has(key)) {
+                    tracked.add(key);
+                    model.extraSources.push({ module: value.module, start: value.node.start, end: value.node.end });
+                }
             }
         };
         const evaluated = (itemRef) => {
@@ -2017,7 +2110,7 @@ module.exports.parse = function (basePath, options = {}) {
             if (param && param.name) {
                 env.set(param.name, { kind: 'self', table: model });
             } else if (param && param.names) {
-                param.names.forEach(({ key, local }) => env.set(local, { kind: 'column', table: model, key }));
+                param.names.filter(name => name.local !== undefined).forEach(({ key, local }) => env.set(local, { kind: 'column', table: model, key }));
             }
             bindLocals(fn, env);
             for (const [name, bound] of fn.env || []) {
@@ -2035,9 +2128,13 @@ module.exports.parse = function (basePath, options = {}) {
         // The arrays and objects being expanded: a spread of one of them (a helper that spreads
         // itself, `const l = [...l]`) never ends when run, it is told instead of being read again
         const expanding = new Set();
+        // The items and the spreads read: a chain of helpers that each spread the one before twice
+        // makes 2^n of them, even when they give no item
         let count = 0;
+        let spreads = 0;
         // The spread of an array or object `spread` (written at itemRef) read by `expand`, or the
-        // reason it is not: unread 'self', 'many' (more items than an extra config holds), or true
+        // reason it is not: unread 'self', 'many' (more items than an extra config holds), 'spreads'
+        // (more spreads than it is worth reading), or true
         const expandSpread = (spread, itemRef, type, depth, expand) => {
             if (spread.kind === 'node' && expanding.has(spread.node)) {
                 return [{ ...itemRef, unread: 'self' }];
@@ -2045,8 +2142,11 @@ module.exports.parse = function (basePath, options = {}) {
             if (spread.kind !== 'node' || spread.node.type !== type || depth >= MAX_DEPTH) {
                 return [{ ...itemRef, unread: true }];
             }
-            if (count > MAX_EXTRA_ITEMS) {
+            if (count >= MAX_EXTRA_ITEMS) {
                 return [{ ...itemRef, unread: 'many' }];
+            }
+            if (++spreads > MAX_SPREADS) {
+                return [{ ...itemRef, unread: 'spreads' }];
             }
             expanding.add(spread.node);
             const items = expand(spread, depth + 1);
@@ -2063,6 +2163,9 @@ module.exports.parse = function (basePath, options = {}) {
                     for (const item of expandSpread(evaluated(itemRef), itemRef, 'Array', depth, arrayItems)) {
                         items.push(item);
                     }
+                } else if (count >= MAX_EXTRA_ITEMS) {
+                    items.push({ ...itemRef, unread: 'many' });
+                    break;
                 } else {
                     count++;
                     items.push(itemRef);
@@ -2070,17 +2173,32 @@ module.exports.parse = function (basePath, options = {}) {
             }
             return items;
         };
-        // The values of an object, its spreads read
+        // The values of an object, its spreads read. As in JavaScript, a key written again (by a
+        // spread too) keeps the place of the first one and takes the last value.
         const objectValues = (object, depth) => {
             const values = [];
+            const places = new Map();
+            const put = (value) => {
+                if (value.key !== undefined && places.has(value.key)) {
+                    values[places.get(value.key)] = value;
+                } else {
+                    if (value.key !== undefined) {
+                        places.set(value.key, values.length);
+                    }
+                    values.push(value);
+                }
+            };
             for (const property of object.node.properties) {
                 const itemRef = property.value ? { module: object.module, node: property.value, env: object.env } : null;
-                if (itemRef && property.kind === 'init') {
+                if (itemRef && property.kind === 'init' && count >= MAX_EXTRA_ITEMS) {
+                    values.push({ ...itemRef, unread: 'many' });
+                    break;
+                } else if (itemRef && property.kind === 'init') {
                     count++;
-                    values.push(itemRef);
+                    put(property.computed ? itemRef : { ...itemRef, key: property.key });
                 } else if (itemRef && property.kind === 'spread') {
                     for (const value of expandSpread(evaluated(itemRef), itemRef, 'Object', depth, objectValues)) {
-                        values.push(value);
+                        put(value);
                     }
                 }
             }
@@ -2096,6 +2214,10 @@ module.exports.parse = function (basePath, options = {}) {
         const readItem = (itemRef, nested) => {
             if (itemRef.unread === 'many') {
                 told(ref, `the extra config gives more than ${MAX_EXTRA_ITEMS} keys and indexes, the others are skipped.`);
+                return;
+            }
+            if (itemRef.unread === 'spreads') {
+                told(ref, `the extra config spreads more than ${MAX_SPREADS} arrays and objects, the others are skipped.`);
                 return;
             }
             if (itemRef.unread) {

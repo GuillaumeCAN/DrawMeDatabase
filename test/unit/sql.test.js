@@ -520,6 +520,20 @@ CREATE TABLE \${table} (id int);`,
         assert.deepEqual(registry.watchPatterns(registry.getSources('sql', flyway)), [{ base: at(flyway, 'db', 'migration'), pattern: '**/*.sql' }]);
     });
 
+    it('the folder of prisma migrate or of drizzle-kit as the framework folder (40): with its lock file or its journal, in their order, watched with its sub-folders', () => {
+        const prisma = project({ '20240102000000_b/migration.sql': TABLE('b'), '20240101000000_a/migration.sql': TABLE('a'), 'migration_lock.toml': 'provider = "postgresql"\n' });
+        assert.deepEqual(layoutOf(prisma), { layout: 'prisma', files: ['20240101000000_a/migration.sql', '20240102000000_b/migration.sql'] });
+        assert.equal(parser.detect(prisma), 40);
+        assert.deepEqual(registry.getSources('sql', prisma), { folders: [{ path: prisma, recursive: true }], files: [path.join(prisma, 'migration_lock.toml')], extensions: ['.sql'] });
+        assert.equal(layoutOf(project({ '1_a/migration.sql': TABLE('a') })), null, 'without its lock file');
+        const drizzle = project({ '0000_b.sql': TABLE('b'), '0001_a.sql': TABLE('a'), 'meta/_journal.json': JSON.stringify({ dialect: 'postgresql', entries: [{ idx: 0, tag: '0001_a' }, { idx: 1, tag: '0000_b' }] }) });
+        assert.deepEqual(layoutOf(drizzle), { layout: 'drizzle', files: ['0001_a.sql', '0000_b.sql'] });
+        assert.deepEqual(tables(drizzle), ['a', 'b']);
+        assert.deepEqual(registry.getSources('sql', drizzle).files, [path.join(drizzle, 'meta', '_journal.json')]);
+        // Without the journal: numbered migrations, by number
+        assert.deepEqual(layoutOf(project({ '0001_a.sql': TABLE('a'), '0000_b.sql': TABLE('b') })), { layout: 'migrations', files: ['0000_b.sql', '0001_a.sql'] });
+    });
+
     it('the tables of the migration tools are not drawn: schema_migrations, flyway_schema_history, _prisma_migrations, goose_db_version...', () => {
         const dump = ['schema_migrations', 'ar_internal_metadata', 'flyway_schema_history', '_prisma_migrations', 'goose_db_version', '__drizzle_migrations', '__diesel_schema_migrations', '_sqlx_migrations', 'atlas_schema_revisions', 'pgmigrations', 'sqlite_sequence']
             .map(name => `CREATE TABLE ${name} (version text PRIMARY KEY);\nCREATE INDEX ${name}_idx ON ${name} (version);\nALTER TABLE ${name} ADD COLUMN x int;\n`).join('') + 'CREATE TABLE drizzle.__drizzle_migrations (id serial);\nCREATE TABLE users (id int);\n';
@@ -531,6 +545,88 @@ CREATE TABLE \${table} (id int);`,
 });
 
 // ---------------------------------------------------------------------------------------------
+
+describe('sql parser: the migrations and the dialect of a project (API version 4)', () => {
+    const TABLE = (name) => `CREATE TABLE ${name} (id int);\n`;
+    const steps = (result) => result && { root: result.root, framework: result.framework, migrations: result.migrations.map(m => [path.relative(result.root, m.file), m.id, m.time]) };
+
+    it('the migrations of each layout in the order of their tool, their id what `until` takes, the time their name or journal tells; none for a dump', () => {
+        const supabase = project({ 'supabase/migrations/20240102030405_b.sql': TABLE('b'), 'supabase/migrations/20240101000000_a.sql': TABLE('a') });
+        assert.deepEqual(steps(parser.migrations(supabase)), { root: supabase, framework: 'sql', migrations: [
+            [path.join('supabase', 'migrations', '20240101000000_a.sql'), '20240101000000_a.sql', Date.UTC(2024, 0, 1) / 1000],
+            [path.join('supabase', 'migrations', '20240102030405_b.sql'), '20240102030405_b.sql', Date.UTC(2024, 0, 2, 3, 4, 5) / 1000],
+        ] });
+        const flyway = project({ 'db/migration/V10__c.sql': TABLE('c'), 'db/migration/V2__b.sql': TABLE('b'), 'db/migration/old/V20240101120000__a.sql': TABLE('a') });
+        assert.deepEqual(steps(parser.migrations(flyway)).migrations.map(([, id, time]) => [id, time]), [['V2__b.sql', undefined], ['V10__c.sql', undefined], ['V20240101120000__a.sql', Date.UTC(2024, 0, 1, 12) / 1000]]);
+        const golang = project({ 'migrations/1704110400_init.up.sql': TABLE('a'), 'migrations/1704110400_init.down.sql': 'DROP TABLE a;', 'migrations/0000000002_seq.up.sql': TABLE('b') });
+        assert.deepEqual(steps(parser.migrations(golang)).migrations.map(([, id, time]) => [id, time]), [['0000000002_seq.up.sql', undefined], ['1704110400_init.up.sql', 1704110400]]);
+        const drizzle = project({ 'drizzle/0000_a.sql': TABLE('a'), 'drizzle/meta/_journal.json': JSON.stringify({ entries: [{ idx: 0, tag: '0000_a', when: 1704110400123 }] }) });
+        assert.deepEqual(steps(parser.migrations(drizzle)).migrations, [[path.join('drizzle', '0000_a.sql'), '0000_a.sql', 1704110400]]);
+        const prisma = project({ 'prisma/migrations/20240101000000_init/migration.sql': TABLE('a'), 'prisma/migrations/migration_lock.toml': 'provider = "postgresql"\n' });
+        assert.deepEqual(steps(parser.migrations(prisma)).migrations, [[path.join('prisma', 'migrations', '20240101000000_init', 'migration.sql'), '20240101000000_init', Date.UTC(2024, 0, 1) / 1000]]);
+        // Each id gives the schema right after its migration
+        for (const migration of parser.migrations(supabase).migrations) {
+            assert.deepEqual(parser.parse(supabase, { git: false, until: migration.id }).tables.map(t => t.table), migration.id.endsWith('_a.sql') ? ['a'] : ['a', 'b']);
+        }
+        // Any .sql file of the folder (the framework set to sql): by name
+        assert.deepEqual(steps(parser.migrations(project({ 'tables.sql': TABLE('a'), 'more.sql': TABLE('b') }))).migrations.map(([, id]) => id), ['more.sql', 'tables.sql']);
+        assert.equal(parser.migrations(project({ 'schema.sql': TABLE('a') })), null, 'a dump');
+        assert.equal(parser.migrations(project({ 'db/structure.sql': TABLE('a') })), null, "Rails' structure.sql");
+        assert.equal(parser.migrations(project({ 'README.md': '' })), null);
+        assert.equal(parser.migrations(path.join(TMP, 'dmdb-sql-missing')), null);
+    });
+
+    it('the time of a migration: the timestamp that starts its name, read as UTC, when it is a date', () => {
+        const at = (...parts) => Date.UTC(...parts) / 1000;
+        assert.equal(parser.migrationTime('20240229235960_leap.sql'), at(2024, 1, 29, 23, 59, 60));
+        assert.equal(parser.migrationTime('2024-01-02-030405_diesel'), at(2024, 0, 2, 3, 4, 5));
+        assert.equal(parser.migrationTime('2024_01_02_030405_create_users_table.php'), at(2024, 0, 2, 3, 4, 5));
+        assert.equal(parser.migrationTime('V20240102030405__flyway.sql'), at(2024, 0, 2, 3, 4, 5));
+        for (const name of ['V1__a.sql', '0001_a.sql', '20241301000000_month.sql', '20240101250000_hour.sql', '202401010000001_more_digits.sql', '19690101000000_old.sql', '', undefined]) {
+            assert.equal(parser.migrationTime(name), undefined, name);
+        }
+    });
+
+    it("the migrations of an ORM's folder (stackMigrations): from the first folder where the SQL reader finds that folder with that layout", () => {
+        const files = { 'supabase/migrations/1_s.sql': TABLE('s'), 'drizzle/0000_a.sql': TABLE('a'), 'drizzle/meta/_journal.json': JSON.stringify({ entries: [{ idx: 0, tag: '0000_a' }] }) };
+        // The framework root reads supabase/migrations first: drizzle/ is read from itself
+        const both = project(files);
+        assert.equal(parser.stackMigrations(both, path.join(both, 'drizzle'), 'drizzle').root, path.join(both, 'drizzle'));
+        const alone = project({ 'drizzle/0000_a.sql': TABLE('a'), 'drizzle/meta/_journal.json': files['drizzle/meta/_journal.json'] });
+        assert.equal(parser.stackMigrations(alone, path.join(alone, 'drizzle'), 'drizzle').root, alone);
+        // drizzle-kit writing into supabase/migrations: its journal, from supabase/
+        const out = project({ 'supabase/migrations/0000_a.sql': TABLE('a'), 'supabase/migrations/meta/_journal.json': files['drizzle/meta/_journal.json'] });
+        assert.deepEqual(steps(parser.stackMigrations(out, path.join(out, 'supabase', 'migrations'), 'drizzle')), { root: path.join(out, 'supabase'), framework: 'sql', migrations: [[path.join('migrations', '0000_a.sql'), '0000_a.sql', undefined]] });
+        // A folder of another name (prisma.config.ts migrations.path), outside of the project too
+        const custom = project({ 'db/history/20240101000000_a/migration.sql': TABLE('a'), 'db/history/migration_lock.toml': 'provider = "mysql"\n' });
+        assert.equal(parser.stackMigrations(path.join(custom, 'app'), path.join(custom, 'db', 'history'), 'prisma').root, path.join(custom, 'db', 'history'));
+        assert.equal(parser.stackMigrations(alone, path.join(alone, 'missing'), 'drizzle'), null);
+        assert.equal(parser.stackMigrations(alone, path.join(alone, 'drizzle'), 'prisma'), null, 'not the layout of that ORM');
+    });
+
+    it('the dialect: the one the tool of the files tells, else what only one dialect writes, else the names of the folders; MariaDB by its dump or folder; null when nothing tells it', () => {
+        const dialect = (files) => parser.dialect(project(files));
+        assert.equal(dialect({ 'supabase/migrations/1_a.sql': TABLE('a') }), 'postgresql');
+        assert.equal(dialect({ 'prisma/migrations/1_a/migration.sql': TABLE('a'), 'prisma/migrations/migration_lock.toml': 'provider = "cockroachdb"\n' }), 'cockroachdb');
+        assert.equal(dialect({ 'prisma/migrations/1_a/migration.sql': TABLE('a'), 'prisma/migrations/migration_lock.toml': 'provider = "sqlserver"\n' }), 'sqlserver');
+        assert.equal(dialect({ 'drizzle/0000_a.sql': TABLE('a'), 'drizzle/meta/_journal.json': JSON.stringify({ dialect: 'turso', entries: [{ idx: 0, tag: '0000_a' }] }) }), 'sqlite');
+        assert.equal(dialect({ 'drizzle/0000_a.sql': TABLE('a'), 'drizzle/meta/_journal.json': JSON.stringify({ dialect: 'singlestore', entries: [{ idx: 0, tag: '0000_a' }] }) }), 'singlestore');
+        assert.equal(dialect({ 'schema.sql': 'CREATE TABLE a (id int AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB;\n' }), 'mysql');
+        assert.equal(dialect({ 'schema.sql': '-- MariaDB dump 10.19  Distrib 10.11.6-MariaDB\nCREATE TABLE a (id int AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB;\n' }), 'mariadb');
+        assert.equal(dialect({ 'db/mariadb/migrations/1_a.sql': 'CREATE TABLE a (id int AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB;\n' }), null, 'not a layout');
+        assert.equal(parser.dialect(path.join(project({ 'mariadb/migrations/1_a.sql': 'CREATE TABLE a (id int AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB;\n' }), 'mariadb')), 'mariadb');
+        assert.equal(dialect({ 'schema.sql': 'CREATE TABLE a (id INTEGER PRIMARY KEY AUTOINCREMENT);\n' }), 'sqlite');
+        assert.equal(dialect({ 'migrations/sqlite/001_a.sql': TABLE('a') }), null, 'the migrations folder is not the framework folder');
+        assert.equal(parser.dialect(path.join(project({ 'sqlite/001_a.sql': TABLE('a') }), 'sqlite')), 'sqlite', 'the name of the folder');
+        assert.equal(dialect({ 'schema.sql': TABLE('a') }), null, 'SQL that only one dialect would not write');
+        assert.equal(dialect({ 'README.md': '' }), null);
+        // The text of an unsaved editor, and only the start of a large dump
+        const dir = project({ 'schema.sql': TABLE('a') });
+        assert.equal(parser.dialect(dir, { overrides: new Map([[path.join(dir, 'schema.sql'), 'CREATE TABLE a (id serial, b jsonb);\n']]) }), 'postgresql');
+        const large = project({ 'dump.sql': `CREATE TABLE a (id int) ENGINE=InnoDB;\n${'-- '.padEnd(1000, 'x')}\n`.repeat(2000) });
+        assert.equal(registry.getDialect('sql', large), 'mysql');
+    });
+});
 
 describe('sql parser: detection among the frameworks', () => {
     it('SQL scores below the frameworks: a Laravel project with a schema.sql is Laravel, a Supabase project with Drizzle is Drizzle', () => {
@@ -983,6 +1079,36 @@ alter table r drop column "null", drop column varying, drop column "precision", 
         assert.deepEqual(tableNamed(tables, 'r').indexes.map(index => index.name), ['r_year', 'r_epoch', 'r_day', 'r_zone', 'r_case', 'r_null', 'r_cast', 'r_double', 'r_with_zone', 'r_literal', 'r_unit', 'r_unknown', 'r_collate']);
     });
 
+    it('DROP COLUMN keeps the indexes of IS JSON, IS NORMALIZED, normalize() and xmlparse(): their words are no columns, columns of those names are', () => {
+        const { tables } = replayed(`create table r (id int primary key, name text, payload text, n int, json int, nfc int, nfkd int, normalized int, document int, content int, keys int, scalar int, object int, value int);
+create index r_a on r (n) where payload is json;
+create index r_b on r (n) where payload is not json object;
+create index r_c on r (n) where payload is json scalar with unique keys;
+create index r_d on r (n) where payload is json value without unique;
+create index r_e on r (n) where name is nfc normalized;
+create index r_f on r (n) where name is not nfkd normalized;
+create index r_g on r (n) where name is normalized;
+create index r_h on r ((normalize(name, nfc)));
+create index r_i on r ((normalize(name, nfkd)));
+create index r_j on r ((xmlparse(document name)::text));
+create index r_k on r ((xmlparse(content name)::text));
+create index r_l on r ((xmlserialize(document xmlparse(document name) as text)));
+create index i_json on r ((json + 1));
+create index i_nfc on r ((nfc + n));
+create index i_doc on r (n) where document > 0;
+create index i_content on r ((content * 2));
+create index i_keys on r ((keys + 1));
+create index i_scalar on r (n) where scalar is not null;
+create index i_object on r ((object - 1));
+create index i_value on r (n) where value is null;
+create index i_norm on r ((normalized + nfkd));
+create index i_fn on r ((normalize(name)));
+alter table r drop column json, drop column nfc, drop column nfkd, drop column normalized, drop column document;
+alter table r drop column content, drop column keys, drop column scalar, drop column object, drop column value;`);
+        // As PostgreSQL 17.11 keeps them: the i_ ones use the dropped columns, except i_fn
+        assert.deepEqual(tableNamed(tables, 'r').indexes.map(index => index.name), ['r_a', 'r_b', 'r_c', 'r_d', 'r_e', 'r_f', 'r_g', 'r_h', 'r_i', 'r_j', 'r_k', 'r_l', 'i_fn']);
+    });
+
     it('the columns added, dropped, renamed or altered on a parent are those of the tables that inherit it (INHERITS), unless ONLY or their own; DROP ... CASCADE drops them', () => {
         const { tables, warnings } = replayed(`create table parent (id int primary key, old text, shared text);
 create table child (extra text, shared text) inherits (parent);
@@ -1039,6 +1165,32 @@ create table own (k int) inherits (s2);`);
         // As PostgreSQL 17 has them
         assert.deepEqual(shape(tables), { p1: '', p2: 'id? b? a? c?', mc: 'id? a? b? own?', mc2: 'id? a? b? own?', q1: 'x? y?', q2: '', mq: 'y?', s1: '', s2: 'k?', sc: 'k? z?', own: 'k?' });
         assert.deepEqual(warnings, []);
+    });
+
+    it('a table that inherits two tables of the same parent (a diamond) counts the columns of that parent once per line: a column dropped from it goes, an added one stays while one line gives it', () => {
+        const { tables, warnings } = replayed(`create table gp (id int, x int);
+create table p1 (a int) inherits (gp);
+create table p2 (b int) inherits (gp);
+create table c (own int) inherits (p1, p2);
+create table cc (k int) inherits (c);
+alter table gp drop column x;
+alter table gp add column y int;
+alter table p1 no inherit gp;
+alter table p1 drop column y;
+alter table gp add column z int;
+create table h1 (id int, w int);
+create table h2 (id int, w int);
+create table hd (own int) inherits (h1, h2);
+create table hdd (q int) inherits (hd);
+alter table c no inherit p2;
+alter table gp drop column z;`);
+        // As PostgreSQL 17.11 has them: c.x dropped through both parents, c.y kept by p2, c.z left
+        // to c once it no longer inherits p2
+        assert.deepEqual(shape(tables), { gp: 'id? y?', p1: 'id? a?', p2: 'id? b? y?', c: 'id? a? b? own? y? z?', cc: 'id? a? b? own? k? y? z?', h1: 'id? w?', h2: 'id? w?', hd: 'id? w? own?', hdd: 'id? w? own? q?' });
+        assert.deepEqual(warnings, []);
+        // A loop of INHERIT (PostgreSQL refuses it) ends: b gets x once
+        const loop = replayed('create table a (id int);\ncreate table b () inherits (a);\nalter table a inherit b;\nalter table a add column x int;\nalter table b drop column id;\n');
+        assert.deepEqual(shape(loop.tables), { a: 'id? x?', b: 'x?' });
     });
 });
 
@@ -1207,6 +1359,38 @@ ALTER TABLE c9 DROP FOREIGN KEY c9_ibfk_2;`;
         // As MariaDB 11.8 (which creates the REFERENCES of c9.d) and MySQL 8.4 have them
         assert.deepEqual(keys(replayed(`-- MariaDB dump 10.19  Distrib 11.8.2-MariaDB\n${text}`, 'mysql').tables), ['c3.b', 'c3.d', 'c4.a', 'c4.b', 'c5.a', 'c5.b', 'c9.a', 'c9.e']);
         assert.deepEqual(keys(replayed(text, 'mysql').tables), ['c3.b', 'c3.d', 'c4.a', 'c4.b', 'c5.a', 'c5.b', 'c9.a']);
+    });
+
+    it('the names of the foreign keys as MySQL and MariaDB give them: CONSTRAINT without a name, a table renamed with its keys, the prefix as written, the index name of FOREIGN KEY idx', () => {
+        const text = `CREATE TABLE u (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE c1 (id INT PRIMARY KEY, x INT, CONSTRAINT FOREIGN KEY (x) REFERENCES u(id)) ENGINE=InnoDB;
+CREATE TABLE c2 (id INT PRIMARY KEY, x INT) ENGINE=InnoDB;
+ALTER TABLE c2 ADD CONSTRAINT FOREIGN KEY (x) REFERENCES u(id);
+CREATE TABLE old_orders (id INT PRIMARY KEY, x INT, y INT, FOREIGN KEY (x) REFERENCES u(id)) ENGINE=InnoDB;
+ALTER TABLE old_orders RENAME TO orders;
+ALTER TABLE orders ADD FOREIGN KEY (y) REFERENCES u(id);
+ALTER TABLE orders DROP FOREIGN KEY orders_ibfk_1;
+CREATE TABLE r1 (id INT PRIMARY KEY, x INT, y INT, FOREIGN KEY (x) REFERENCES u(id)) ENGINE=InnoDB;
+RENAME TABLE r1 TO r2;
+ALTER TABLE r2 ADD FOREIGN KEY (y) REFERENCES u(id);
+ALTER TABLE r2 DROP FOREIGN KEY r2_ibfk_2;
+CREATE TABLE a4 (id INT PRIMARY KEY, x INT, y INT, CONSTRAINT A4_IBFK_3 FOREIGN KEY (x) REFERENCES u(id)) ENGINE=InnoDB;
+ALTER TABLE a4 ADD FOREIGN KEY (y) REFERENCES u(id);
+ALTER TABLE a4 DROP FOREIGN KEY a4_ibfk_1;
+CREATE TABLE a3 (id INT PRIMARY KEY, x INT, y INT, FOREIGN KEY fk_named_idx (y) REFERENCES u(id), FOREIGN KEY (x) REFERENCES u(id)) ENGINE=InnoDB;`;
+        const names = (dump) => {
+            const state = parser.replay([{ path: path.join(BASE, 'schema.sql'), rel: 'schema.sql', text: dump, sections: null }]);
+            return [...state.tables.values()].flatMap(table => table.foreignKeys.map(fk => `${table.ref.name}.${fk.columns.join()} ${fk.name}`));
+        };
+        // As MySQL 8.4.11 names them (a3_ibfk_1 is y's, dropped)
+        assert.deepEqual(names(`${text}\nALTER TABLE a3 DROP FOREIGN KEY a3_ibfk_1;`), ['c1.x c1_ibfk_1', 'c2.x c2_ibfk_1', 'orders.y orders_ibfk_2', 'r2.x r2_ibfk_1', 'a4.x A4_IBFK_3', 'a3.x a3_ibfk_2']);
+        // As MariaDB 11.8.9 names them: FOREIGN KEY fk_named_idx is the name of the key
+        assert.deepEqual(names(`-- MariaDB dump 10.19  Distrib 10.11.6-MariaDB\n${text}`), ['c1.x c1_ibfk_1', 'c2.x c2_ibfk_1', 'orders.y orders_ibfk_2', 'r2.x r2_ibfk_1', 'a4.x A4_IBFK_3', 'a3.y fk_named_idx', 'a3.x a3_ibfk_1']);
+        // The unnamed CONSTRAINT UNIQUE and CHECK too, on a table and on a column
+        const { tables, warnings } = replayed('CREATE TABLE u (id INT PRIMARY KEY) ENGINE=InnoDB;\nCREATE TABLE c3 (id INT PRIMARY KEY, x INT, y INT, z INT CONSTRAINT CHECK (z > 0), CONSTRAINT UNIQUE (y), CONSTRAINT UNIQUE KEY uz (z), CONSTRAINT CHECK (x > 0), CONSTRAINT FOREIGN KEY (x) REFERENCES u(id)) ENGINE=InnoDB;', 'mysql');
+        assert.deepEqual(tableNamed(tables, 'c3').columns.map(column => [column.name, Boolean(column.unique)]), [['id', false], ['x', false], ['y', true], ['z', true]]);
+        assert.deepEqual(relationsOf(tables), ['c3.x -> u.id many-to-one']);
+        assert.deepEqual(warnings, []);
     });
 });
 

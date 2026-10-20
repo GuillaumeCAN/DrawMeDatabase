@@ -449,7 +449,8 @@ function splitList(ctx, from, to) {
     return items;
 }
 
-// The parameters of a function between from..to: [{ name } | { names: [{ key, local }] } | {}]
+// The parameters of a function between from..to: [{ name, default } | { names: [{ key, local,
+// default } | { key, pattern: { names, default } }], default } | { rest } | {}]
 function readParams(ctx, from, to) {
     const { tokens } = ctx;
     return splitList(ctx, from, to).map(([a, b]) => {
@@ -472,8 +473,13 @@ function readParams(ctx, from, to) {
         }
         if (isPunct(tokens[j], '{')) {
             const close = Math.min(after(ctx, j) - 1, b);
-            // { key }, { key: local }, and their default values ({ key = 1 }, { key: local = 1 })
+            // { key }, { key: local }, and their default values ({ key = 1 }, { key: local = 1 }); a
+            // nested pattern ({ key: { inner = 1 } = {} }): { key, pattern: { names, default } }
             const names = splitList(ctx, j + 1, close).map(([c, d]) => {
+                if (isName(tokens[c]) && isPunct(tokens[c + 1], ':') && isPunct(tokens[c + 2], '{')) {
+                    const [pattern] = readParams(ctx, c + 2, d);
+                    return pattern && pattern.names ? { key: tokens[c].value, pattern } : null;
+                }
                 const renamed = isName(tokens[c]) && isPunct(tokens[c + 1], ':') && isName(tokens[c + 2]);
                 if (!renamed && !(isName(tokens[c]) && c < d)) {
                     return null;
@@ -636,6 +642,131 @@ function blockDeclarations(block) {
 
 // Words before the `(...)` of a statement whose `{` opens a block of statements
 const BLOCK_STATEMENTS = new Set(['if', 'for', 'while', 'switch', 'catch', 'with']);
+// Words before a `(` that is not the parameters of a method
+const NOT_METHODS = new Set([...BLOCK_STATEMENTS, 'function', 'return', 'typeof', 'void', 'delete', 'await', 'yield', 'new', 'in', 'of', 'instanceof', 'case', 'throw', 'super', 'import']);
+
+// Whether a token is followed by the start of a member of an object or a class (its name)
+const MEMBER_WORDS = new Set(['async', 'get', 'set', 'static', 'public', 'private', 'protected', 'readonly', 'override', 'abstract']);
+const memberStart = (token) => !token || (token.type === 'punct' && ['{', ',', ';', '}', '*'].includes(token.value)) || (isName(token) && MEMBER_WORDS.has(token.value));
+
+// The names a parameter list (from..to) declares, destructured ones included
+function paramNames(ctx, from, to) {
+    const { tokens } = ctx;
+    const names = [];
+    for (const [a, b] of splitList(ctx, from, to)) {
+        let j = a;
+        while (j < b && (isName(tokens[j], 'public') || isName(tokens[j], 'private') || isName(tokens[j], 'protected') || isName(tokens[j], 'readonly') || isPunct(tokens[j], '...'))) {
+            j++;
+        }
+        if (isPunct(tokens[j], '{') || isPunct(tokens[j], '[')) {
+            names.push(...patternNames(ctx, j, b).names);
+        } else if (isName(tokens[j])) {
+            names.push(tokens[j].value);
+        }
+    }
+    return names;
+}
+
+// The scopes nested in tokens from..to that declare names of their own: the functions (their
+// parameters and the declarations of their body: arrow functions, function declarations and
+// expressions, methods) and the blocks of statements (their declarations, the variable of a `for`
+// or a `catch`). [{ from, to, names: Set }]: a name used from..to is not the one of the outer block.
+function nestedScopes(ctx, from, to) {
+    const { tokens } = ctx;
+    const scopes = [];
+    // The opening bracket of each closing one
+    const openers = new Map();
+    for (let k = from; k < to; k++) {
+        if (ctx.match[k] >= 0) {
+            openers.set(ctx.match[k], k);
+        }
+    }
+    const add = (a, b, names) => {
+        if (names.length > 0) {
+            scopes.push({ from: a, to: b, names: new Set(names) });
+        }
+    };
+    // The body at i: a Block (its declarations count) or an expression; the index after it
+    const body = (i, names) => {
+        if (isPunct(tokens[i], '{')) {
+            const close = Math.min(after(ctx, i) - 1, to);
+            return { end: close + 1, names: [...names, ...blockDeclarations({ ctx, from: i + 1, to: close }).map(declaration => declaration.name)] };
+        }
+        return { end: Math.max(parseExpression(ctx, i, to).next, i + 1), names };
+    };
+    // The parameters (open..close) and the body after them (a return type skipped): a function
+    const fn = (start, open, close) => {
+        let k = close + 1;
+        if (isPunct(tokens[k], ':')) {
+            k = skipType(ctx, k + 1, to);
+        }
+        if (isPunct(tokens[k], '{')) {
+            const read = body(k, paramNames(ctx, open + 1, close));
+            add(start, read.end, read.names);
+        }
+    };
+    for (let j = from; j < to; j++) {
+        const token = tokens[j];
+        const arrow = (isPunct(token, '(') || isName(token)) && !isPunct(tokens[j - 1], '.') ? arrowAt(ctx, j, to) : null;
+        if (arrow) {
+            const read = body(arrow.arrow + 1, arrow.single ? [arrow.single] : paramNames(ctx, arrow.params[0], arrow.params[1]));
+            add(j, read.end, read.names);
+            continue;
+        }
+        if (isName(token, 'function')) {
+            let k = j + 1;
+            if (isPunct(tokens[k], '*')) {
+                k++;
+            }
+            if (isName(tokens[k])) {
+                k++;
+            }
+            if (isPunct(tokens[k], '<')) {
+                const next = skipAngles(ctx, k, to);
+                k = next === -1 ? k : next;
+            }
+            if (isPunct(tokens[k], '(')) {
+                fn(j, k, Math.min(after(ctx, k) - 1, to));
+            }
+            continue;
+        }
+        if (isPunct(token, '(') && isName(tokens[j - 1]) && !NOT_METHODS.has(tokens[j - 1].value) && memberStart(tokens[j - 2])) {
+            // A method: name(params) { ... } in an object or a class
+            fn(j, j, Math.min(after(ctx, j) - 1, to));
+            continue;
+        }
+        if (isPunct(token, '(') && (isName(tokens[j - 1], 'for') || isName(tokens[j - 1], 'catch'))) {
+            // for (const x of list) { ... }, catch (err) { ... }: the variable, then the block
+            const close = Math.min(after(ctx, j) - 1, to);
+            let k = j + 1;
+            if (isName(tokens[k], 'await')) {
+                k++;
+            }
+            if (isName(tokens[k], 'const') || isName(tokens[k], 'let') || isName(tokens[k], 'var')) {
+                k++;
+            } else if (!isName(tokens[j - 1], 'catch')) {
+                continue;
+            }
+            const names = isPunct(tokens[k], '{') || isPunct(tokens[k], '[') ? patternNames(ctx, k, close).names : isName(tokens[k]) ? [tokens[k].value] : [];
+            const block = isPunct(tokens[close + 1], '{') ? Math.min(after(ctx, close + 1), to) : Math.max(parseExpression(ctx, close + 1, to).next, close + 1);
+            add(j, block, names);
+            continue;
+        }
+        if (isPunct(token, '{')) {
+            // A block of statements, not an object: its declarations
+            const previous = tokens[j - 1];
+            const group = isPunct(previous, ')') ? openers.get(j - 1) : -1;
+            const statement = j === from || (previous && previous.type === 'punct' && [';', '{', '}'].includes(previous.value))
+                || (isName(previous) && ['else', 'try', 'finally', 'do', 'catch'].includes(previous.value))
+                || (group > 0 && isName(tokens[group - 1]) && BLOCK_STATEMENTS.has(tokens[group - 1].value));
+            if (statement) {
+                const close = Math.min(after(ctx, j) - 1, to);
+                add(j, close + 1, blockDeclarations({ ctx, from: j + 1, to: close }).map(declaration => declaration.name));
+            }
+        }
+    }
+    return scopes;
+}
 
 // The methods of an array that change it, besides push and unshift
 const ARRAY_CHANGES = new Set(['pop', 'shift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin']);
@@ -652,7 +783,8 @@ const ENDS_EXPRESSION = new Set(['name', 'number', 'string', 'template', 'regex'
 // (`name.push(a, ...b)`), { type: 'merge', sources } (`Object.assign(name, a, b)`). A local changed
 // in a way that cannot be read is unreadable: another operator, a change nested in an inner block,
 // a condition, a loop or a function, a change that uses the local itself, another method that
-// changes an array. params: the names of the parameters of the function of the block, changed the
+// changes an array; not a nested function or block that declares a variable of the same name (it
+// changes its own). params: the names of the parameters of the function of the block, changed the
 // same way. Kept on the block.
 function blockChanges(block, params = []) {
     if (block.changes) {
@@ -744,10 +876,17 @@ function blockChanges(block, params = []) {
         }
         return Boolean(tokens[i].newline) && (ENDS_EXPRESSION.has(previous.type) || isPunct(previous, ']') || isPunct(previous, ')'));
     };
+    // The functions and blocks nested in the block that declare names of their own (read once
+    // needed): a name they declare is not the local there (`(cols) => { cols.x = 1 }`)
+    let scopes = null;
+    const shadowed = (i) => {
+        scopes = scopes || nestedScopes(ctx, from, to);
+        return scopes.some(scope => scope.from <= i && i < scope.to && scope.names.has(tokens[i].value));
+    };
     // Whether tokens a..b use the local `name`, except at `except`
     const uses = (a, b, name, except) => {
         for (let k = a; k < b; k++) {
-            if (k !== except && isName(tokens[k], name) && !isPunct(tokens[k - 1], '.') && !isPunct(tokens[k - 1], '?.')) {
+            if (k !== except && isName(tokens[k], name) && !isPunct(tokens[k - 1], '.') && !isPunct(tokens[k - 1], '?.') && !shadowed(k)) {
                 return true;
             }
         }
@@ -831,9 +970,10 @@ function blockChanges(block, params = []) {
         j++;
     }
     // Any other change cannot be read: nested in an inner block or a function, in a condition, in
-    // an expression. The dead code after the return is left out, not the functions declared there.
+    // an expression. The dead code after the return is left out, not the functions declared there,
+    // nor the functions and blocks that declare a variable of the same name (another variable).
     for (let j = from; j < to; j++) {
-        if (isLocal(j) && !handled.has(j) && !(top[j] && j > returnAt) && changesAt(j)) {
+        if (isLocal(j) && !handled.has(j) && !(top[j] && j > returnAt) && changesAt(j) && !shadowed(j)) {
             unreadable(tokens[j].value);
         }
     }

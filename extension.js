@@ -86,7 +86,7 @@ const MAX_EXPORT_LENGTH = 200 * 1024 * 1024;
 
 // DrawMeDatabase Pro adds its exports and tools through the API below
 const PRO_EXTENSION_ID = 'GuillaumeCancalon.draw-me-database-pro';
-const API_VERSION = 3;
+const API_VERSION = 4;
 
 // Tools and exports of DrawMeDatabase Pro, shown greyed in the side panel until it adds them
 const PRO_TOOLS = ['pro.canvas', 'pro.timeline', 'pro.designer', 'pro.addColumns', 'pro.compare', 'pro.compareRefs', 'pro.drift', 'pro.migrationChanges', 'pro.checks', 'pro.findPath', 'pro.saveView', 'pro.openView', 'pro.models'];
@@ -143,7 +143,8 @@ function activate(context) {
     context.subscriptions.push(schemaChanged);
     const exporters = new Map();
     // Tools of other extensions in the side panel (id → { id, label, hint, icon, command, args,
-    // pro, locked }), and the license of DrawMeDatabase Pro ({ kind, daysLeft, commands } or null)
+    // pro, locked, frameworks, unavailable }), and the license of DrawMeDatabase Pro ({ kind,
+    // daysLeft, commands } or null)
     const tools = new Map();
     let license = null;
     // What other extensions show in the inspector of a table (id → provide(table, schema)), and
@@ -172,19 +173,35 @@ function activate(context) {
             vscode.window.showInformationMessage(tr('message.proUnavailable'));
         });
 
+    // Why a tool does not apply to the project on screen: the reason its extension gives
+    // (update({ unavailable })), else, for a tool of other stacks (frameworks), that it is not for
+    // this one; '' when it applies (or before a schema is read)
+    const unavailableReason = (tool) => {
+        if (!tool) {
+            return '';
+        }
+        if (tool.unavailable) {
+            return tool.unavailable;
+        }
+        const framework = current && current.framework;
+        return framework && tool.frameworks && !tool.frameworks.includes(framework) ? tr('panel.tool.unavailable', { stack: frameworkLabel(framework) || framework }) : '';
+    };
     // What the side panel lists: the tools and exports of the extensions (the ones of DrawMeDatabase
-    // Pro greyed while it does not add them, locked when its trial has ended) and the license
+    // Pro greyed while it does not add them, locked when its trial has ended, a tool greyed with its
+    // reason when it does not apply to the project) and the license
     const features = () => {
         const expired = Boolean(license && license.kind === 'expired');
-        const state = (item) => (!item ? 'missing' : item.locked || (item.pro && expired) ? 'locked' : 'available');
-        const describe = (id, item) => ({
+        const state = (item, reason) => (!item ? 'missing' : reason ? 'unavailable' : item.locked || (item.pro && expired) ? 'locked' : 'available');
+        const describe = (id, item, reason = '') => ({
             id,
             label: item ? item.label : '',
             hint: item && item.hint ? item.hint : '',
             icon: item && item.icon ? item.icon : undefined,
             pro: item ? item.pro : true,
-            state: state(item),
+            state: state(item, reason),
+            ...(reason ? { reason } : {}),
         });
+        const describeTool = (id, tool) => describe(id, tool, unavailableReason(tool));
         const others = (registry, catalog) => [...registry.values()].filter(item => !catalog.includes(item.id));
         const commands = license && license.commands ? license.commands : {};
         let actions = ['discover'];
@@ -194,14 +211,18 @@ function activate(context) {
                 .filter(action => commands[action]);
         }
         return {
-            tools: [...PRO_TOOLS.map(id => describe(id, tools.get(id))), ...others(tools, PRO_TOOLS).map(tool => describe(tool.id, tool))],
+            tools: [...PRO_TOOLS.map(id => describeTool(id, tools.get(id))), ...others(tools, PRO_TOOLS).map(tool => describeTool(tool.id, tool))],
             exports: [...PRO_EXPORTS.map(id => describe(id, exporters.get(id))), ...others(exporters, PRO_EXPORTS).map(exporter => describe(exporter.id, exporter))],
             license: license ? { kind: license.kind, daysLeft: license.daysLeft, actions } : { kind: 'free', actions },
         };
     };
+    // A tool that does not apply to the project tells why instead of running
     const runTool = (id) => {
         const tool = tools.get(id);
-        if (tool) {
+        const reason = unavailableReason(tool);
+        if (tool && reason) {
+            vscode.window.showInformationMessage(reason);
+        } else if (tool) {
             Promise.resolve(vscode.commands.executeCommand(tool.command, ...tool.args)).catch(err => reportUnexpectedError(output, err));
         } else if (PRO_TOOLS.includes(id)) {
             openPro();
@@ -266,9 +287,10 @@ function activate(context) {
                 },
             });
         }
+        const stack = current && current.framework;
         if (schema && schema.tables.length > 0) {
             // overrides: the sources follow an unsaved configuration file that moves the schema
-            current = { folder, basePath: schema.basePath, framework: schema.framework, tables: schema.tables, warnings: schema.warnings, overrides };
+            current = { folder, basePath: schema.basePath, framework: schema.framework, dialect: schema.dialect, tables: schema.tables, warnings: schema.warnings, overrides };
             if (watching()) {
                 watcher.watch(current);
             }
@@ -278,6 +300,10 @@ function activate(context) {
             current = null;
             watcher.stop();
             views.schemaChanged(schema ? 'noTables' : failure);
+        }
+        // The tools of other stacks are greyed, or no longer
+        if ((current && current.framework) !== stack) {
+            featuresChanged();
         }
         return schema;
     };
@@ -414,10 +440,12 @@ function activate(context) {
         watchGitRepositories(() => watcher.schedule({ disk: true })),
     );
 
-    // The schema on screen, as other extensions get it (copies: they cannot change it)
+    // The schema on screen, as other extensions get it (copies: they cannot change it). dialect: the
+    // database of the project, or null (version 4)
     const publicSchema = () => (current ? {
         tables: JSON.parse(JSON.stringify(current.tables)),
         framework: current.framework,
+        dialect: current.dialect || null,
         basePath: current.basePath,
         project: { name: current.folder.name, folder: current.folder.uri.toString() },
     } : null);
@@ -681,6 +709,20 @@ function activate(context) {
             }
             return registry.getSources(framework, basePath);
         },
+        // The migrations of a framework root in the order of their tool (version 4): { root,
+        // framework, migrations: [{ id, file, time }] }, to parse with parseSchema(root, framework,
+        // { until: id }), or null (a dump, a stack without migrations: docs/api.md)
+        getMigrations(basePath, framework) {
+            if (!registry.getParser(framework)) {
+                throw new ParserError(`Unknown framework: ${framework}`);
+            }
+            try {
+                return registry.getMigrations(framework, basePath);
+            } catch (err) {
+                output.appendLine(`Migrations of ${basePath}: ${err && err.message ? err.message : err}`);
+                return null;
+            }
+        },
         // The page files, for the panels of other extensions (localResourceRoots, script order)
         viewsUri: vscode.Uri.joinPath(context.extensionUri, 'views'),
         viewScripts: html.SCRIPTS.filter(segments => !['app.js', 'json.js'].includes(segments[segments.length - 1])).map(segments => segments.join('/')),
@@ -708,13 +750,23 @@ function activate(context) {
                 },
             };
         },
-        // A tool in the side panel: { id, label, command, args, hint, icon, pro }. Returns
-        // { update({ label, hint, locked }), dispose() }
+        // A tool in the side panel: { id, label, command, args, hint, icon, pro, frameworks,
+        // unavailable }. frameworks (version 4): the stacks it applies to, greyed with its reason
+        // for the others (all of them without it); unavailable: why it does not apply (greyed with
+        // this text, as given). Returns { update({ label, hint, locked, frameworks, unavailable }),
+        // dispose() }
         registerTool(tool) {
             if (!tool || typeof tool.id !== 'string' || typeof tool.command !== 'string') {
                 throw new TypeError('A tool needs an id and a command');
             }
             const text = (value) => (typeof value === 'string' ? value.slice(0, 200) : '');
+            // The stacks of a tool: ids of getFrameworks(), or undefined for all of them (an empty list too)
+            const stacks = (value) => {
+                const ids = Array.isArray(value) ? [...new Set(value.filter(id => typeof id === 'string' && id))] : [];
+                return ids.length > 0 ? ids : undefined;
+            };
+            // The reason a tool does not apply, at most 500 characters ('' when it applies)
+            const reason = (value) => (typeof value === 'string' ? value.trim().slice(0, 500) : '');
             const entry = {
                 id: tool.id,
                 label: text(tool.label) || tool.id,
@@ -724,6 +776,8 @@ function activate(context) {
                 args: Array.isArray(tool.args) ? tool.args.filter(arg => ['string', 'number', 'boolean'].includes(typeof arg)) : [],
                 pro: tool.pro === true,
                 locked: tool.locked === true,
+                frameworks: stacks(tool.frameworks),
+                unavailable: reason(tool.unavailable),
             };
             tools.set(entry.id, entry);
             featuresChanged();
@@ -738,6 +792,12 @@ function activate(context) {
                         }
                         if (typeof changes.locked === 'boolean') {
                             entry.locked = changes.locked;
+                        }
+                        if ('frameworks' in changes) {
+                            entry.frameworks = stacks(changes.frameworks);
+                        }
+                        if ('unavailable' in changes) {
+                            entry.unavailable = reason(changes.unavailable);
                         }
                         featuresChanged();
                     }
@@ -784,9 +844,9 @@ function activate(context) {
 }
 
 // Detects the framework and parses the schema: returns { tables, warnings (count), framework,
-// basePath }, or undefined after an error (already shown to the user). notify: false writes the
-// messages to the output only (automatic refresh); overrides, gitCache and git go to the parser.
-// onFailure(reason) tells the Schema view why there is no schema: 'noProject' or 'error'.
+// dialect, basePath }, or undefined after an error (already shown to the user). notify: false
+// writes the messages to the output only (automatic refresh); overrides, gitCache and git go to the
+// parser. onFailure(reason) tells the Schema view why there is no schema: 'noProject' or 'error'.
 function readSchema(folder, output, { notify = true, overrides = null, gitCache = null, git = true, onFailure = () => {} } = {}) {
     const tell = (show, text, ...items) => (notify ? show(text, ...items) : output.appendLine(text));
     const showError = (text) => tell(vscode.window.showErrorMessage, text);
@@ -866,7 +926,9 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         output.appendLine(`Files read: ${describeSources(framework, basePath)}`);
         tell(vscode.window.showInformationMessage, tr('message.noTables', { path: basePath }));
     }
-    return { tables, warnings: warnings.length, framework, basePath };
+    // The database of the project, for the API (the provider of a Prisma schema...), or null
+    const dialect = registry.getDialect(framework, basePath, { overrides });
+    return { tables, warnings: warnings.length, framework, dialect, basePath };
 }
 
 // The detection errors of registry.detect() as warnings, one per message: 'composer.json in "..."

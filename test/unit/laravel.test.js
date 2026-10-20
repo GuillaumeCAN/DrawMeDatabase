@@ -1891,3 +1891,73 @@ INSERT INTO \`migrations\` (\`id\`, \`migration\`, \`batch\`) VALUES (2,'2024_01
         assert.equal(registry.detect(fixture('schema-dump-linkace')).framework, 'laravel');
     });
 });
+
+describe('laravel parser: the dialect and the migrations of an application (API version 4)', () => {
+    const registry = require('../../parsers/registry');
+    const TMP = fs.realpathSync(os.tmpdir());
+    // A Laravel application with any files ({ '.env': '...' })
+    function app(files) {
+        const dir = fs.mkdtempSync(path.join(TMP, 'dmdb-laravel-api-'));
+        tempDirs.push(dir);
+        for (const [rel, content] of Object.entries({ artisan: '', 'composer.json': JSON.stringify({ require: { 'laravel/framework': '^12.0' } }), ...files })) {
+            fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+            fs.writeFileSync(path.join(dir, rel), content);
+        }
+        return dir;
+    }
+    const CONFIG = `<?php
+return [
+    // 'default' => 'sqlite',
+    'default' => env('DB_CONNECTION', 'sqlite'),
+    'connections' => [
+        'sqlite' => [
+            'driver' => 'sqlite',
+            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+        ],
+        'mysql' => ['driver' => 'mysql', 'url' => env('DB_URL')],
+        'analytics' => array(
+            'driver' => env('ANALYTICS_DRIVER', 'pgsql'),
+        ),
+        'legacy' => [
+            /* 'driver' => 'mysql', */
+            'driver' => 'sqlsrv',
+        ],
+    ],
+];
+`;
+
+    it('the dialect: the driver of the default connection (DB_CONNECTION of .env, else the default of config/database.php), else the connection named after a driver, else the one of the only dump', () => {
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG })), 'sqlite', 'the default of config/database.php');
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG, '.env': 'APP_NAME=x\nDB_CONNECTION=mysql\n' })), 'mysql');
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG, '.env': 'DB_CONNECTION=analytics\n' })), 'postgresql', 'a connection of another name');
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG, '.env': 'DB_CONNECTION="legacy"\n' })), 'sqlserver');
+        assert.equal(parser.dialect(app({ '.env': 'DB_CONNECTION=pgsql\n' })), 'postgresql', 'without config/database.php: the name of a driver');
+        assert.equal(parser.dialect(app({ '.env': 'DB_CONNECTION=mariadb\n' })), 'mariadb');
+        assert.equal(parser.dialect(app({ '.env': 'DB_CONNECTION=reporting\n' })), null, 'a connection that tells no driver');
+        assert.equal(parser.dialect(app({ 'database/schema/pgsql-schema.sql': 'CREATE TABLE a (id int);\n', 'database/migrations/.gitkeep': '' })), 'postgresql', 'the connection of the only dump');
+        assert.equal(parser.dialect(app({})), null);
+        const dir = app({ 'config/database.php': CONFIG });
+        assert.equal(registry.getDialect('laravel', dir, { overrides: new Map([[path.join(dir, '.env'), 'DB_CONNECTION=mysql\n']]) }), 'mysql', 'an unsaved .env');
+    });
+
+    it('the migrations: the files of database/migrations in the order of php artisan migrate, the time of their name; the ones a schema dump lists too; until gives the schema after each', () => {
+        const up = (name) => migration(`        Schema::create('${name}', function (Blueprint $table) {\n            $table->id();\n        });`);
+        const dir = app({
+            'database/migrations/2024_01_02_000000_create_posts_table.php': up('posts'),
+            'database/migrations/0001_01_01_000000_create_users_table.php': up('users'),
+            'database/migrations/create_tags_table.php': up('tags'),
+            'database/migrations/.hidden_migration.php': up('hidden'),
+            'database/migrations/nested/2024_01_03_000000_x.php': up('x'),
+        });
+        const result = registry.getMigrations('laravel', dir);
+        assert.deepEqual(result, { root: dir, framework: 'laravel', migrations: [
+            { id: '0001_01_01_000000_create_users_table.php', file: path.join(dir, 'database', 'migrations', '0001_01_01_000000_create_users_table.php') },
+            { id: '2024_01_02_000000_create_posts_table.php', file: path.join(dir, 'database', 'migrations', '2024_01_02_000000_create_posts_table.php'), time: Date.UTC(2024, 0, 2) / 1000 },
+            { id: 'create_tags_table.php', file: path.join(dir, 'database', 'migrations', 'create_tags_table.php') },
+        ] });
+        assert.deepEqual(result.migrations.map(m => parser.parse(result.root, { git: false, until: m.id }).tables.map(t => t.table)), [['users'], ['users', 'posts'], ['users', 'posts', 'tags']]);
+        assert.equal(parser.migrations(app({ 'database/schema/sqlite-schema.sql': 'CREATE TABLE a (id integer);\n' })), null, 'a dump without migrations');
+        assert.equal(parser.migrations(app({ 'database/migrations/README.md': '' })), null);
+        assert.equal(parser.migrations(app({})), null);
+    });
+});

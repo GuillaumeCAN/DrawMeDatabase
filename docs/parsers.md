@@ -8,7 +8,7 @@ DrawMeDatabase reads the schema of the database from the code of a project. Each
 | `symfony` | Symfony | `src/Entity/**/*.php` (Doctrine entities) | `bin/console` and `symfony/framework-bundle` (or another `symfony/*` package except the polyfills) in the `require` of `composer.json` |
 | `prisma` | Prisma | The Prisma schema where the Prisma CLI looks for it: the `schema` of the config object of `prisma.config.ts` (read, not run), else `prisma.schema` of `package.json` (Prisma 5 and 6: Prisma 7 ignores it, so it is then read only when there is no schema at a default location), else `schema.prisma`, `prisma/schema.prisma`, then the multi-file folder `prisma/schema/` (`**/*.prisma`). Also `package.json` and the config file, which can move it | A schema and `prisma` or `@prisma/client` in the `dependencies` or `devDependencies` of `package.json`, or a Prisma config file (100); the schema alone, or a config file (or a `prisma.schema` of `package.json` with the package) whose schema is missing (50). The package alone is no Prisma project: the root of a monorepo whose schema is in a package gets the advice to set `DrawMeDatabase.frameworkPath` |
 | `drizzle` | Drizzle | The schema files of the `schema` of `drizzle.config.ts` (`.js`, `.json`, `.mjs`...; read, not run): a file, a folder (its files), a glob or an array of them, relative to the framework folder as drizzle-kit runs there; else the first usual location (`src/db/schema.ts`, the `src/db/schema/` folder, `src/schema.ts`, `db/schema.ts`, `drizzle/schema.ts`...). Also the files they import or re-export (relative paths, the path aliases of `tsconfig.json`), the imports whose file does not exist yet (watched for their creation), `package.json`, the config file and `tsconfig.json` | A config file whose schema files exist, or a schema at a usual location with `drizzle-orm` or `drizzle-kit` in `package.json` (100); a config file whose schema is missing, or a schema at a usual location that imports `drizzle-orm` without the package (50). The package alone is no Drizzle project (a monorepo root) |
-| `sql` | SQL | The SQL files of the first layout found, replayed in the order of their tool: `supabase/migrations/<timestamp>_<name>.sql` (by name, the other files skipped with a warning); Flyway's `V<version>__<name>.sql` in `src/main/resources/db/migration`, `db/migration`, `sql`... and their sub-folders (by version: `V1.1` = `V1_1`, `V10` after `V2`; `R__` and `U__` left out); dbmate's `db/migrations/<version>_<name>.sql` with `-- migrate:up` (by name, the up section); golang-migrate's `<version>_<name>.up.sql` (by version number); goose's `-- +goose Up` files (by version number); diesel's `migrations/<name>/up.sql`; the output of prisma migrate (`prisma/migrations/<name>/migration.sql`, the dialect of `migration_lock.toml`) and of drizzle-kit (`drizzle/`, in the order of `meta/_journal.json`, or the folders of drizzle-kit 1.0) when that stack is not detected; numbered migrations (`migrations/001_name.sql`, sqlx, Atlas...); Rails' `db/structure.sql`; a dump (`schema.sql`, `structure.sql`, `dump.sql`... at the root, then in `db/`). The folders are also looked for in the framework folder itself (`DrawMeDatabase.frameworkPath` set to the folder of the migrations), and, when the setting chooses `sql`, any `.sql` file of it, by name | The migrations of a tool or Rails' `db/structure.sql` (45), a dump or migrations in the framework folder itself (40): below the frameworks, so that a project whose SQL is the output of Laravel, Prisma or Drizzle (or a side script) is read with its framework; `DrawMeDatabase.framework` set to `sql` reads its SQL (the history of `prisma/migrations`) |
+| `sql` | SQL | The SQL files of the first layout found, replayed in the order of their tool: `supabase/migrations/<timestamp>_<name>.sql` (by name, the other files skipped with a warning); Flyway's `V<version>__<name>.sql` in `src/main/resources/db/migration`, `db/migration`, `sql`... and their sub-folders (by version: `V1.1` = `V1_1`, `V10` after `V2`; `R__` and `U__` left out); dbmate's `db/migrations/<version>_<name>.sql` with `-- migrate:up` (by name, the up section); golang-migrate's `<version>_<name>.up.sql` (by version number); goose's `-- +goose Up` files (by version number); diesel's `migrations/<name>/up.sql`; the output of prisma migrate (`prisma/migrations/<name>/migration.sql`, the dialect of `migration_lock.toml`) and of drizzle-kit (`drizzle/`, in the order of `meta/_journal.json`, or the folders of drizzle-kit 1.0) when that stack is not detected; numbered migrations (`migrations/001_name.sql`, sqlx, Atlas...); Rails' `db/structure.sql`; a dump (`schema.sql`, `structure.sql`, `dump.sql`... at the root, then in `db/`). The folders are also looked for in the framework folder itself (`DrawMeDatabase.frameworkPath` set to the folder of the migrations, the folder of prisma migrate or of drizzle-kit too, with its lock file or journal), and, when the setting chooses `sql`, any `.sql` file of it, by name | The migrations of a tool or Rails' `db/structure.sql` (45), a dump or migrations in the framework folder itself (40): below the frameworks, so that a project whose SQL is the output of Laravel, Prisma or Drizzle (or a side script) is read with its framework; `DrawMeDatabase.framework` set to `sql` reads its SQL (the history of `prisma/migrations`) |
 
 ## The contract
 
@@ -21,6 +21,9 @@ module.exports = {
     detect(basePath) { },     // → score, 0 = not this stack
     sources(basePath, options) { }, // → { folders, files, extensions }: what it reads
     parse(basePath, options) { }, // → { tables, warnings }: the pivot format
+    // optional:
+    dialect(basePath, options) { }, // → 'postgresql', 'mysql'... or null: the database of the project
+    migrations(basePath, options) { }, // → { root, framework, migrations } or null: the steps of `until`
 };
 ```
 
@@ -74,6 +77,14 @@ The tables in the pivot format, and the warnings (strings) written to the DrawMe
 - throw a `ParserError` with a message for the user when there is nothing to read (`No src/Entity folder found in ...`): the message is shown as is;
 - keep `type` the name the stack gives to the column type (the Blueprint method, the Doctrine type, the Prisma scalar): the diagram draws any string.
 
+### `dialect(basePath, options)` → id or `null` (optional)
+
+The database the project is written for, read without running anything nor connecting to it: one of `DIALECTS` of the registry (`postgresql`, `mysql`, `mariadb`, `sqlite`, `sqlserver`, `cockroachdb`, `singlestore`, `mongodb`), or `null` when the code does not tell. `options.overrides`: the unsaved editors. It is read after each `parse()` for `getSchema().dialect` of the API: keep it cheap (configuration files, the start of the SQL files). What each parser reads is in [api.md](api.md#the-dialect-of-a-project). A parser without it, or that throws, tells `null`.
+
+### `migrations(basePath, options)` → `{ root, framework, migrations }` or `null` (optional)
+
+The migrations of the project in the order their tool runs them, for the `until` option (the time machine of DrawMeDatabase Pro): `migrations: [{ id, file, time }]`, where `parse(root, framework, { until: id })` (with `framework` the id of a parser, `'sql'` for the SQL of an ORM) gives the schema right after the migration `id`; `file`: its path; `time`: its date in seconds since 1970 when it tells it. `null` for a project without migrations that a parser replays (a dump, entities). `sql.stackMigrations(basePath, folder, stack)` gives the ones of the SQL output of an ORM (the folder of prisma migrate, the `out` of drizzle-kit), and `sql.migrationTime(name)` the date of a name. See [api.md](api.md#migrations).
+
 ## The registry (`parsers/registry.js`)
 
 | Function | Returns |
@@ -84,10 +95,12 @@ The tables in the pivot format, and the warnings (strings) written to the DrawMe
 | `detect(basePath, { framework })` | `{ framework, forced, matches, errors }`: the id of the best parser (or `'Unknown'`), `forced: true` when `framework` names a parser (it then wins without detection), the parsers that recognize the folder, best first (`{ id, label, score }`), and the ones that threw while another one recognized it (`{ id, label, message }`) |
 | `detectFramework(basePath, { framework })` | `detect(...).framework` |
 | `getSources(id, basePath, { overrides })` | The cleaned `sources()` of a parser (`overrides`: the unsaved editors) |
+| `getDialect(id, basePath, { overrides })` | The `dialect()` of a parser when it is one of `DIALECTS`, else `null` (no `dialect()`, an error) |
+| `getMigrations(id, basePath, { overrides })` | The cleaned `migrations()` of a parser (absolute paths, `time` an integer when it is given), or `null` |
 | `covers(sources, file)`, `watchPatterns(sources)` | Whether a file is one of the sources; the globs that watch them |
 | `createRegistry(parsers)` | Another registry with these parsers (modules, or functions that return them), for the tests |
 
-The extension and its API (`detectFramework`, `parseSchema`, `getFrameworks`, `getSources`, see [api.md](api.md)) only go through the registry.
+The extension and its API (`detectFramework`, `parseSchema`, `getFrameworks`, `getSources`, `getMigrations`, `getSchema().dialect`, see [api.md](api.md)) only go through the registry.
 
 ## Adding a stack
 

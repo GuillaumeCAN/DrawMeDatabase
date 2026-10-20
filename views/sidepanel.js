@@ -16,8 +16,10 @@
 //        { type: 'text', id, label, value, placeholder }
 //        { type: 'palettes', id, label, value, options: [{ value, label, colors }] }
 //        { type: 'colors', id, label, resetLabel, items: [{ key, label, value, custom }] }
-//        { type: 'actions', items: [{ id, label, hint, icon, state, badge, title }] }
-//          state: 'available', 'missing' (greyed, PRO badge) or 'locked' (greyed, lock)
+//        { type: 'actions', items: [{ id, label, hint, icon, state, badge, title, reason }] }
+//          state: 'available', 'missing' (greyed, PRO badge), 'locked' (greyed, lock) or
+//          'unavailable' (greyed, without a badge: a tool that does not apply to the project; its
+//          reason, as given, under its label and as its title)
 //        { type: 'button', id, label, primary }
 //        { type: 'heading', label } and { type: 'note', text }
 //        A control with locked: true (a feature of DrawMeDatabase Pro) is disabled, with a PRO
@@ -239,22 +241,24 @@
             actions(item) {
                 const list = element('div', { className: 'panel-actions', role: 'list' });
                 item.items.forEach(entry => {
-                    const state = entry.state || 'available';
+                    const state = ['available', 'missing', 'locked', 'unavailable'].includes(entry.state) ? entry.state : 'available';
+                    const reason = state === 'unavailable' && typeof entry.reason === 'string' ? entry.reason : '';
+                    const hint = reason || entry.hint;
                     const button = element('button', {
                         type: 'button',
                         className: `panel-action ${state}`,
-                        title: entry.title,
+                        title: reason || entry.title,
                         'data-key': entry.id,
                         'aria-disabled': state === 'available' ? null : 'true',
                     }, [
                         icon(entry.icon, 'panel-action-icon'),
                         element('span', { className: 'panel-action-text' }, [
                             element('span', { className: 'panel-action-label', text: entry.label }),
-                            entry.hint ? element('span', { className: 'panel-action-hint', text: entry.hint }) : null,
+                            hint ? element('span', { className: 'panel-action-hint', text: hint }) : null,
                         ]),
                         state === 'locked'
                             ? icon('lock', 'panel-action-lock')
-                            : entry.badge ? element('span', { className: 'panel-badge', text: entry.badge }) : null,
+                            : entry.badge && state !== 'unavailable' ? element('span', { className: 'panel-badge', text: entry.badge }) : null,
                     ]);
                     // Greyed items stay clickable: they tell how to get them
                     button.addEventListener('click', () => action(entry.id));

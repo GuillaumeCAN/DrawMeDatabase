@@ -105,7 +105,14 @@ suite('DrawMeDatabase extension: a project of SQL migrations', () => {
         const api = extension.exports;
         const schema = api.getSchema();
         assert.equal(schema.framework, 'sql');
+        assert.equal(schema.dialect, 'postgresql', 'Supabase (API version 4)');
         assert.equal(schema.basePath, workspace());
+        // The migrations in the order of the Supabase CLI, each the `until` of the schema after it
+        const steps = api.getMigrations(workspace(), 'sql');
+        assert.deepEqual(steps, { root: workspace(), framework: 'sql', migrations: [
+            { id: '20240101000000_init.sql', file: path.join(migrations(), '20240101000000_init.sql'), time: Date.UTC(2024, 0, 1) / 1000 },
+            { id: '20240102000000_posts_index.sql', file: path.join(migrations(), '20240102000000_posts_index.sql'), time: Date.UTC(2024, 0, 2) / 1000 },
+        ] });
         assert.deepEqual(api.getFrameworks().map(framework => framework.id), ['laravel', 'symfony', 'prisma', 'drizzle', 'sql']);
         assert.equal(api.detectFramework(workspace()), 'sql');
         assert.deepEqual(api.getSources(workspace(), 'sql'), { folders: [{ path: migrations(), recursive: false }], files: [], extensions: ['.sql'] });

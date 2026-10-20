@@ -18,8 +18,8 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 
 | Member | Description |
 |--------|-------------|
-| `apiVersion` | `3` since DrawMeDatabase 1.8.0 (`2` in 1.6.0 and 1.7.0, `1` in 1.5.0). A new member raises it; members are never removed within a major version of the extension |
-| `getSchema()` | The schema on screen: `{ tables, framework, basePath, project: { name, folder } }` (`framework` is the id of the parser that read it, see `getFrameworks()`; `folder` is the URI of the workspace folder as a string), or `null` before the first drawing. A copy: changing it changes nothing |
+| `apiVersion` | `4` since DrawMeDatabase 1.8.0 (`2` in 1.6.0 and 1.7.0, `1` in 1.5.0). A new member raises it; members are never removed within a major version of the extension |
+| `getSchema()` | The schema on screen: `{ tables, framework, dialect, basePath, project: { name, folder } }` (`framework` is the id of the parser that read it, see `getFrameworks()`; `dialect` (version 4): the database of the project, see [Version 4](#version-4-drawmedatabase-180); `folder` is the URI of the workspace folder as a string), or `null` before the first drawing. A copy: changing it changes nothing |
 | `onDidChangeSchema(listener)` | Event fired with the new schema after each drawing (command, refresh, live edit). Returns a `Disposable` |
 | `showDiagram()` | Draws the schema of the workspace, like the DrawMeDatabase command. Resolves to the parsed tables |
 | `detectFramework(basePath, options)` | The id of the stack of a framework root (`'laravel'`, `'symfony'`, `'prisma'`, `'drizzle'`, `'sql'`, see `getFrameworks()`), or `'Unknown'` for an unsupported folder. 1.8.0: `options.framework`, an id that wins over the detection, like the `DrawMeDatabase.framework` setting (the API does not read the setting: `getSchema().framework` follows it) |
@@ -35,7 +35,7 @@ Declare `"extensionDependencies": ["GuillaumeCancalon.draw-me-database"]` so tha
 
 | Member | Description |
 |--------|-------------|
-| `registerTool({ id, label, command, args, hint, icon, pro })` | Adds a tool to the Tools view of the sidebar (1.6.0: the Tools section of the side panel of the diagram): a click runs `command` with `args` (strings, numbers, booleans). The ids of DrawMeDatabase Pro (`pro.canvas`, `pro.designer`...) replace the greyed items shown before it is installed, and their texts come from the translations of DrawMeDatabase. `icon`: a codicon (`plug`), or an icon of `views/sidepanel.js` (`history`, `compare`...). Returns `{ update({ label, hint, locked }), dispose() }` |
+| `registerTool({ id, label, command, args, hint, icon, pro })` | Adds a tool to the Tools view of the sidebar (1.6.0: the Tools section of the side panel of the diagram): a click runs `command` with `args` (strings, numbers, booleans). The ids of DrawMeDatabase Pro (`pro.canvas`, `pro.designer`...) replace the greyed items shown before it is installed, and their texts come from the translations of DrawMeDatabase. `icon`: a codicon (`plug`), or an icon of `views/sidepanel.js` (`history`, `compare`...). Returns `{ update({ label, hint, locked }), dispose() }`. Version 4: `frameworks` and `unavailable`, see [below](#tools-that-do-not-apply-to-a-project) |
 | `connectPro()` | Shows the license of DrawMeDatabase Pro in the License view of the sidebar (1.6.0: at the bottom of the side panel), which is only shown while it is set. DrawMeDatabase reads it from the exports of DrawMeDatabase Pro, not from the caller: see [License of DrawMeDatabase Pro](#license-of-drawmedatabase-pro). Resolves to `true` once it follows it |
 | `registerTableInfoProvider({ id, provide })` | Adds sections to the inspector of a table (a click on a table in the diagram). `provide(table, schema)` returns, or resolves to within 10 s, a list of sections: `{ title, items: [{ label, value, hint, badge, tone }], actions: [{ label, command, args }], note, locked }`. `tone`: `'added'`, `'modified'`, `'removed'`, `'muted'` or `'accent'`; an action runs `command` with `args` (strings, numbers, booleans); `locked: true` greys the section with a PRO badge. Without any provider, the inspector shows what DrawMeDatabase Pro would add. Returns a `Disposable` |
 | `getDisplaySettings()` | The appearance and the language chosen by the user: `{ theme, palette, colors, font, customFont, fontSize, grid, language }` (`language`: `'en'` or `'fr'`, already resolved) |
@@ -49,6 +49,40 @@ The parsers are pluggable ([parsers.md](parsers.md)): a stack is an id (`framewo
 |--------|-------------|
 | `getFrameworks()` | The supported stacks, in the order of detection (the first one wins a tie): `[{ id, label }]`, today `[{ id: 'laravel', label: 'Laravel' }, { id: 'symfony', label: 'Symfony' }, { id: 'prisma', label: 'Prisma' }, { id: 'drizzle', label: 'Drizzle' }, { id: 'sql', label: 'SQL' }]` |
 | `getSources(basePath, framework)` | What the parser of a stack reads in a framework root: `{ folders: [{ path, recursive, pattern? }], files, extensions }`, absolute paths (`recursive`: its sub-folders too; `pattern`: when set, only the files of the folder that match this glob, `**/schema.ts`; `extensions`: of the files of the folders, `['.php']`; `files`: single files, whatever their extension). For example the files to copy for a version of the schema, or to watch. Throws a `ParserError` for an unknown framework |
+
+## Version 4 (DrawMeDatabase 1.8.0)
+
+| Member | Description |
+|--------|-------------|
+| `getSchema().dialect` | The database the project is written for, read from its code and configuration without connecting to it: `'postgresql'`, `'mysql'`, `'mariadb'`, `'sqlite'`, `'sqlserver'`, `'cockroachdb'`, `'singlestore'`, `'mongodb'`, or `null` when the project does not tell. In `onDidChangeSchema` too. More ids may come: keep a default for the ones you do not know |
+| `getMigrations(basePath, framework)` | The migrations of a framework root, in the order their tool runs them: `{ root, framework, migrations: [{ id, file, time }] }`, or `null` for a project without migrations that the parsers replay (a schema dump, Symfony's entities) or without any. `parseSchema(root, framework, { until: id })` gives the schema right after a migration: `framework` is `'laravel'` for Laravel and `'sql'` (the SQL reader) for the others, `root` the folder to give it (absolute). `file`: the absolute path of the migration; `time` (only when the migration tells it): its date in seconds since 1970, from the journal of drizzle-kit or the timestamp that starts its name (`20240101120000_init`, `2024_01_01_120000_create_users_table.php`), read as UTC. Throws a `ParserError` for an unknown framework |
+| `registerTool({ ..., frameworks, unavailable })` | `frameworks`: the stacks the tool applies to (ids of `getFrameworks()`); on another one, the Tools view greys it with "This tool is not available for Prisma projects.". `unavailable`: why it does not apply, shown as given (never translated), whatever the stack. `update({ frameworks, unavailable })` changes them (`unavailable: ''` or `null` clears it). See [below](#tools-that-do-not-apply-to-a-project) |
+
+### The dialect of a project
+
+| Stack | Read from |
+|-------|-----------|
+| Laravel | The default connection (`DB_CONNECTION` of `.env`, else the default of `config/database.php`, else the connection of the only schema dump) and its `driver` in `config/database.php` (`pgsql` gives `'postgresql'`, `sqlsrv` gives `'sqlserver'`, `mariadb`, `mysql`, `sqlite`); a connection that `config/database.php` does not describe is taken for its driver when it is named after one. `null` without a known connection |
+| Symfony | The scheme of `DATABASE_URL` in the `.env` files, in the order Symfony reads them (`.env.<APP_ENV>.local`, `.env.<APP_ENV>`, `.env.local`, `.env`): `postgresql://`, `mysql://` (`'mariadb'` when its `serverVersion` names MariaDB), `sqlite:///`, `sqlsrv://`...; else the `driver` and `server_version` of `config/packages/doctrine.yaml`. `null` when the URL is set by the environment (`${...}`, not in the files) |
+| Prisma | The `provider` of the `datasource` block (`postgresql`, `mysql`, `sqlite`, `sqlserver`, `cockroachdb`, `mongodb`) |
+| Drizzle | The `dialect` of `drizzle.config.ts` (`turso` gives `'sqlite'`; `gel` gives `null`), else its `driver` of drizzle-kit before 0.21 (`pg`, `mysql2`, `better-sqlite`, `libsql`, `turso`, `d1`), else the module of drizzle-orm that the schema files import (`drizzle-orm/pg-core`), when they all import the same one |
+| SQL | The dialect the SQL reader reads the files in: the one their tool tells (Supabase, the `provider` of the `migration_lock.toml` of prisma migrate, the dialect of the journal of drizzle-kit), else what only one dialect writes (`ENGINE=`, `AUTOINCREMENT`, `$$`, `::`...), else a folder named `postgres`, `mysql`, `sqlite`...; `'mariadb'` for a MariaDB dump or a `mariadb` folder. `null` for SQL that does not tell (read as PostgreSQL) |
+
+The dialect tells what the code is written for, not the server it runs on: a MySQL project may run on MariaDB, a PostgreSQL one on CockroachDB.
+
+### Migrations
+
+| Stack | `framework`, `root` | Migrations |
+|-------|---------------------|------------|
+| Laravel | `'laravel'`, the framework root | `database/migrations/*.php` in the order of `php artisan migrate` (by name; `id`: the file name). The migrations that a schema dump lists are given too: `until` replays them from the migration files alone |
+| Prisma | `'sql'`, the folder from which the SQL reader finds them | The SQL of prisma migrate (`<timestamp>_<name>/migration.sql`, `id`: the folder name), from the `migrations.path` of `prisma.config.ts` (read, not run), else the `migrations` folder next to the schema (`prisma/migrations`) |
+| Drizzle | `'sql'`, idem | The SQL of drizzle-kit in its `out` folder (`out` of `drizzle.config.ts`, `drizzle/` by default), in the order of its journal (`id`: `0000_name.sql`) or the folders of drizzle-kit 1.0 |
+| SQL | `'sql'`, the framework root | The files of the layout the diagram reads (Supabase, Flyway, dbmate, golang-migrate, goose, diesel...), in the order of their tool; `null` for a dump (`schema.sql`, Rails' `db/structure.sql`) |
+| Symfony | | `null`: Doctrine migrations are not replayed |
+
+### Tools that do not apply to a project
+
+A tool of a stack (a Laravel migration generator) registered with `frameworks: ['laravel']`, or told `update({ unavailable: 'Eloquent models are for Laravel projects.' })`, is greyed in the Tools view (`not for this project`, its reason in the tooltip; context value `tool.unavailable`) once the schema of another stack is read, before a lock or a PRO badge. A click shows its reason instead of running its command. A tool registered without `frameworks` applies to every stack, as before version 4 (the tools of an older DrawMeDatabase Pro). The side panel of the pages (`views/sidepanel.js`) draws an action with `state: 'unavailable'` greyed the same way, with its `reason` under its label.
 
 ## Sidebar (DrawMeDatabase 1.7.0)
 

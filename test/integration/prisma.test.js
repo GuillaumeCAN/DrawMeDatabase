@@ -105,7 +105,9 @@ suite('DrawMeDatabase extension: a Prisma project', () => {
         const api = extension.exports;
         const schema = api.getSchema();
         assert.equal(schema.framework, 'prisma');
+        assert.equal(schema.dialect, 'postgresql', 'the provider of the datasource (API version 4)');
         assert.equal(schema.basePath, workspace());
+        assert.equal(api.getMigrations(workspace(), 'prisma'), null, 'no prisma/migrations yet');
         assert.deepEqual(api.getFrameworks().map(framework => framework.id), ['laravel', 'symfony', 'prisma', 'drizzle', 'sql']);
         assert.equal(api.detectFramework(workspace()), 'prisma');
         assert.deepEqual(api.getSources(workspace(), 'prisma'), {

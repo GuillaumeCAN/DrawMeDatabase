@@ -10,7 +10,8 @@
 // *Nodes functions, tested without VS Code), then turned into TreeItems by createSidebar().
 //
 // node: { id, label, description, tooltip, icon, muted, decoration, contextValue, command, children }
-//   icon: a codicon; muted: greyed (a feature of DrawMeDatabase Pro that is missing or locked)
+//   icon: a codicon; muted: greyed (a feature of DrawMeDatabase Pro that is missing or locked, a
+//   tool that does not apply to the project)
 //   decoration: { git } or { state }, the color (and letter) of the label, see DECORATIONS
 //   command: { id, args }, run by a click
 
@@ -83,9 +84,10 @@ const DECORATIONS = {
     unsaved: { badge: '●', color: 'editorInfo.foreground' },
     missing: { color: 'disabledForeground' },
     locked: { color: 'disabledForeground' },
+    unavailable: { color: 'disabledForeground' },
 };
 const GIT_STATUSES = ['untracked', 'modified', 'unsaved'];
-const FEATURE_STATES = ['available', 'missing', 'locked'];
+const FEATURE_STATES = ['available', 'missing', 'locked', 'unavailable'];
 
 const list = (value) => (Array.isArray(value) ? value : []);
 // The translation of the key when there is one, else the text given by the extension
@@ -160,15 +162,17 @@ function columnNode(table, column, relations, t, { git }) {
 }
 
 // A tool or an export of an extension: greyed with PRO while DrawMeDatabase Pro does not add it,
-// greyed with a lock once its trial has ended
+// greyed with a lock once its trial has ended, greyed with the reason its extension gives (as
+// written, never translated here) when it does not apply to the project
 function featureNode(prefix, item, t, { icon, command }) {
     const state = featureState(item);
     const greyed = state !== 'available';
+    const unavailable = state === 'unavailable';
     return {
         id: `${prefix}:${item.id}`,
         label: translated(t, `${prefix}.${item.id}`, item.label || item.id),
-        description: item.pro && greyed ? t('panel.pro') : undefined,
-        tooltip: lines(translated(t, `${prefix}.${item.id}.hint`, item.hint || ''), stateTitle(state, t)),
+        description: unavailable ? t('panel.unavailable') : item.pro && greyed ? t('panel.pro') : undefined,
+        tooltip: lines(translated(t, `${prefix}.${item.id}.hint`, item.hint || ''), unavailable ? (typeof item.reason === 'string' ? item.reason : '') : stateTitle(state, t)),
         icon: state === 'locked' ? 'lock' : icon,
         muted: greyed,
         decoration: greyed ? { state } : undefined,

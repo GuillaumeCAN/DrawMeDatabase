@@ -192,6 +192,46 @@ test('blocks: the changes of the locals before the return, at the top level (ass
     assert.equal(blockChanges(node.body), blockChanges(node.body), 'read once');
 });
 
+test('blocks: a nested function or block that declares a variable of the name of a local changes its own (parameters, destructured ones, locals, for, catch), not the local', () => {
+    const changed = (text) => [...blockChanges(parseExpression(context(tokenize(text)), 0).node.body).keys()];
+    const shadowed = [
+        '() => { const o = {}; const add = (o) => { o.x = 1; }; return o; }',
+        '() => { const o = {}; const add = o => o.x = 1; return o; }',
+        '() => { const o = {}; const add = async (o) => { o.x = 1; }; return o; }',
+        '() => { const o = {}; function f(o) { o.push(1); return o; } return o; }',
+        '() => { const o = {}; const g = function (o) { o.x = 1; }; return o; }',
+        '() => { const o = {}; const add = ({ o }) => { o.x = 1; }; const ren = ({ k: o }) => { o.x = 1; }; const arr = ([o]) => { o.x = 1; }; const rest = (...o) => { o.push(1); }; return o; }',
+        '() => { const o = {}; const obj = { m(o) { o.x = 1; }, async n(o) { o.y = 1; } }; class C { static s(o) { o.z = 1; } } return o; }',
+        '() => { const o = {}; const f = () => { const o = {}; o.x = 1; return o; }; return o; }',
+        '() => { const o = {}; const f = (o) => () => { o.x = 1; }; return o; }',
+        '() => { const o = {}; { let o = {}; o.x = 1; } return o; }',
+        '() => { const o = {}; if (c) { const o = []; o.push(1); } else { let o = 1; o++; } return o; }',
+        '() => { const o = {}; while (c) { const o = {}; o.x = 1; } return o; }',
+        '() => { const o = {}; for (const o of l) { o.x = 1; } for (let o = 0; o < 2; o++) {} return o; }',
+        '() => { const o = {}; try { f(); } catch (o) { o.x = 1; } return o; }',
+        '() => { const o = {}; try { f(); } catch { const o = {}; o.x = 1; } return o; }',
+    ];
+    for (const text of shadowed) {
+        assert.deepEqual(changed(text), [], text);
+    }
+    // Still the local: a nested function or block that does not declare it, a default value
+    const local = [
+        '() => { const o = {}; const add = (p) => { o.x = 1; }; return o; }',
+        '() => { const o = {}; const add = (p) => { const q = {}; q.x = 1; o.y = 1; }; return o; }',
+        '() => { const o = {}; const add = (p = o.x = 1) => p; return o; }',
+        '() => { const o = {}; { let p = {}; o.x = 1; } return o; }',
+        '() => { const o = {}; for (const p of l) { o[p] = 1; } return o; }',
+        '() => { const o = {}; try { o.x = 1; } catch (o) {} return o; }',
+        '() => { const o = {}; obj.m(o); const n = { m(p) { o.x = 1; } }; return o; }',
+    ];
+    for (const text of local) {
+        assert.deepEqual(changed(text), ['o'], text);
+    }
+    // A change at the top level that uses a variable of that name of a nested function is read
+    assert.deepEqual(changed('() => { const o = { a: 1 }; o.b = [1].map(o => o + 1); return o; }'), ['o']);
+    assert.equal(blockChanges(parseExpression(context(tokenize('() => { const o = { a: 1 }; o.b = [1].map(o => o + 1); return o; }')), 0).node.body).get('o').unreadable, undefined);
+});
+
 test('blocks: the returns nested in inner blocks (if, loops, switch, try), not in nested functions, objects or classes', () => {
     const nested = (text) => hasNestedReturn(parseExpression(context(tokenize(text)), 0).node.body);
     assert.equal(nested('() => { if (a) { return 1; } return 2; }'), true);

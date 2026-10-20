@@ -2371,3 +2371,21 @@ class Vehicle
     });
 });
 
+
+describe('symfony parser: the dialect of an application (API version 4)', () => {
+    const registry = require('../../parsers/registry');
+
+    it('the scheme of DATABASE_URL in the .env files, in the order Symfony reads them; MariaDB by its serverVersion; else the driver of doctrine.yaml', () => {
+        const ENV = '# DATABASE_URL="sqlite:///%kernel.project_dir%/var/data.db"\n# DATABASE_URL="mysql://app:!ChangeMe!@127.0.0.1:3306/app?serverVersion=8.0.32&charset=utf8mb4"\nDATABASE_URL="postgresql://app:!ChangeMe!@127.0.0.1:5432/app?serverVersion=16&charset=utf8"\n';
+        assert.equal(parser.dialect(project({ '.env': ENV })), 'postgresql', 'the line that is not commented');
+        assert.equal(parser.dialect(project({ '.env': ENV, '.env.local': "DATABASE_URL='mysql://root@127.0.0.1/app?serverVersion=10.11.2-MariaDB'\n" })), 'mariadb', '.env.local first');
+        assert.equal(parser.dialect(project({ '.env': `APP_ENV=prod\n${ENV}`, '.env.prod': 'DATABASE_URL=sqlite:///%kernel.project_dir%/var/app.db\n', '.env.dev': 'DATABASE_URL=mysql://x\n' })), 'sqlite', 'the files of APP_ENV');
+        assert.equal(parser.dialect(project({ '.env': 'DATABASE_URL=mysql://x\nDATABASE_URL=pdo-sqlsrv://x\n' })), 'sqlserver', 'the last one');
+        assert.equal(parser.dialect(project({ '.env': 'DATABASE_URL=${SECRET_URL}\n', 'config/packages/doctrine.yaml': 'doctrine:\n    dbal:\n        driver: pdo_mysql\n' })), null, 'set by the environment');
+        assert.equal(parser.dialect(project({ 'config/packages/doctrine.yaml': "doctrine:\n    dbal:\n        # driver: pdo_pgsql\n        driver: 'pdo_mysql'\n        server_version: '10.11.2-MariaDB'\n" })), 'mariadb');
+        assert.equal(parser.dialect(project({ 'config/packages/doctrine.yaml': 'doctrine:\n    dbal:\n        driver: pdo_pgsql\n' })), 'postgresql');
+        assert.equal(registry.getDialect('symfony', project({ '.env': 'DATABASE_URL=oci8://x\n' })), null, 'a database the API does not name');
+        assert.equal(parser.dialect(project({})), null);
+        assert.equal(registry.getMigrations('symfony', project({})), null, 'no migrations the parsers replay');
+    });
+});

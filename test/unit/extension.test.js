@@ -1066,14 +1066,14 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     const api = ext.context.api;
     const dir = folder('api', LARAVEL);
     ext.openFolders(dir);
-    assert.equal(api.apiVersion, 3);
+    assert.equal(api.apiVersion, 4);
     assert.equal(api.getSchema(), null);
 
     const seen = [];
     const subscription = api.onDidChangeSchema(schema => seen.push(schema));
     ext.run();
     const schema = api.getSchema();
-    assert.deepEqual(schema, { tables: SOURCED, framework: 'laravel', basePath: dir, project: { name: 'api', folder: Uri.file(dir).toString() } });
+    assert.deepEqual(schema, { tables: SOURCED, framework: 'laravel', dialect: null, basePath: dir, project: { name: 'api', folder: Uri.file(dir).toString() } });
     assert.deepEqual(seen, [schema]);
     schema.tables.length = 0;
     assert.equal(api.getSchema().tables.length, 2, 'a copy: other extensions cannot change it');
@@ -1097,6 +1097,105 @@ test('API: the schema on screen, its changes, and the parsers', () => {
     assert.ok(api.viewScripts.includes('vendor/mermaid.min.js') && api.viewScripts.includes('mermaid/diagram.js'));
     assert.ok(!api.viewScripts.includes('app.js'));
     assert.equal(api.viewsUri.fsPath, path.join(ROOT, 'views'));
+});
+
+test('API version 4: the dialect of the schema on screen, and the migrations of a framework root', () => {
+    const ext = activate(() => ({ tables: SOURCED, warnings: [] }));
+    const api = ext.context.api;
+    const up = "<?php\nreturn new class extends Illuminate\\Database\\Migrations\\Migration {\n    public function up(): void {}\n};\n";
+    const dir = folder('api-v4', { ...LARAVEL, '.env': 'DB_CONNECTION=pgsql\n', 'database/migrations/2024_01_02_000000_create_posts_table.php': up, 'database/migrations/2024_01_01_000000_create_users_table.php': up });
+    ext.openFolders(dir);
+    const seen = [];
+    api.onDidChangeSchema(schema => seen.push(schema.dialect));
+    ext.run();
+    assert.equal(api.getSchema().dialect, 'postgresql');
+    assert.deepEqual(seen, ['postgresql']);
+    assert.deepEqual(api.getMigrations(dir, 'laravel'), { root: dir, framework: 'laravel', migrations: [
+        { id: '2024_01_01_000000_create_users_table.php', file: path.join(dir, 'database', 'migrations', '2024_01_01_000000_create_users_table.php'), time: Date.UTC(2024, 0, 1) / 1000 },
+        { id: '2024_01_02_000000_create_posts_table.php', file: path.join(dir, 'database', 'migrations', '2024_01_02_000000_create_posts_table.php'), time: Date.UTC(2024, 0, 2) / 1000 },
+    ] });
+    const sql = folder('api-v4-sql', { 'supabase/migrations/20240101000000_init.sql': 'create table a (id int);\n' });
+    assert.deepEqual(api.getMigrations(sql, 'sql').migrations.map(m => m.id), ['20240101000000_init.sql']);
+    assert.equal(api.getMigrations(folder('api-v4-dump', { 'schema.sql': 'create table a (id int);\n' }), 'sql'), null, 'a dump');
+    assert.equal(api.getMigrations(dir, 'symfony'), null, 'Symfony replays no migrations');
+    assert.equal(api.getMigrations(folder('api-v4-none'), 'prisma'), null);
+    assert.throws(() => api.getMigrations(dir, 'rails'), error => error instanceof ParserError && error.message === 'Unknown framework: rails');
+    // A copy: changing it changes nothing
+    api.getMigrations(dir, 'laravel').migrations.length = 0;
+    assert.equal(api.getMigrations(dir, 'laravel').migrations.length, 2);
+    // A project whose code tells no database
+    const other = folder('api-v4-other', LARAVEL);
+    ext.openFolders(other);
+    ext.run();
+    assert.equal(api.getSchema().dialect, null);
+});
+
+test('API version 4: a tool of other stacks (frameworks) or that tells it does not apply (unavailable) is greyed with its reason, and tells it instead of running', async () => {
+    const ext = activate();
+    const api = ext.context.api;
+    const laravel = folder('tools-laravel', LARAVEL);
+    const symfony = folder('tools-symfony', SYMFONY);
+    const toolsView = () => ext.state.treeViews.get('DMDB.tools');
+    const node = (id) => toolsView().items().find(item => item.id === `tool:${id}`);
+    const panelTools = () => ext.state.panels[0].sent('features').at(-1).tools;
+    const tool = (id) => panelTools().find(item => item.id === id);
+
+    // Before a schema is read: every tool applies
+    const models = api.registerTool({ id: 'pro.models', label: 'Eloquent models', command: 'DMDBPro.generateModel', pro: true, frameworks: ['laravel', 'laravel', 3] });
+    const designer = api.registerTool({ id: 'pro.designer', label: 'Design', command: 'DMDBPro.designTable', pro: true, frameworks: ['laravel', 'symfony'] });
+    const old = api.registerTool({ id: 'pro.migrationChanges', label: 'Migration', command: 'DMDBPro.migrationChanges', pro: true });
+    api.registerTool({ id: 'acme.any', label: 'Any', command: 'acme.any', frameworks: [] });
+    ext.openFolders(symfony);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(tool('pro.models'), { id: 'pro.models', label: 'Eloquent models', hint: '', icon: undefined, pro: true, state: 'unavailable', reason: 'This tool is not available for Symfony projects.' });
+    assert.equal(tool('pro.designer').state, 'available');
+    assert.equal(tool('pro.migrationChanges').state, 'available', 'registered without frameworks: as before version 4');
+    assert.equal(tool('acme.any').state, 'available', 'an empty list: every stack');
+    // The Tools view: greyed, its reason after its hint, the texts of DrawMeDatabase for the label
+    assert.deepEqual({ label: node('pro.models').label, description: node('pro.models').description, tooltip: node('pro.models').tooltip, contextValue: node('pro.models').contextValue, color: node('pro.models').iconPath.color.id },
+        { label: 'Generate Eloquent models', description: 'not for this project', tooltip: 'With their relationships (Laravel)\nThis tool is not available for Symfony projects.', contextValue: 'tool.unavailable', color: 'disabledForeground' });
+
+    // A click tells why, without running the command
+    ext.state.executed = [];
+    panel.postFromPage({ type: 'tool', id: 'pro.models' });
+    ext.state.commands.get('DMDB.runTool')('pro.models');
+    await flush();
+    assert.deepEqual(ext.state.executed, []);
+    assert.deepEqual(ext.state.infos.slice(-2).map(info => info.text), ['This tool is not available for Symfony projects.', 'This tool is not available for Symfony projects.']);
+
+    // The reason of the extension, as it writes it: not the translations of DrawMeDatabase
+    old.update({ unavailable: '  What a migration changes reads Laravel migrations: it is not available for Symfony projects.  ' });
+    assert.deepEqual(tool('pro.migrationChanges'), { id: 'pro.migrationChanges', label: 'Migration', hint: '', icon: undefined, pro: true, state: 'unavailable', reason: 'What a migration changes reads Laravel migrations: it is not available for Symfony projects.' });
+    assert.match(node('pro.migrationChanges').tooltip, /\nWhat a migration changes reads Laravel migrations: it is not available for Symfony projects\.$/);
+    ext.state.commands.get('DMDB.runTool')('pro.migrationChanges');
+    assert.equal(ext.state.infos.at(-1).text, 'What a migration changes reads Laravel migrations: it is not available for Symfony projects.');
+    // Before the lock of an ended trial
+    const pro = installPro(ext, { kind: 'expired', commands: { buy: 'DMDBPro.buyLicense' } });
+    await pro.connect();
+    assert.equal(tool('pro.migrationChanges').state, 'unavailable');
+    assert.equal(tool('pro.designer').state, 'locked');
+
+    // The stack of the schema on screen changes: the tools follow
+    ext.openFolders(laravel);
+    ext.run();
+    assert.equal(tool('pro.models').state, 'locked');
+    assert.equal(tool('pro.migrationChanges').state, 'unavailable', 'its own reason, whatever the stack');
+    old.update({ unavailable: null });
+    assert.equal(tool('pro.migrationChanges').state, 'locked');
+    pro.set({ kind: 'licensed', commands: {} });
+    ext.state.executed = [];
+    ext.state.commands.get('DMDB.runTool')('pro.models');
+    await flush();
+    assert.deepEqual(ext.state.executed, [{ id: 'DMDBPro.generateModel', args: [] }]);
+    // update({ frameworks })
+    designer.update({ frameworks: ['symfony'] });
+    assert.deepEqual(tool('pro.designer'), { id: 'pro.designer', label: 'Design', hint: '', icon: undefined, pro: true, state: 'unavailable', reason: 'This tool is not available for Laravel projects.' });
+    designer.update({ frameworks: undefined });
+    assert.equal(tool('pro.designer').state, 'available');
+    models.dispose();
+    assert.equal(tool('pro.models').state, 'missing');
 });
 
 test('API: exports of other extensions are listed in the page and saved like the others', async () => {

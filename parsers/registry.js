@@ -8,12 +8,16 @@
 // The parsers of DrawMeDatabase, one per stack (framework or ORM), and the detection of the stack
 // of a folder. Each parser module follows the contract of docs/parsers.md:
 //   { id, label, detect(basePath) → score, sources(basePath, { overrides }) → { folders, files, extensions },
-//     parse(basePath, options) → { tables, warnings } }
+//     parse(basePath, options) → { tables, warnings },
+//     optional: dialect(basePath, { overrides }) → id | null, migrations(basePath, { overrides }) → { root, framework, migrations } | null }
 // A new stack is a new module in the list below.
 
 const path = require('path');
 
 const UNKNOWN = 'Unknown';
+
+// The databases a parser may tell (dialect()): the SQL of the project is written for one of them
+const DIALECTS = ['postgresql', 'mysql', 'mariadb', 'sqlite', 'sqlserver', 'cockroachdb', 'singlestore', 'mongodb'];
 
 // In the order of detection: the first one wins a tie. Loaded on first use (require() runs each
 // time, Node keeps the modules)
@@ -112,7 +116,48 @@ function createRegistry(entries) {
         };
     };
 
-    return { getParsers, getParser, labels, detect, detectFramework, getSources };
+    // The database the project of a framework root is for (one of DIALECTS), as its parser reads it
+    // (the provider of a Prisma schema, the dialect of drizzle.config.ts, the connection of a Laravel
+    // application...), or null when the parser cannot tell (or has no dialect()). options.overrides:
+    // the unsaved editors. A parser that throws tells nothing.
+    const getDialect = (id, basePath, options = {}) => {
+        const parser = getParser(id);
+        if (!parser || typeof parser.dialect !== 'function' || !nonEmpty(basePath)) {
+            return null;
+        }
+        try {
+            const dialect = parser.dialect(basePath, { overrides: options && options.overrides instanceof Map ? options.overrides : null });
+            return DIALECTS.includes(dialect) ? dialect : null;
+        } catch {
+            return null;
+        }
+    };
+
+    // The migrations of a framework root, in the order their tool runs them, cleaned: { root,
+    // framework, migrations: [{ id, file, time? }] } (root, file: absolute paths; id: what the option
+    // `until` of parse(root, framework) takes; time: seconds since 1970, when the migration tells
+    // it), or null when the stack keeps no migrations the parsers replay (a dump, Symfony) or when
+    // there are none. parse(root, framework, { until: id }) gives the schema right after one.
+    const getMigrations = (id, basePath, options = {}) => {
+        const parser = getParser(id);
+        if (!parser || typeof parser.migrations !== 'function' || !nonEmpty(basePath)) {
+            return null;
+        }
+        const raw = parser.migrations(basePath, { overrides: options && options.overrides instanceof Map ? options.overrides : null });
+        if (!raw || !nonEmpty(raw.root) || !getParser(raw.framework) || !Array.isArray(raw.migrations)) {
+            return null;
+        }
+        const migrations = raw.migrations
+            .filter(migration => migration && nonEmpty(migration.id) && nonEmpty(migration.file))
+            .map(migration => ({
+                id: migration.id,
+                file: path.resolve(raw.root, migration.file),
+                ...(Number.isFinite(migration.time) ? { time: Math.floor(migration.time) } : {}),
+            }));
+        return migrations.length > 0 ? { root: path.resolve(raw.root), framework: raw.framework, migrations } : null;
+    };
+
+    return { getParsers, getParser, labels, detect, detectFramework, getSources, getDialect, getMigrations };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -216,4 +261,4 @@ function watchPatterns(sources) {
     ];
 }
 
-module.exports = { UNKNOWN, createRegistry, covers, watchPatterns, globRegExp, ...createRegistry(MODULES) };
+module.exports = { UNKNOWN, DIALECTS, createRegistry, covers, watchPatterns, globRegExp, ...createRegistry(MODULES) };

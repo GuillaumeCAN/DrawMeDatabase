@@ -340,6 +340,54 @@ describe('prisma parser: where the schema is', () => {
     });
 });
 
+describe('prisma parser: the dialect and the migrations of a project (API version 4)', () => {
+    const MIGRATION = (name) => ({ [`${name}/migration.sql`]: `CREATE TABLE "${name.replace(/^\d+_/, '')}" ("id" INTEGER NOT NULL PRIMARY KEY);\n` });
+    const migrationsIn = (folder, provider = 'postgresql') => Object.fromEntries(Object.entries({ ...MIGRATION('20240101000000_a'), ...MIGRATION('20240102000000_b'), 'migration_lock.toml': `provider = "${provider}"\n` }).map(([rel, text]) => [`${folder}/${rel}`, text]));
+    const ids = (result) => result && result.migrations.map(m => m.id);
+
+    it('the dialect: the provider of the datasource, of a schema folder too', () => {
+        for (const [provider, dialect] of [['postgresql', 'postgresql'], ['postgres', 'postgresql'], ['mysql', 'mysql'], ['sqlite', 'sqlite'], ['sqlserver', 'sqlserver'], ['cockroachdb', 'cockroachdb'], ['mongodb', 'mongodb'], ['other', null]]) {
+            assert.equal(parser.dialect(schemaProject('model A {\n  id Int @id\n}\n', provider)), dialect, provider);
+        }
+        const folder = project({ 'package.json': PACKAGE, 'prisma/schema/user.prisma': 'model User {\n  id Int @id\n}\n', 'prisma/schema/schema.prisma': datasource('mysql') });
+        assert.equal(registry.getDialect('prisma', folder), 'mysql');
+        // The unsaved schema
+        const dir = schemaProject('', 'sqlite');
+        assert.equal(parser.dialect(dir, { overrides: new Map([[path.join(dir, 'prisma', 'schema.prisma'), datasource('mysql')]]) }), 'mysql');
+        assert.equal(parser.dialect(project({ 'package.json': PACKAGE })), null);
+        assert.equal(parser.dialect(project({ 'prisma/schema.prisma': 'model A {\n  id Int @id\n}\n' })), null, 'no datasource');
+    });
+
+    it('the migrations: the SQL of prisma migrate next to the schema, or in the migrations.path of prisma.config.ts, read by the SQL reader in their order', () => {
+        const dir = project({ 'package.json': PACKAGE, 'prisma/schema.prisma': SCHEMA, ...migrationsIn('prisma/migrations') });
+        const result = registry.getMigrations('prisma', dir);
+        assert.deepEqual(result, { root: dir, framework: 'sql', migrations: [
+            { id: '20240101000000_a', file: path.join(dir, 'prisma', 'migrations', '20240101000000_a', 'migration.sql'), time: Date.UTC(2024, 0, 1) / 1000 },
+            { id: '20240102000000_b', file: path.join(dir, 'prisma', 'migrations', '20240102000000_b', 'migration.sql'), time: Date.UTC(2024, 0, 2) / 1000 },
+        ] });
+        assert.deepEqual(registry.getParser('sql').parse(result.root, { git: false, until: '20240101000000_a' }).tables.map(t => t.table), ['a']);
+        // A schema at the root: ./migrations; a schema folder: its migrations sub-folder, else the one next to it
+        assert.deepEqual(ids(parser.migrations(project({ 'package.json': PACKAGE, 'schema.prisma': SCHEMA, ...migrationsIn('migrations') }))), ['20240101000000_a', '20240102000000_b']);
+        const inFolder = project({ 'package.json': PACKAGE, 'prisma/schema/schema.prisma': SCHEMA, ...migrationsIn('prisma/schema/migrations') });
+        assert.equal(parser.migrations(inFolder).root, inFolder);
+        const nextToFolder = project({ 'package.json': PACKAGE, 'prisma/schema/schema.prisma': SCHEMA, ...migrationsIn('prisma/migrations') });
+        assert.deepEqual(ids(parser.migrations(nextToFolder)), ['20240101000000_a', '20240102000000_b']);
+        // prisma.config.ts: migrations.path, relative to the config file; its migrations are read from their own folder when the reader would find others first
+        const config = "import { defineConfig } from 'prisma/config';\nexport default defineConfig({\n  schema: 'prisma/schema.prisma',\n  migrations: {\n    path: 'db/history', // the folder of prisma migrate\n    seed: 'tsx db/seed.ts',\n  },\n});\n";
+        const configured = project({ 'package.json': PACKAGE, 'prisma.config.ts': config, 'prisma/schema.prisma': SCHEMA, ...migrationsIn('db/history', 'sqlite'), ...migrationsIn('prisma/migrations') });
+        const moved = registry.getMigrations('prisma', configured);
+        assert.equal(moved.root, path.join(configured, 'db', 'history'));
+        assert.deepEqual(moved.migrations.map(m => path.relative(configured, m.file)), [path.join('db', 'history', '20240101000000_a', 'migration.sql'), path.join('db', 'history', '20240102000000_b', 'migration.sql')]);
+        assert.equal(registry.getDialect('sql', moved.root), 'sqlite');
+        const joined = project({ 'package.json': PACKAGE, 'prisma.config.ts': "import path from 'node:path';\nexport default { migrations: { path: path.join('prisma', 'history') } };\n", 'prisma/schema.prisma': SCHEMA, ...migrationsIn('prisma/history') });
+        assert.equal(parser.migrations(joined).root, path.join(joined, 'prisma', 'history'));
+        // None: no migrations yet, or a computed path that cannot be read (the default folder then)
+        assert.equal(parser.migrations(project({ 'package.json': PACKAGE, 'prisma/schema.prisma': SCHEMA })), null);
+        assert.equal(parser.migrations(project({ 'package.json': PACKAGE, 'prisma.config.ts': 'export default { migrations: { path: process.env.MIGRATIONS } };\n', 'prisma/schema.prisma': SCHEMA })), null);
+        assert.equal(parser.migrations(path.join(TMP, 'dmdb-prisma-missing')), null);
+    });
+});
+
 describe('prisma parser: sources of unsaved editors', () => {
     it('sources() follow an unsaved package.json or prisma.config.ts that moves the schema (options.overrides), as parse() does', () => {
         const pkgText = (extra = {}) => JSON.stringify({ ...extra, devDependencies: { prisma: '6.19.1' } });
