@@ -189,7 +189,7 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 ### Fixed
 - A button of DrawMeDatabase Pro (PRO badge, Discover, a Pro tool or export) no longer fails with "Extension not found" while Pro is not on the Marketplace: a message tells that it is not published yet, or that VS Code is offline
 
-## [v1.8.0] - Unreleased
+## [v1.8.0] - 2026-10-20
 
 ### Added
 - Prisma: the tables of the Prisma schema (Prisma ORM 5 to 7), found where the Prisma CLI looks for it (`schema.prisma`, `prisma/schema.prisma`, the schema of `prisma.config.ts`, read without running it, or of the `prisma` section of `package.json`) or in a multi-file schema folder (`prisma/schema/`). PostgreSQL, MySQL, SQLite, SQL Server and CockroachDB
