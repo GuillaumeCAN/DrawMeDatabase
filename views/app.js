@@ -26,6 +26,10 @@
 
     let schema = null;
     let settings = { layout: 'dagre', direction: 'TB', git: true };
+    // Exports added by other extensions (DrawMeDatabase Pro), and whether Pro is installed
+    let extraExports = { items: [], pro: false };
+    // Tables shown by another extension (a path, a saved view): { tables, highlight, label }
+    let focus = null;
     let drawn = false;
 
     const $ = (id) => document.getElementById(id);
@@ -44,6 +48,8 @@
         searchCount: $('search-count'),
         git: $('git-button'),
         legend: $('legend'),
+        focus: $('focus'),
+        focusLabel: $('focus-label'),
     };
 
     let saveTimer;
@@ -120,6 +126,18 @@
     let filtered = null;
 
     function filterSchema() {
+        if (focus && schema) {
+            const shown = new Set(focus.tables);
+            filtered = {
+                tables: schema.tables
+                    .filter(table => shown.has(table.table))
+                    .map(table => ({ ...table, relations: (table.relations || []).filter(relation => shown.has(relation.on)) })),
+                matches: focus.highlight.filter(name => shown.has(name)),
+                neighbours: [],
+            };
+            elements.searchCount.textContent = '';
+            return;
+        }
         filtered = window.DrawMeDatabaseSearch.filterTables(schema ? schema.tables : [], state.query);
         const count = filtered.matches.length;
         elements.searchCount.textContent = !state.query.trim() || !schema
@@ -129,7 +147,7 @@
 
     // The tables on screen: all of them, or the result of the search
     const shownTables = () => (filtered ? filtered.tables : schema ? schema.tables : []);
-    const searching = () => Boolean(state.query.trim());
+    const searching = () => Boolean(state.query.trim()) || Boolean(focus);
 
     function draw(view) {
         if (!schema) {
@@ -137,9 +155,9 @@
         }
         filterSchema();
         const matches = new Set(filtered.matches);
-        json.render(searching() ? schema.tables.filter(table => matches.has(table.table)) : schema.tables);
-        if (searching() && filtered.matches.length === 0) {
-            diagram.showMessage(`No table or column matches "${state.query.trim()}".`);
+        json.render(!searching() ? schema.tables : focus ? filtered.tables : schema.tables.filter(table => matches.has(table.table)));
+        if (searching() && filtered.tables.length === 0) {
+            diagram.showMessage(focus ? 'None of these tables is in the schema.' : `No table or column matches "${state.query.trim()}".`);
             return;
         }
         diagram.render(shownTables(), { ...settings, highlight: searching() ? filtered.matches : null }, view);
@@ -178,6 +196,7 @@
         searchTimer = setTimeout(() => {
             state.query = elements.search.value;
             persist();
+            setFocus(null, false);
             draw('fit');
         }, 250);
     });
@@ -195,6 +214,22 @@
             elements.search.select();
         }
     });
+
+    // Focus of another extension, with a label to go back to the whole schema
+    function setFocus(next, redraw = true) {
+        focus = next && next.tables.length > 0 ? next : null;
+        elements.focus.hidden = !focus;
+        elements.focusLabel.textContent = focus ? focus.label || `${focus.tables.length} tables` : '';
+        if (focus) {
+            elements.search.value = '';
+            state.query = '';
+            persist();
+        }
+        if (redraw) {
+            draw('fit');
+        }
+    }
+    $('focus-clear').addEventListener('click', () => setFocus(null));
 
     // Toolbar
 
@@ -276,16 +311,46 @@
         vscode.postMessage({ type: 'copy', format, content });
     }
 
+    // The exports of the page, then those of other extensions (or what DrawMeDatabase Pro adds)
+    function menuItems() {
+        const items = [...(EXPORTS[state.viewer] || [])];
+        if (state.viewer !== 'diagram') {
+            return items;
+        }
+        if (extraExports.items.length > 0) {
+            items.push({ separator: true });
+            extraExports.items.forEach(item => items.push({
+                label: item.label,
+                run: () => vscode.postMessage({ type: 'export', id: item.id, tables: shownTables().map(table => table.table) }),
+            }));
+        } else if (!extraExports.pro) {
+            items.push({ separator: true });
+            items.push({ label: 'SQL, DBML, TypeScript, docs… (Pro)', pro: true, run: () => vscode.postMessage({ type: 'pro' }) });
+        }
+        return items;
+    }
+
     function openMenu() {
         const menu = elements.exportMenu;
         menu.textContent = '';
-        (EXPORTS[state.viewer] || []).forEach(item => {
+        menuItems().forEach(item => {
+            if (item.separator) {
+                const line = document.createElement('div');
+                line.className = 'menu-separator';
+                line.setAttribute('role', 'separator');
+                menu.appendChild(line);
+                return;
+            }
             const button = document.createElement('button');
             button.type = 'button';
             button.setAttribute('role', 'menuitem');
             button.tabIndex = -1;
             button.textContent = item.label;
-            button.disabled = !schema;
+            button.disabled = !schema && !item.pro;
+            if (item.pro) {
+                button.classList.add('menu-pro');
+                button.title = 'More export formats and tools with DrawMeDatabase Pro';
+            }
             button.addEventListener('click', async () => {
                 closeMenu(true);
                 try {
@@ -375,6 +440,25 @@
             }
             case 'busy':
                 setBusy(Boolean(message.busy));
+                break;
+            case 'exporters':
+                extraExports = {
+                    items: Array.isArray(message.items) ? message.items.filter(item => item && typeof item.id === 'string') : [],
+                    pro: Boolean(message.pro),
+                };
+                break;
+            case 'focus':
+                setFocus({
+                    tables: Array.isArray(message.tables) ? message.tables.map(String) : [],
+                    highlight: Array.isArray(message.highlight) ? message.highlight.map(String) : [],
+                    label: String(message.label || ''),
+                }, Boolean(schema));
+                if (state.viewer !== 'diagram') {
+                    showViewer('diagram');
+                }
+                break;
+            case 'svgRequest':
+                vscode.postMessage({ type: 'svg', id: message.id, svg: diagram.exportSvg() });
                 break;
             case 'toast':
                 toast(String(message.text || ''));

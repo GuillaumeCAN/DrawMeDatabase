@@ -373,6 +373,7 @@ test('draws the schema in one panel: the page once, then the settings and the sc
     panel.postFromPage({ type: 'ready' });
     assert.deepEqual(panel.posted, [
         { type: 'settings', layout: 'elk', direction: 'TB', showGitStatus: true },
+        { type: 'exporters', items: [], pro: false },
         {
             type: 'schema',
             tables: TABLES,
@@ -730,6 +731,100 @@ test('auto-refresh can be turned off; a new frameworkPath redraws the diagram', 
     await settle();
     assert.equal(ext.state.parsed.length, 2);
     ext.context.subscriptions.forEach(item => item.dispose());
+});
+
+test('API: the schema on screen, its changes, and the parsers', () => {
+    const ext = activate(() => ({ tables: SOURCED, warnings: [] }));
+    const api = ext.context.api;
+    const dir = folder('api', LARAVEL);
+    ext.openFolders(dir);
+    assert.equal(api.apiVersion, 1);
+    assert.equal(api.getSchema(), null);
+
+    const seen = [];
+    const subscription = api.onDidChangeSchema(schema => seen.push(schema));
+    ext.run();
+    const schema = api.getSchema();
+    assert.deepEqual(schema, { tables: SOURCED, framework: 'laravel', basePath: dir, project: { name: 'api', folder: Uri.file(dir).toString() } });
+    assert.deepEqual(seen, [schema]);
+    schema.tables.length = 0;
+    assert.equal(api.getSchema().tables.length, 2, 'a copy: other extensions cannot change it');
+
+    subscription.dispose();
+    ext.run();
+    assert.equal(seen.length, 1);
+
+    assert.deepEqual(api.parseSchema(dir, 'laravel', { git: false }).tables, SOURCED);
+    assert.deepEqual(ext.state.parseOptions.at(-1), { git: false });
+    assert.throws(() => api.parseSchema(dir, 'rails'), ParserError);
+    assert.equal(api.detectFramework(dir), 'laravel');
+    assert.ok(api.viewScripts.includes('vendor/mermaid.min.js') && api.viewScripts.includes('mermaid/diagram.js'));
+    assert.ok(!api.viewScripts.includes('app.js'));
+    assert.equal(api.viewsUri.fsPath, path.join(ROOT, 'views'));
+});
+
+test('API: exports of other extensions are listed in the page and saved like the others', async () => {
+    const ext = activate(() => ({ tables: SOURCED, warnings: [] }));
+    const api = ext.context.api;
+    const dir = folder('api-export', LARAVEL);
+    ext.openFolders(dir);
+    ext.run();
+    const panel = ext.state.panels[0];
+    panel.postFromPage({ type: 'ready' });
+
+    const exported = [];
+    const registration = api.registerExporter({
+        id: 'sql', label: 'Save as SQL…', extension: 'sql',
+        export: (schema) => {
+            exported.push(schema.tables.map(table => table.table));
+            return 'CREATE TABLE users;';
+        },
+    });
+    assert.deepEqual(panel.sent('exporters').at(-1), { type: 'exporters', items: [{ id: 'sql', label: 'Save as SQL…', extension: 'sql' }], pro: false });
+    assert.throws(() => api.registerExporter({ id: 'x' }), TypeError);
+
+    ext.state.saveUri = Uri.file(path.join(dir, 'out.sql'));
+    panel.postFromPage({ type: 'export', id: 'sql', tables: ['users'] });
+    panel.postFromPage({ type: 'export', id: 'unknown', tables: [] });
+    await flush();
+    await flush();
+    assert.deepEqual(exported, [['users']], 'the tables on screen only');
+    assert.equal(ext.state.saveDialogs[0].defaultUri.fsPath, path.join(dir, 'api-export-schema.sql'));
+    assert.deepEqual(ext.state.saveDialogs[0].filters, { 'Save as SQL…': ['sql'] });
+    assert.equal(ext.state.written[0].data.toString(), 'CREATE TABLE users;');
+
+    registration.dispose();
+    assert.deepEqual(panel.sent('exporters').at(-1).items, []);
+
+    // Without Pro, the page offers it: its page opens in the Extensions view
+    panel.postFromPage({ type: 'pro' });
+    await flush();
+    assert.deepEqual(ext.state.executed.at(-1), { id: 'extension.open', args: ['GuillaumeCancalon.draw-me-database-pro'] });
+});
+
+test('API: focus on tables, also before the panel is ready, and the SVG of the diagram', async () => {
+    const ext = activate();
+    const api = ext.context.api;
+    ext.openFolders(folder('api-focus', LARAVEL));
+    assert.equal(await api.getDiagramSvg(), null, 'no diagram yet');
+    ext.run();
+    const panel = ext.state.panels[0];
+
+    api.focusTables({ tables: ['users', 'posts', 42], highlight: ['users'], label: 'Path: users → posts' });
+    assert.deepEqual(panel.sent('focus'), []);
+    panel.postFromPage({ type: 'ready' });
+    assert.deepEqual(panel.sent('focus'), [{ type: 'focus', tables: ['users', 'posts'], highlight: ['users'], label: 'Path: users → posts' }]);
+    api.focusTables({ tables: ['users'] });
+    assert.equal(panel.sent('focus').length, 2);
+    assert.equal(panel.reveals, 1);
+
+    const svg = api.getDiagramSvg();
+    const request = panel.sent('svgRequest')[0];
+    panel.postFromPage({ type: 'svg', id: request.id, svg: '<svg/>' });
+    assert.equal(await svg, '<svg/>');
+    const pending = api.getDiagramSvg();
+    panel.dispose();
+    assert.equal(await pending, null, 'a closed panel answers null');
 });
 
 test('DMDB.refresh draws the schema like DMDB.parseSchema', () => {

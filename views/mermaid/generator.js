@@ -26,6 +26,8 @@
     const DOT = String.fromCharCode(0x25cf);
     const gitLabel = (status) => `${DOT} ${GIT_LABELS[status]}`;
     const gitStatus = (value) => (Object.prototype.hasOwnProperty.call(GIT_LABELS, value) ? value : null);
+    // A mark is a CSS class name of the node: a plain word, so it cannot break the source
+    const markClass = (value) => (typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,40}$/.test(value) ? value : null);
 
     // Words the erDiagram lexer reads as keywords, so they cannot be entity ids (compared in
     // lower case). Ids are only used as is when they are plain ASCII words outside this list.
@@ -96,7 +98,7 @@
             }
             const name = asText(table.table);
             if (!merged.has(name)) {
-                merged.set(name, { name, columns: [], relations: [], git: gitStatus(table.git) });
+                merged.set(name, { name, columns: [], relations: [], git: gitStatus(table.git), mark: markClass(table.mark) });
             }
             const entry = merged.get(name);
             asArray(table.columns).forEach(column => {
@@ -141,7 +143,9 @@
 
     // The diagram and its entities: { source, entities: [{ id, table, declared }] }. Options:
     // direction ('TB', 'LR'...), highlight (table names drawn as matches, the others dimmed),
-    // git (true: the tables get the class of their git status, uncommitted columns a comment).
+    // git (true: the tables get the class of their git status, uncommitted columns a comment),
+    // marks (true: a table's `mark` becomes a CSS class of its node and a column's `note` its
+    // comment, for the tools of other extensions, e.g. a schema comparison).
     function buildDiagram(tables, options) {
         const settings = options || {};
         const merged = mergeTables(tables);
@@ -188,7 +192,8 @@
                 }
                 const attribute = `${typeWord(column.type, column.nullable === true)} ${attributeWord(column.name, 'unnamed')}`;
                 const status = settings.git ? gitStatus(column.git) : null;
-                const comment = status ? ` "${gitLabel(status)}"` : '';
+                const note = settings.marks && typeof column.note === 'string' ? quotableText(column.note) : '';
+                const comment = note ? ` "${note}"` : status ? ` "${gitLabel(status)}"` : '';
                 lines.push(`    ${keys.length ? `${attribute} ${keys.join(', ')}` : attribute}${comment}`);
             });
             lines.push('  }');
@@ -225,6 +230,14 @@
             if (others.length > 0) {
                 lines.push(`  class ${others.join(',')} dimmed`);
             }
+        }
+
+        if (settings.marks) {
+            const marks = new Map();
+            entries.filter(entry => entry.mark).forEach(entry => {
+                marks.set(entry.mark, [...(marks.get(entry.mark) || []), entityId(entry.name)]);
+            });
+            marks.forEach((ids, mark) => lines.push(`  class ${ids.join(',')} ${mark}`));
         }
 
         if (settings.git) {
