@@ -1,6 +1,6 @@
 {
   "name": "draw-me-database",
-  "displayName": "DrawMeDatabase",
+  "displayName": "DrawMeDatabase: ER Diagram (ERD) for Laravel, Symfony, Prisma, Drizzle & SQL",
   "publisher": "GuillaumeCancalon",
   "description": "%description%",
   "version": "1.8.0",
