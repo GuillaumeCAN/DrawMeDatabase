@@ -232,3 +232,12 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 - The listing of the extension: its description (also in French) tells that it draws ER diagrams (ERD) from the code of Laravel, Symfony, Prisma, Drizzle and SQL migrations, without a database; the Visualization category; keywords for these stacks and databases; a table of the supported stacks at the top of the README
 
 Laravel and Symfony projects are read as before: same tables, warnings and git status (except the Laravel projects that have a schema dump, now read), and Laravel still wins when a project is both. Laravel and Symfony also win a tie with Prisma (a PHP project with a Prisma schema), and Prisma wins a tie with Drizzle (a project moving from one to the other); `DrawMeDatabase.framework` chooses the other one there. Every framework wins over SQL.
+
+## [v1.8.1] - 2026-10-20
+
+### Fixed
+- The page of the extension (Marketplace, Open VSX) and the settings:
+  - The paragraph *Code-Driven Visualization* is shown as text, no longer as a block of code
+  - A click on a table shows it in the inspector, a double-click (or Ctrl/Cmd+click) opens the file it comes from: the *Usage* section and the SQL section said that a click opens it
+  - The settings `DrawMeDatabase.palette`, `colors`, `font` and `customFont` say that they are DrawMeDatabase Pro features, as `showColumnGitStatus` does: without Pro, the diagram keeps the colors of the theme and the default font (also in French)
+- The publishing guide (`docs/publishing.md`): the federated credential of DrawMeDatabase Pro, a repository created after July 15, 2026, uses the immutable subject of GitHub (`repo:GuillaumeCAN@145674412/DrawMeDatabase-Pro@1424346322:environment:marketplace`); the first publication is the latest version of each extension, the core first on both registries, then Pro; a private repository without *Settings → Environments* keeps its credential on the environment
