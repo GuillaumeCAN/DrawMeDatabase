@@ -1,4 +1,4 @@
-**v1.8.0**
+**v1.8.1**
 
 **DrawMeDatabase** draws the ER diagram (ERD) of your database from your code, in VS Code: no database connection is needed, and the diagram follows your code as you type, with its git status.
 
@@ -55,7 +55,7 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
   - Supported layouts: Supabase (`supabase/migrations/<timestamp>_<name>.sql`), Flyway (`V<version>__<name>.sql` in `src/main/resources/db/migration`, `db/migration` or `sql`, by version; the repeatable `R__` ones are left out), dbmate (`db/migrations`, the `-- migrate:up` section), golang-migrate (`<version>_<name>.up.sql`), goose (`-- +goose Up`), diesel (`migrations/<name>/up.sql`), numbered migrations (`migrations/001_name.sql`: sqlx, Atlas...), Rails `db/structure.sql`, a dump (`schema.sql`, `structure.sql`, `dump.sql`... at the root or in `db/`: pg_dump, mysqldump, `sqlite3 .schema`; its data, `INSERT` and `COPY`, is skipped without being read: a dump of 100 MB is drawn in about half a second). The output of `prisma migrate` (`prisma/migrations`) and of drizzle-kit (`drizzle/`, in the order of its journal) is read when the project has no Prisma or Drizzle schema, or with `DrawMeDatabase.framework` set to `sql`. Set `DrawMeDatabase.frameworkPath` to a folder of migrations elsewhere
   - `CREATE TABLE` (types with their length and precision, `NOT NULL`, `DEFAULT`, primary keys, `UNIQUE`, `REFERENCES` and `FOREIGN KEY` with `ON DELETE` / `ON UPDATE`), `CREATE TYPE ... AS ENUM` and `ALTER TYPE`, `CREATE [UNIQUE] INDEX`, `ALTER TABLE` (columns added, dropped, changed and renamed, constraints added and dropped, `RENAME TO`, `SET SCHEMA`), `INHERITS` (the tables that inherit a parent follow the changes of its columns), `DROP TABLE`, `DROP SCHEMA ... CASCADE`; schema-qualified and quoted names, the search path (`SET`, `RESET`, `SET LOCAL`), comments, dollar-quoted bodies, the DDL of `DO` blocks, transactions. Functions, triggers, policies, grants, extensions, views and data are passed over
   - MySQL: backticks, `AUTO_INCREMENT`, `ENGINE=...`, inline `KEY`, `INDEX`, `UNIQUE KEY` and `CONSTRAINT`, `MODIFY`, `CHANGE`, `FIRST` / `AFTER`, `RENAME TABLE`, `DELIMITER` and the executable comments of mysqldump, a dump of several databases (`USE`: the tables after the first database are prefixed with theirs; the databases of the server, `mysql` and `sys`, that `mysqldump --all-databases` dumps are not drawn). SQLite: `AUTOINCREMENT`, `WITHOUT ROWID`, the tables that prisma migrate and drizzle-kit rebuild to change them
-  - A click on a table opens its `CREATE TABLE`, on a column the statement that declared or last changed it; the git status follows the migrations (a new migration marks the tables it changes as modified)
+  - A double-click (or Ctrl/Cmd+click) on a table opens its `CREATE TABLE`, on a column the statement that declared or last changed it; the git status follows the migrations (a new migration marks the tables it changes as modified)
   - Checked against PostgreSQL 17, MySQL 8.4 and SQLite on the migrations of Chatbot UI, Basejump, Next.js Subscription Payments, Harness, OpenFGA, Umami (prisma migrate), OpenStatus (drizzle-kit), Atala PRISM (Flyway), and the dumps of Feedbin (Rails), Pagila, listmonk, Sakila and GitLab: the same tables, columns, keys, foreign keys and indexes as the database
 
 **Diagram viewer:**
@@ -92,9 +92,7 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 **JSON viewer:** the parsed schema, colored like code, to save or copy.
 
-**Code-Driven Visualization**: 
-
-    Automatically analyzes your codebase to create detailed and accurate diagrams, saving time and effort. No database connection is needed, and everything works offline.
+**Code-Driven Visualization**: automatically analyzes your codebase to create detailed and accurate diagrams, saving time and effort. No database connection is needed, and everything works offline.
 
 ## DrawMeDatabase Pro
 
@@ -135,7 +133,7 @@ In the panel:
 - The toolbar changes the layout and the direction, zooms, exports and refreshes the diagram after you changed your code (also `DrawMeDatabase: Refresh Diagram`, or the refresh button in the title bar of the panel)
 - Keyboard, once the diagram has the focus: `+` and `-` to zoom, `0` for 100 %, `F` to fit, arrows to move
 - `Ctrl+F` (`Cmd+F` on macOS) goes to the search box, `Escape` clears it
-- A click on a table opens the file it comes from; the exports and the JSON viewer follow the search
+- A click on a table shows it in the inspector, a double-click (or Ctrl/Cmd+click) opens the file it comes from; the exports and the JSON viewer follow the search
 
 **Settings:**
 
@@ -147,7 +145,7 @@ In the panel:
 - `DrawMeDatabase.showGitStatus`: show the git status of the tables in the diagram (default: on, also the **Git** button of the toolbar)
 - `DrawMeDatabase.keysOnly`, `DrawMeDatabase.relationLabels`: only the keys of each table, the names of the relations (also in the options panel)
 - `DrawMeDatabase.language`: `auto` (the language of VS Code), `en` or `fr`
-- `DrawMeDatabase.theme`, `DrawMeDatabase.palette`, `DrawMeDatabase.colors`, `DrawMeDatabase.font`, `DrawMeDatabase.customFont`, `DrawMeDatabase.fontSize`, `DrawMeDatabase.grid`: the appearance of the diagram, easier to change from the options panel
+- `DrawMeDatabase.theme`, `DrawMeDatabase.palette`, `DrawMeDatabase.colors`, `DrawMeDatabase.font`, `DrawMeDatabase.customFont`, `DrawMeDatabase.fontSize`, `DrawMeDatabase.grid`: the appearance of the diagram, easier to change from the options panel (`palette`, `colors`, `font` and `customFont`: DrawMeDatabase Pro)
 
 Details and warnings (for example a table whose name cannot be read) are written in the **DrawMeDatabase** output panel.
 
@@ -212,5 +210,5 @@ GitHub Actions runs these checks on every pull request, the integration tests al
 
 ## Changelog
 
-Latest release : **v1.8.0**
+Latest release : **v1.8.1**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

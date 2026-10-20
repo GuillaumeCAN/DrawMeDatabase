@@ -68,7 +68,7 @@ The namespace `GuillaumeCancalon` (the `publisher` of `package.json`, same case)
 
    The token is then given only to the jobs of this environment, which only runs from `main` and from version tags: a workflow pushed on another branch cannot read it. Do not store it as a repository secret, which every workflow of every branch can read. Create the environment before the first release: a release that names an environment that does not exist creates it, without these rules.
 7. **DrawMeDatabase Pro**: the token publishes to every namespace of its account. Do step 6 again in [GuillaumeCAN/DrawMeDatabase-Pro](https://github.com/GuillaumeCAN/DrawMeDatabase-Pro), with the same token. If *Settings → Environments* is missing there (a private repository, see [step 6 of the Marketplace](#6-github-environment-marketplace-both-repositories)), store it as the `OVSX_PAT` repository secret instead (*Settings → Secrets and variables → Actions → New repository secret*).
-8. **Versions released before the secret**: publish each one with *Run workflow* on its tag (see [When something goes wrong](#when-something-goes-wrong)).
+8. **Versions released before the secret**: publish the latest version of each extension only, with *Run workflow* on its tag (see [When something goes wrong](#when-something-goes-wrong)): `v1.8.1` here first, then `v1.1.3` in DrawMeDatabase-Pro once [its Open VSX page](https://open-vsx.org/extension/GuillaumeCancalon/draw-me-database) shows 1.8.1. Open VSX refuses an extension whose `extensionDependencies` it does not have (*Cannot resolve dependency*). Never on the Pro tags v1.1.0 to v1.1.2: the package of v1.1.0 holds `core/` (91 MB), and these versions refuse the keys of the Team license.
 
 Open VSX scans every upload (secret detection, blocklist, names close to existing ones) and rejects it if a check fails. The error message names the check.
 
@@ -160,9 +160,17 @@ They tell Entra ID to accept the OIDC tokens that GitHub issues to the jobs of t
    - *Name*: `github-drawmedatabase`
    - Check the values the portal shows: *Issuer* `https://token.actions.githubusercontent.com`, *Subject identifier* `repo:GuillaumeCAN/DrawMeDatabase:environment:marketplace`, *Audience* `api://AzureADTokenExchange` (the default: do not change it).
    - **Add**.
-2. Again, for DrawMeDatabase Pro: *Repository* `DrawMeDatabase-Pro`, *Entity* **Environment**, *Environment* `marketplace`, *Name* `github-drawmedatabase-pro`. Subject: `repo:GuillaumeCAN/DrawMeDatabase-Pro:environment:marketplace`.
+2. Again, for DrawMeDatabase Pro, with the scenario **Other issuer**. GitHub created DrawMeDatabase-Pro after July 15, 2026, so its OIDC tokens carry the [immutable subject](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims), with the IDs of the owner and of the repository, which the form *GitHub Actions deploying Azure resources* does not build:
+   - *Federated credential scenario*: **Other issuer**
+   - *Issuer*: `https://token.actions.githubusercontent.com`
+   - *Subject identifier*: `repo:GuillaumeCAN@145674412/DrawMeDatabase-Pro@1424346322:environment:marketplace`
+   - *Name*: `github-drawmedatabase-pro`
+   - *Audience*: `api://AzureADTokenExchange` (the default)
+   - **Add**.
 
-The subject is compared character by character, case included: owner and repository as GitHub writes them, environment `marketplace` in lowercase. A job that has no `environment:` sends another subject (`repo:GuillaumeCAN/DrawMeDatabase:ref:refs/heads/main`) and is refused: this is why only the jobs of the `marketplace` environment can publish.
+   The prefix is the `sub_claim_prefix` of `gh api repos/GuillaumeCAN/DrawMeDatabase-Pro/actions/oidc/customization/sub`. DrawMeDatabase, created in 2024, keeps the subject with names only (`use_immutable_subject: false`): step 1 is right for it.
+
+The subject is compared character by character, case included: owner and repository as GitHub writes them (with their IDs for DrawMeDatabase-Pro), environment `marketplace` in lowercase. A repository renamed or transferred moves to the immutable subject: its credential must then be changed. A job that has no `environment:` sends another subject (`repo:GuillaumeCAN/DrawMeDatabase:ref:refs/heads/main`) and is refused: this is why only the jobs of the `marketplace` environment can publish.
 
 ##### 5. Client ID and tenant ID
 
@@ -184,7 +192,7 @@ In [GuillaumeCAN/DrawMeDatabase](https://github.com/GuillaumeCAN/DrawMeDatabase)
 
 Do the same in [GuillaumeCAN/DrawMeDatabase-Pro](https://github.com/GuillaumeCAN/DrawMeDatabase-Pro).
 
-DrawMeDatabase-Pro is a private repository: GitHub documents environments in private repositories for GitHub Pro, Team and Enterprise only, and required reviewers in private repositories for Enterprise only. If *Settings → Environments* is missing in DrawMeDatabase-Pro, upgrade the account to GitHub Pro, or change its credential (step 4) to *Entity* **Branch** `main` and remove `environment:` from the `marketplace` job of its `release.yml` (*Run workflow* on a tag would then need one more credential, *Entity* **Tag** with the exact tag name). Not tested.
+DrawMeDatabase-Pro is a private repository: GitHub documents environments in private repositories for GitHub Pro, Team and Enterprise only, and required reviewers in private repositories for Enterprise only. If *Settings → Environments* is missing in DrawMeDatabase-Pro, keep its credential on the environment (step 4) and its `release.yml` as it is: a job that names `marketplace` still sends the subject `…:environment:marketplace` (the release runs already created the environment `open-vsx` there), but the environment then has no deployment rules, so keep the write access of the repository to yourself. Do not change the credential to *Entity* **Branch**: *Run workflow* on a tag runs the `release.yml` of that tag, whose job names the environment, and would be refused. Or upgrade the account to GitHub Pro. Not tested.
 
 ##### 7. Azure DevOps ID of the identity
 
@@ -228,7 +236,12 @@ From now on, every release of the repository publishes to the Marketplace.
 
 ##### 10. First automated release
 
-- **The versions released before step 9** (1.8.0, released at its merge, and Pro 1.1.0 if it was merged before): *Run workflow* on their tag (*Actions → Release → Run workflow → Use workflow from → Tags → v1.8.0*), in each repository. The job *Publish to the VS Code Marketplace* publishes the version; its log ends with `Published GuillaumeCancalon.draw-me-database v1.8.0.`, and the job's environment links to the Marketplace page. If the version was already uploaded by hand, vsce prints `Version 1.8.0 is already published. Skipping publish.`: the sign-in and the read access work, but the right to publish is only proven by a new version.
+- **The versions released before step 9**: the latest version of each extension only, the core first.
+  1. In DrawMeDatabase: *Run workflow* on its tag (*Actions → Release → Run workflow → Use workflow from → Tags → v1.8.1*). The job *Publish to the VS Code Marketplace* publishes the version; its log ends with `Published GuillaumeCancalon.draw-me-database v1.8.1.`, and the job's environment links to the Marketplace page. If the version was already uploaded by hand, vsce prints `Version 1.8.1 is already published. Skipping publish.`: the sign-in and the read access work, but the right to publish is only proven by a new version.
+  2. Wait until *Publish to Open VSX* and *Publish to the VS Code Marketplace* are both green (published, not skipped with a warning), and until the [Marketplace page](https://marketplace.visualstudio.com/items?itemName=GuillaumeCancalon.draw-me-database) shows 1.8.1: a DrawMeDatabase Pro installed before would get an older core, without the API it needs.
+  3. Then in DrawMeDatabase-Pro: *Run workflow* on `v1.1.3`. Never on its tags v1.1.0 to v1.1.2: the package of v1.1.0 holds `core/` (91 MB), and these versions refuse the keys of the Team license. If its Open VSX job says *Cannot resolve dependency*, the core is not on Open VSX yet: publish it there first, then *Re-run failed jobs*.
+
+  The same order applies to the [upload by hand](#fallback-upload-by-hand).
 - **The next versions**, released as in the [checklist](#release-checklist), publish to the Marketplace on their own.
 
 If something fails, the GitHub Release and Open VSX are already done: [upload by hand](#fallback-upload-by-hand) and look at [Troubleshooting](#troubleshooting).
@@ -238,7 +251,7 @@ If something fails, the GitHub Release and Open VSX are already done: [upload by
 Signing in (`azure/login` step):
 
 - **`Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable`**, or a message asking for the `id-token: write` permission: the job cannot request an OIDC token. The `marketplace` job of `release.yml` and the identity job of `marketplace-identity.yml` declare `permissions: id-token: write`; it must stay there. Workflows started from a fork never get it.
-- **`AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:…'`** (or the older `AADSTS70021`): the subject that GitHub sent, quoted in the message, matches no federated credential. Compare it with step 4: owner and repository with their case, *Entity* **Environment** (not *Branch*), environment `marketplace`. A job without `environment:` sends `…:ref:refs/heads/main`. If the message names the issuer or the audience instead, check `https://token.actions.githubusercontent.com` and `api://AzureADTokenExchange`.
+- **`AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:…'`** (or the older `AADSTS70021`): the subject that GitHub sent, quoted in the message, matches no federated credential. Compare it with step 4: owner and repository with their case, *Entity* **Environment** (not *Branch*), environment `marketplace`. DrawMeDatabase-Pro sends the immutable subject `repo:GuillaumeCAN@145674412/DrawMeDatabase-Pro@1424346322:environment:marketplace`: a credential made with the form *GitHub Actions deploying Azure resources* has the subject with names only, and is refused. Copy the subject quoted in the message into the credential, as written, then *Re-run failed jobs*. A job without `environment:` sends `…:ref:refs/heads/main`. If the message names the issuer or the audience instead, check `https://token.actions.githubusercontent.com` and `api://AzureADTokenExchange`.
 - **`AADSTS700016: Application with identifier '…' was not found in the directory '…'`**: the client ID is not the identity's client ID (the object ID was copied?), or the tenant ID is another tenant. Copy both again (step 5).
 - **`AADSTS700024: Client assertion is not within its valid time range`**: the OIDC token expired between `azure/login` and the publication. Re-run the job; keep `azure/login` right before *Publish*.
 - **`No subscriptions found`**: `allow-no-subscriptions: true` is missing from `azure/login`.
@@ -266,6 +279,7 @@ When the Marketplace is not set up, or its job failed:
 
 1. Download the `.vsix` from the GitHub Release (*Assets*), or from the *Artifacts* of the run.
 2. Open the [publisher management page](https://marketplace.visualstudio.com/manage), click `…` next to DrawMeDatabase, then *Update*, and select the `.vsix`.
+   An extension that is not on the Marketplace yet (DrawMeDatabase Pro, the first time): *New extension → Visual Studio Code*, and select its `.vsix`. The core first, then Pro, once the core shows its new version.
 3. Wait for the verification to finish, then check the new version on the extension page.
 
 To stop the automatic publication, delete the variable `AZURE_CLIENT_ID`: the `marketplace` job is then skipped. To remove the access entirely: remove the member from the publisher, then delete the federated credentials, the identity or the whole resource group. There is no secret to revoke.
