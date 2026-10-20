@@ -2388,4 +2388,20 @@ describe('symfony parser: the dialect of an application (API version 4)', () => 
         assert.equal(parser.dialect(project({})), null);
         assert.equal(registry.getMigrations('symfony', project({})), null, 'no migrations the parsers replay');
     });
+
+    it('the .env files as Dotenv::loadEnv() reads them: .env.local skipped in the test environment, APP_ENV of .env.local, .env.dist without .env, no .env.local.local', () => {
+        const PG = 'DATABASE_URL="postgresql://a@h/db"\n';
+        const MY = 'DATABASE_URL="mysql://a@h/db"\n';
+        const LITE = 'DATABASE_URL="sqlite:///x.db"\n';
+        assert.equal(parser.dialect(project({ '.env': `APP_ENV=test\n${PG}`, '.env.local': MY })), 'postgresql', 'the test environment does not read .env.local');
+        assert.equal(parser.dialect(project({ '.env': `APP_ENV=test\n${PG}`, '.env.local': MY, '.env.test': LITE })), 'sqlite', '.env.test');
+        assert.equal(parser.dialect(project({ '.env': `APP_ENV=test\n${PG}`, '.env.test': LITE, '.env.test.local': MY })), 'mysql', '.env.test.local');
+        assert.equal(parser.dialect(project({ '.env': `APP_ENV=test\n${PG}`, '.env.local': `APP_ENV=prod\n${MY}`, '.env.prod': LITE })), 'postgresql', 'nor its APP_ENV');
+        assert.equal(parser.dialect(project({ '.env': PG, '.env.local': `APP_ENV=test\n${MY}`, '.env.test': LITE })), 'sqlite', 'APP_ENV of .env.local');
+        assert.equal(parser.dialect(project({ '.env': PG, '.env.local': `APP_ENV=test\n${MY}` })), 'mysql', '.env.local read before it sets APP_ENV=test');
+        assert.equal(parser.dialect(project({ '.env': `APP_ENV=local\n${PG}`, '.env.local': MY, '.env.local.local': LITE })), 'mysql', 'no .env.local.local');
+        assert.equal(parser.dialect(project({ '.env.dist': PG })), 'postgresql', '.env.dist without .env');
+        assert.equal(parser.dialect(project({ '.env': MY, '.env.dist': PG })), 'mysql', 'not .env.dist with .env');
+        assert.equal(parser.dialect(project({ '.env': `APP_ENV=../x\n${PG}`, '.env.local': MY })), 'mysql', 'an APP_ENV that is not a name reads no other file');
+    });
 });

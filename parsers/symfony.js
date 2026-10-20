@@ -841,10 +841,12 @@ function envValue(text, name) {
     return value;
 }
 
-// The database of the application (docs/api.md): the scheme of DATABASE_URL in the .env files, in
-// the order Symfony reads them (.env.<APP_ENV>.local, .env.<APP_ENV>, .env.local, .env), MariaDB
-// told by its serverVersion; else the driver (and server_version) of
-// config/packages/doctrine.yaml; null when they do not tell (a URL set by the environment)
+// The database of the application (docs/api.md): the scheme of DATABASE_URL in the .env files, as
+// Symfony's Dotenv::loadEnv() reads them (the last one wins: .env, or .env.dist without it, then
+// .env.local, except in the test environment, then .env.<APP_ENV> and .env.<APP_ENV>.local, APP_ENV
+// read from .env, then from .env.local), MariaDB told by its serverVersion; else the driver (and
+// server_version) of config/packages/doctrine.yaml; null when they do not tell (a URL set by the
+// environment)
 module.exports.dialect = function (basePath) {
     if (typeof basePath !== 'string') {
         return null;
@@ -857,9 +859,17 @@ module.exports.dialect = function (basePath) {
         }
     };
     const mariadb = (text) => /mariadb/i.test(text);
-    const appEnv = envValue(read('.env.local'), 'APP_ENV') || envValue(read('.env'), 'APP_ENV') || 'dev';
-    const files = /^[\w-]+$/.test(appEnv) ? [`.env.${appEnv}.local`, `.env.${appEnv}`, '.env.local', '.env'] : ['.env.local', '.env'];
-    for (const file of files) {
+    const base = !isFile(path.join(basePath, '.env')) && isFile(path.join(basePath, '.env.dist')) ? '.env.dist' : '.env';
+    let appEnv = envValue(read(base), 'APP_ENV') || 'dev';
+    const loaded = [base];
+    if (appEnv !== 'test') {
+        loaded.push('.env.local');
+        appEnv = envValue(read('.env.local'), 'APP_ENV') || appEnv;
+    }
+    if (appEnv !== 'local' && /^[\w-]+$/.test(appEnv)) {
+        loaded.push(`.env.${appEnv}`, `.env.${appEnv}.local`);
+    }
+    for (const file of loaded.reverse()) {
         const url = envValue(read(file), 'DATABASE_URL');
         if (url !== undefined) {
             const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(url);

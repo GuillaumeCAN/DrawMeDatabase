@@ -565,9 +565,9 @@ function patternNames(ctx, i, end) {
 }
 
 // The declarations at the top level of a Block (const, let, var, function), in the order of the
-// code: [{ name, init, at }], init: the node of the value, or null when it cannot be read (a
+// code: [{ name, init, at, kind }], init: the node of the value, or null when it cannot be read (a
 // destructuring, a declaration without a value); at: the index of the token of the name (not for
-// a destructuring). Kept on the block.
+// a destructuring); kind: 'const', 'let', 'var' or 'function'. Kept on the block.
 function blockDeclarations(block) {
     if (block.declarations) {
         return block.declarations;
@@ -581,6 +581,7 @@ function blockDeclarations(block) {
         const previous = tokens[j - 1];
         const statementStart = j === from || !(isPunct(previous, '.') || isPunct(previous, '?.'));
         if (statementStart && (isName(token, 'const') || isName(token, 'let') || isName(token, 'var')) && tokens[j + 1] && (isName(tokens[j + 1]) || isPunct(tokens[j + 1], '{') || isPunct(tokens[j + 1], '['))) {
+            const kind = token.value;
             j++;
             for (;;) {
                 let names;
@@ -611,7 +612,7 @@ function blockDeclarations(block) {
                     j = Math.max(parsed.next, j + 1);
                 }
                 for (const name of names) {
-                    declarations.push(simple ? { name, init, at } : { name, init: null });
+                    declarations.push(simple ? { name, init, at, kind } : { name, init: null, kind });
                 }
                 if (!isPunct(tokens[j], ',')) {
                     break;
@@ -625,7 +626,7 @@ function blockDeclarations(block) {
             const nameIndex = isPunct(tokens[nameAt], '*') ? nameAt + 1 : nameAt;
             const parsed = parseExpression(ctx, j, to);
             if (isName(tokens[nameIndex]) && parsed.node.type === 'Function') {
-                declarations.push({ name: tokens[nameIndex].value, init: parsed.node, at: nameIndex });
+                declarations.push({ name: tokens[nameIndex].value, init: parsed.node, at: nameIndex, kind: 'function' });
             }
             j = Math.max(parsed.next, j + 1);
             continue;
@@ -668,12 +669,20 @@ function paramNames(ctx, from, to) {
 }
 
 // The scopes nested in tokens from..to that declare names of their own: the functions (their
-// parameters and the declarations of their body: arrow functions, function declarations and
-// expressions, methods) and the blocks of statements (their declarations, the variable of a `for`
-// or a `catch`). [{ from, to, names: Set }]: a name used from..to is not the one of the outer block.
+// parameters, the declarations of their body and the `var` of its inner blocks: arrow functions,
+// function declarations and expressions, methods) and the blocks of statements (their `let`,
+// `const` and functions, the `let` or `const` variable of a `for`, the variable of a `catch`).
+// [{ from, to, names: Set }]: a name used from..to is not the one of the outer block. A `var`
+// belongs to the function around it, not to its block: one of an inner block or a `for` of
+// from..to itself (not in a nested function) is the variable of from..to, listed in `vars` of the
+// result ([{ name, at, assigned }], at: the index of its name, not for a destructuring; assigned:
+// given a value there).
 function nestedScopes(ctx, from, to) {
     const { tokens } = ctx;
     const scopes = [];
+    // The functions, and the `var` of the inner blocks and of the `for` statements
+    const functions = [];
+    const vars = [];
     // The opening bracket of each closing one
     const openers = new Map();
     for (let k = from; k < to; k++) {
@@ -686,6 +695,7 @@ function nestedScopes(ctx, from, to) {
             scopes.push({ from: a, to: b, names: new Set(names) });
         }
     };
+    const addFunction = (a, b, names) => functions.push({ from: a, to: b, names: new Set(names) });
     // The body at i: a Block (its declarations count) or an expression; the index after it
     const body = (i, names) => {
         if (isPunct(tokens[i], '{')) {
@@ -702,7 +712,7 @@ function nestedScopes(ctx, from, to) {
         }
         if (isPunct(tokens[k], '{')) {
             const read = body(k, paramNames(ctx, open + 1, close));
-            add(start, read.end, read.names);
+            addFunction(start, read.end, read.names);
         }
     };
     for (let j = from; j < to; j++) {
@@ -710,7 +720,7 @@ function nestedScopes(ctx, from, to) {
         const arrow = (isPunct(token, '(') || isName(token)) && !isPunct(tokens[j - 1], '.') ? arrowAt(ctx, j, to) : null;
         if (arrow) {
             const read = body(arrow.arrow + 1, arrow.single ? [arrow.single] : paramNames(ctx, arrow.params[0], arrow.params[1]));
-            add(j, read.end, read.names);
+            addFunction(j, read.end, read.names);
             continue;
         }
         if (isName(token, 'function')) {
@@ -742,9 +752,26 @@ function nestedScopes(ctx, from, to) {
             if (isName(tokens[k], 'await')) {
                 k++;
             }
-            if (isName(tokens[k], 'const') || isName(tokens[k], 'let') || isName(tokens[k], 'var')) {
+            const keyword = isName(tokens[k], 'const') || isName(tokens[k], 'let') || isName(tokens[k], 'var') ? tokens[k].value : null;
+            if (keyword) {
                 k++;
             } else if (!isName(tokens[j - 1], 'catch')) {
+                continue;
+            }
+            if (keyword === 'var') {
+                // for (var x of list): the variable of the function, given a value by the loop
+                if (isName(tokens[k])) {
+                    let m = k + 1;
+                    if (isPunct(tokens[m], '!')) {
+                        m++;
+                    }
+                    if (isPunct(tokens[m], ':')) {
+                        m = skipType(ctx, m + 1, close);
+                    }
+                    vars.push({ name: tokens[k].value, at: k, assigned: isPunct(tokens[m], '=') || isName(tokens[m], 'of') || isName(tokens[m], 'in'), where: j });
+                } else if (isPunct(tokens[k], '{') || isPunct(tokens[k], '[')) {
+                    vars.push(...patternNames(ctx, k, close).names.map(name => ({ name, assigned: true, where: j })));
+                }
                 continue;
             }
             const names = isPunct(tokens[k], '{') || isPunct(tokens[k], '[') ? patternNames(ctx, k, close).names : isName(tokens[k]) ? [tokens[k].value] : [];
@@ -761,10 +788,38 @@ function nestedScopes(ctx, from, to) {
                 || (group > 0 && isName(tokens[group - 1]) && BLOCK_STATEMENTS.has(tokens[group - 1].value));
             if (statement) {
                 const close = Math.min(after(ctx, j) - 1, to);
-                add(j, close + 1, blockDeclarations({ ctx, from: j + 1, to: close }).map(declaration => declaration.name));
+                const declarations = blockDeclarations({ ctx, from: j + 1, to: close });
+                add(j, close + 1, declarations.filter(declaration => declaration.kind !== 'var').map(declaration => declaration.name));
+                for (const declaration of declarations) {
+                    if (declaration.kind === 'var') {
+                        // A destructuring always has a value
+                        vars.push({ name: declaration.name, at: declaration.at, assigned: declaration.at === undefined || declaration.init !== null, where: j });
+                    }
+                }
             }
         }
     }
+    // Each `var` to the innermost function around it, else to from..to
+    const own = [];
+    for (const { name, at, assigned, where } of vars) {
+        let owner = null;
+        for (const scope of functions) {
+            if (scope.from <= where && where < scope.to && (!owner || scope.from > owner.from)) {
+                owner = scope;
+            }
+        }
+        if (owner) {
+            owner.names.add(name);
+        } else {
+            own.push({ name, at, assigned });
+        }
+    }
+    for (const scope of functions) {
+        if (scope.names.size > 0) {
+            scopes.push(scope);
+        }
+    }
+    scopes.vars = own;
     return scopes;
 }
 
@@ -969,11 +1024,28 @@ function blockChanges(block, params = []) {
         }
         j++;
     }
+    // A `var` declared again with a value (`var cols: any = {}`, at the top level, in an inner
+    // block or a `for` of the block): the same variable, changed there (a destructuring: cannot
+    // be read)
+    const declaredAgain = new Set();
+    if (tokens.slice(from, to).some(token => isName(token, 'var'))) {
+        scopes = scopes || nestedScopes(ctx, from, to);
+        const again = blockDeclarations(block).filter(d => d.kind !== 'function').map(d => ({ name: d.name, at: d.at, assigned: d.at === undefined || d.init !== null }));
+        for (const { name, at, assigned } of [...again, ...scopes.vars]) {
+            if (assigned && declared.has(name) && declared.get(name) !== at) {
+                if (at === undefined) {
+                    unreadable(name);
+                } else {
+                    declaredAgain.add(at);
+                }
+            }
+        }
+    }
     // Any other change cannot be read: nested in an inner block or a function, in a condition, in
     // an expression. The dead code after the return is left out, not the functions declared there,
     // nor the functions and blocks that declare a variable of the same name (another variable).
     for (let j = from; j < to; j++) {
-        if (isLocal(j) && !handled.has(j) && !(top[j] && j > returnAt) && changesAt(j) && !shadowed(j)) {
+        if (isLocal(j) && !handled.has(j) && !(top[j] && j > returnAt) && (changesAt(j) || declaredAgain.has(j)) && !shadowed(j)) {
             unreadable(tokens[j].value);
         }
     }
@@ -1046,7 +1118,13 @@ function parseObject(ctx, i, depth) {
             key = keyToken.type === 'number' ? String(Number(keyToken.value.replace(/_/g, ''))) : keyToken.value;
             j++;
         } else if (isPunct(keyToken, '[')) {
-            computed = true;
+            // ['key'] and [1] are the keys key and 1 (not ['__proto__'], an own property)
+            const inner = tokens[j + 1];
+            if (after(ctx, j) === j + 3 && inner && ((inner.type === 'number' && !Number.isNaN(Number(inner.value.replace(/_/g, '')))) || (inner.type === 'string' && inner.value !== '__proto__'))) {
+                key = inner.type === 'number' ? String(Number(inner.value.replace(/_/g, ''))) : inner.value;
+            } else {
+                computed = true;
+            }
             j = after(ctx, j);
         } else {
             properties.push({ kind: 'unknown', start, end });

@@ -1,4 +1,5 @@
 {
+  "description": "Dessine le diagramme entité-association (ERD) de votre base de données à partir de votre code : migrations Laravel, entités Doctrine de Symfony, schémas Prisma et Drizzle ORM, migrations et dumps SQL (Supabase, Flyway, pg_dump...). Sans base de données : le diagramme suit votre code en direct, avec son statut git.",
   "command.parseSchema": "Dessiner le schéma de la base de données",
   "command.refresh": "Rafraîchir le diagramme",
   "setting.frameworkPath": "Chemin relatif du dossier du framework **(laissez vide si le framework est à la racine de l'espace de travail)** \n\n Exemple : **`mon-projet/app/symfony`**",

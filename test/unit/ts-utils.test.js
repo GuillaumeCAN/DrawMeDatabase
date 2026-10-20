@@ -210,6 +210,10 @@ test('blocks: a nested function or block that declares a variable of the name of
         '() => { const o = {}; for (const o of l) { o.x = 1; } for (let o = 0; o < 2; o++) {} return o; }',
         '() => { const o = {}; try { f(); } catch (o) { o.x = 1; } return o; }',
         '() => { const o = {}; try { f(); } catch { const o = {}; o.x = 1; } return o; }',
+        // The var of an inner block or a for of a nested function is the one of that function
+        '() => { const o = {}; function f() { if (c) { var o = {}; } o.x = 1; } return o; }',
+        '() => { const o = {}; const f = () => { for (var o of l) {} o.push(1); }; return o; }',
+        '() => { const o = {}; function f() { if (c) { var { o } = p; } o.x = 1; } return o; }',
     ];
     for (const text of shadowed) {
         assert.deepEqual(changed(text), [], text);
@@ -230,6 +234,32 @@ test('blocks: a nested function or block that declares a variable of the name of
     // A change at the top level that uses a variable of that name of a nested function is read
     assert.deepEqual(changed('() => { const o = { a: 1 }; o.b = [1].map(o => o + 1); return o; }'), ['o']);
     assert.equal(blockChanges(parseExpression(context(tokenize('() => { const o = { a: 1 }; o.b = [1].map(o => o + 1); return o; }')), 0).node.body).get('o').unreadable, undefined);
+});
+
+test('blocks: a var declared again in an inner block, a for or a catch of the same function is the same variable: given a value there, it cannot be read', () => {
+    const changesOf = (text) => Object.fromEntries([...blockChanges(parseExpression(context(tokenize(text)), 0).node.body)].map(([name, entry]) => [name, entry.unreadable ? 'unreadable' : entry.changes.length]));
+    const unreadable = [
+        '() => { var o: any = { a: 1 }; { var o: any = {}; o.x = 1; } return o; }',
+        '() => { var o = { a: 1 }; { var o = {}; } return o; }',
+        '() => { var o: any = { a: 1 }; if (c) { var o: any = { b: 1 }; } return o; }',
+        '() => { var o: any = { a: 1 }; for (var o of [{}] as any[]) { o.x = 1; } return o; }',
+        '() => { var o: any = { a: 1 }; for (var o in p) {} return o; }',
+        '() => { var o: any = { a: 1 }; try { f(); } catch (e) { var o: any = { b: 1 }; } return o; }',
+        '() => { var o: any = { a: 1 }; var o: any = { b: 1 }; return o; }',
+        '() => { var o: any = { a: 1 }; while (c) { { var o: any = []; } } return o; }',
+        '() => { var o: any = { a: 1 }; { var { o } = p; } return o; }',
+        '() => { var o: any = { a: 1 }; for (var [o] of l) {} return o; }',
+        '() => { var o: any = { a: 1 }; var { k: o } = p; return o; }',
+    ];
+    for (const text of unreadable) {
+        assert.deepEqual(changesOf(text), { o: 'unreadable' }, text);
+    }
+    // Declared again without a value: no change; a let of an inner block is another variable
+    assert.deepEqual(changesOf('() => { var o = { a: 1 }; { var o; } var o; return o; }'), {});
+    assert.deepEqual(changesOf('() => { var o = { a: 1 }; { let o = {}; o.x = 1; } for (let o of l) { o.y = 1; } return o; }'), {});
+    assert.deepEqual(changesOf('() => { var o = { a: 1 }; var o2 = {}; { var p = {}; p.x = 1; } return o; }'), {});
+    // A var declared again after the return is never given its value
+    assert.deepEqual(changesOf('() => { var o: any = { a: 1 }; return o; var o: any = {}; }'), {});
 });
 
 test('blocks: the returns nested in inner blocks (if, loops, switch, try), not in nested functions, objects or classes', () => {

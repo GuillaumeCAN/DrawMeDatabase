@@ -686,6 +686,45 @@ export const u = pgTable('u', { id: serial('id').primaryKey(), ...notShadowed(),
         ]);
     });
 
+    it('a var of a helper declared again in one of its blocks or in a for is the same variable: its change there is told, not read as declared', () => {
+        const body = `function inBlock() {
+  var cols: any = { a0: text('a0') };
+  { var cols: any = {}; cols.zz = text('zz'); }
+  return cols;
+}
+function inFor() {
+  var cols: any = { b0: text('b0') };
+  for (var cols of [{}] as any[]) { cols.zz = text('zz'); }
+  return cols;
+}
+function inIf(flag = true) {
+  var cols: any = { c0: text('c0') };
+  if (flag) { var cols: any = { c1: text('c1') }; }
+  return cols;
+}
+function again() {
+  var cols: any = { d0: text('d0') };
+  var cols: any = { d1: text('d1') };
+  return cols;
+}
+function innerFunction() {
+  const cols: any = { e0: text('e0') };
+  function inner() { if (true) { var cols: any = {}; } cols.zz = text('zz'); }
+  return cols;
+}
+export const t = pgTable('t', { id: serial('id').primaryKey(), ...inBlock(), ...inFor(), ...inIf(), ...again() });
+export const u = pgTable('u', { id: serial('id').primaryKey(), ...innerFunction() });
+`;
+        const result = parseSchema(body);
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.map(c => c.name)]), [['t', ['id']], ['u', ['id', 'e0']]]);
+        assert.deepEqual(result.warnings, [
+            'src/db/schema.ts:27: t: ...inBlock() cannot be read, its columns are skipped.',
+            'src/db/schema.ts:27: t: ...inFor() cannot be read, its columns are skipped.',
+            'src/db/schema.ts:27: t: ...inIf() cannot be read, its columns are skipped.',
+            'src/db/schema.ts:27: t: ...again() cannot be read, its columns are skipped.',
+        ]);
+    });
+
     it('the locals of a helper changed by its statements before the return (assigned again, a property set, Object.assign(), push()) are read as they are then; a change that cannot be read is told', () => {
         const files = { 'src/db/helpers.ts': "import { text, integer } from 'drizzle-orm/pg-core';\nconst base = () => ({ id: integer('id') });\nexport function renamed() {\n  let name = 'first';\n  name = 'second';\n  return { col: text(name) };\n}\nexport function built(prefix: string) {\n  const cols: Record<string, any> = { one: text(`${prefix}_one`) };\n  cols.two = text(`${prefix}_two`);\n  cols['three'] = text('three');\n  cols.one = text('one_again');\n  return cols;\n}\nexport function assigned() {\n  const cols = base()\n  Object.assign(cols, { four: text('four') });\n  return cols;\n  cols.dead = text('dead');\n}\nexport function later() {\n  let name;\n  name = 'later';\n  return { later: text(name) };\n}\nexport function conditional(flag: boolean) {\n  const cols = { five: text('five') };\n  if (flag) cols.six = text('six');\n  return cols;\n}\nexport function looped() {\n  const cols = { seven: text('seven') };\n  for (const key of ['a', 'b']) {\n    cols[key] = text(key);\n  }\n  return cols;\n}\nexport function concatenated() {\n  let name = 'eight';\n  name += '_x';\n  return { eight: text(name) };\n}\nexport function itself() {\n  const cols = { nine: text('nine') };\n  cols.ten = cols.nine;\n  return cols;\n}\nexport function inCallback() {\n  const cols = { eleven: text('eleven') };\n  ['x'].forEach((key) => { cols[key] = text(key); });\n  return cols;\n}\n" };
         const result = parseSchema("import { renamed, built, assigned, later, conditional, looped, concatenated, itself, inCallback } from './helpers';\nexport const t = pgTable('t', {\n  ...renamed(),\n  ...built('x'),\n  ...assigned(),\n  ...later(),\n});\nexport const u = pgTable('u', {\n  ...conditional(true),\n  ...looped(),\n  ...concatenated(),\n  ...itself(),\n  ...inCallback(),\n});\n", { columnSources: true }, files);
@@ -843,8 +882,22 @@ describe('drizzle parser: relations', () => {
         assert.deepEqual(result.tables.map(t => [t.table, (t.indexes || []).map(i => i.name)]), [['a', ['x']], ['b', ['o0']], ['c', ['o9', 'j2']]]);
         assert.deepEqual(result.warnings, [
             'src/db/schema.ts:48: a: the extra config spreads more than 5000 arrays and objects, the others are skipped.',
-            'src/db/schema.ts:49: b: the extra config gives more than 1000 keys and indexes, the others are skipped.',
+            'src/db/schema.ts:49: b: the extra config spreads more than 5000 arrays and objects, the others are skipped.',
         ]);
+    });
+
+    it('the extra config, object form: a key written again counts once toward the 1000 keys and indexes, and a key written as a string in brackets ([\'i\']) is that key, as in JavaScript', () => {
+        const objects = Array.from({ length: 10 }, (_, i) => `const o${i + 1} = (t: any): any => ({ ...o${i}(t), ...o${i}(t) });\n`).join('');
+        const again = Array.from({ length: 1200 }, (_, i) => `i: index('i${i}').on(t.a)`).join(', ');
+        const body = `const o0 = (t: any): any => ({ i: index('o0').on(t.a) });\n${objects}export const a = pgTable('a', { a: integer() }, (t) => o10(t));\nexport const b = pgTable('b', { a: integer() }, (t) => ({ ${again} }));\nexport const c = pgTable('c', { a: integer(), b: integer() }, (t) => ({ i: index('a6').on(t.a), ["i"]: index('b6').on(t.b), j: index('j1').on(t.a), ['j']: index('j2').on(t.b), [\`k\`]: index('k1').on(t.a) }));\nexport const d = pgTable('d', { a: integer('a'), ['b']: text('b'), ['a']: text('a2') });\n`;
+        const result = parseSchema(body, { details: true });
+        assert.deepEqual(result.tables.map(t => [t.table, t.columns.map(c => `${c.name}:${c.type}`), (t.indexes || []).map(i => i.name)]), [
+            ['a', ['a:integer'], ['o0']],
+            ['b', ['a:integer'], ['i1199']],
+            ['c', ['a:integer', 'b:integer'], ['b6', 'j2', 'k1']],
+            ['d', ['a2:text', 'b:text'], []],
+        ]);
+        assert.deepEqual(result.warnings, []);
     });
 
     it('a partial unique index (.where()) makes no column unique and no relation one-to-one, as in the SQL of drizzle-kit: it is a unique index', () => {

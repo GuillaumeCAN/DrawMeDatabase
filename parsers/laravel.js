@@ -1294,22 +1294,48 @@ function defaultConnection(basePath, overrides) {
 // The databases of the drivers of Laravel's connections (config/database.php)
 const DRIVERS = { mysql: 'mysql', mariadb: 'mariadb', pgsql: 'postgresql', sqlite: 'sqlite', sqlsrv: 'sqlserver' };
 
-// The database of the default connection (docs/api.md): the driver of the connection in
-// config/database.php ('driver' => 'pgsql'), else the connection named after a driver (the
-// connections of Laravel's config: mysql, mariadb, pgsql, sqlite, sqlsrv); without a known
-// connection, the connection of the only schema dump. null when it cannot be told.
-function connectionDialect(basePath, overrides) {
-    const dump = findSchemaDump(basePath, overrides);
-    const connection = defaultConnection(basePath, overrides) || (dump ? dump.name.replace(/-schema\.\w+$/, '') : null);
-    if (!connection) {
-        return null;
+// Whether a schema dump is SQL that parse() loads, not a binary pg_dump: the start of the file
+function textDump(dump, overrides) {
+    let start = overrides && overrides.has(dump.path) ? overrides.get(dump.path).slice(0, 65536) : '';
+    if (!(overrides && overrides.has(dump.path))) {
+        let fd = null;
+        try {
+            fd = fs.openSync(dump.path, 'r');
+            const buffer = Buffer.alloc(65536);
+            start = buffer.toString('latin1', 0, fs.readSync(fd, buffer, 0, buffer.length, 0));
+        } catch {
+            return false;
+        } finally {
+            if (fd !== null) {
+                fs.closeSync(fd);
+            }
+        }
     }
+    return !start.startsWith('PGDMP') && !start.includes('\u0000');
+}
+
+// The database of the application (docs/api.md): the connection of the schema dump that parse()
+// loads (its tables are the SQL of that database), else the default connection; the driver of
+// the connection in config/database.php ('driver' => 'pgsql'), else the connection named after a
+// driver (the connections of Laravel's config: mysql, mariadb, pgsql, sqlite, sqlsrv); without a
+// known connection, the connection of the only schema dump. null when it cannot be told.
+function connectionDialect(basePath, overrides) {
     const config = stripComments(readAppFile(basePath, overrides, ['config', 'database.php']));
-    const name = connection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const entry = new RegExp(`['"]${name}['"]\\s*=>\\s*(?:\\[|array\\s*\\()`).exec(config);
-    const driver = entry ? /['"]driver['"]\s*=>\s*(?:env\(\s*['"]\w+['"]\s*,\s*)?['"](\w+)['"]/.exec(config.slice(entry.index + entry[0].length)) : null;
-    const id = driver ? driver[1] : connection;
-    return Object.prototype.hasOwnProperty.call(DRIVERS, id) ? DRIVERS[id] : null;
+    const dialectOf = (connection) => {
+        const name = connection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const entry = new RegExp(`['"]${name}['"]\\s*=>\\s*(?:\\[|array\\s*\\()`).exec(config);
+        const driver = entry ? /['"]driver['"]\s*=>\s*(?:env\(\s*['"]\w+['"]\s*,\s*)?['"](\w+)['"]/.exec(config.slice(entry.index + entry[0].length)) : null;
+        const id = driver ? driver[1] : connection;
+        return Object.prototype.hasOwnProperty.call(DRIVERS, id) ? DRIVERS[id] : null;
+    };
+    const dump = findSchemaDump(basePath, overrides);
+    const dumped = dump ? dump.name.replace(/-schema\.\w+$/, '') : null;
+    const loaded = dump && textDump(dump, overrides) ? dialectOf(dumped) : null;
+    if (loaded) {
+        return loaded;
+    }
+    const connection = defaultConnection(basePath, overrides) || dumped;
+    return connection ? dialectOf(connection) : null;
 }
 
 // The schema dump that `php artisan migrate` loads: database/schema/<connection>-schema.dump, else

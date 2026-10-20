@@ -1940,6 +1940,19 @@ return [
         assert.equal(registry.getDialect('laravel', dir, { overrides: new Map([[path.join(dir, '.env'), 'DB_CONNECTION=mysql\n']]) }), 'mysql', 'an unsaved .env');
     });
 
+    it('the dialect: the connection of the schema dump that is loaded wins (its tables are drawn), unless it is a binary pg_dump', () => {
+        const DUMP = 'CREATE TABLE `a` (`id` int NOT NULL);\n';
+        // The default of config/database.php (sqlite) has no dump: the only dump is drawn, MySQL
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG, 'database/schema/mysql-schema.sql': DUMP, 'database/migrations/.gitkeep': '' })), 'mysql');
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG, '.env': 'DB_CONNECTION=analytics\n', 'database/schema/mysql-schema.sql': DUMP })), 'mysql', 'the default connection has no dump');
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG, '.env': 'DB_CONNECTION=analytics\n', 'database/schema/analytics-schema.sql': 'CREATE TABLE a (id int);\n', 'database/schema/mysql-schema.sql': DUMP })), 'postgresql', 'the dump of the default connection');
+        assert.equal(parser.dialect(app({ 'config/database.php': CONFIG, 'database/schema/pgsql-schema.dump': 'PGDMP\u0001\u0000binary' })), 'sqlite', 'a binary dump is not loaded: the default connection');
+        assert.equal(parser.dialect(app({ 'database/schema/pgsql-schema.dump': 'PGDMP\u0001\u0000binary' })), 'postgresql', 'without a known connection, the one of the only dump');
+        assert.equal(parser.dialect(app({ '.env': 'DB_CONNECTION=pgsql\n', 'database/schema/tenant-schema.sql': 'CREATE TABLE a (id int);\n' })), 'postgresql', 'a dump of a connection that tells no driver: the default connection');
+        const dir = app({ 'config/database.php': CONFIG, 'database/schema/pgsql-schema.dump': 'PGDMP\u0001\u0000binary' });
+        assert.equal(registry.getDialect('laravel', dir, { overrides: new Map([[path.join(dir, 'database', 'schema', 'pgsql-schema.dump'), 'CREATE TABLE a (id int);\n']]) }), 'postgresql', 'an unsaved dump');
+    });
+
     it('the migrations: the files of database/migrations in the order of php artisan migrate, the time of their name; the ones a schema dump lists too; until gives the schema after each', () => {
         const up = (name) => migration(`        Schema::create('${name}', function (Blueprint $table) {\n            $table->id();\n        });`);
         const dir = app({

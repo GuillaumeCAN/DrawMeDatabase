@@ -2174,13 +2174,15 @@ module.exports.parse = function (basePath, options = {}) {
             return items;
         };
         // The values of an object, its spreads read. As in JavaScript, a key written again (by a
-        // spread too) keeps the place of the first one and takes the last value.
+        // spread too) keeps the place of the first one and takes the last value: the value it
+        // replaces no longer counts.
         const objectValues = (object, depth) => {
             const values = [];
             const places = new Map();
             const put = (value) => {
                 if (value.key !== undefined && places.has(value.key)) {
                     values[places.get(value.key)] = value;
+                    count--;
                 } else {
                     if (value.key !== undefined) {
                         places.set(value.key, values.length);

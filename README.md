@@ -1,5 +1,19 @@
 **v1.8.0**
 
+**DrawMeDatabase** draws the ER diagram (ERD) of your database from your code, in VS Code: no database connection is needed, and the diagram follows your code as you type, with its git status.
+
+## Supported stacks
+
+| Stack | Read from |
+|-------|-----------|
+| **Laravel** | The migrations of `database/migrations`, after the schema dump of `php artisan schema:dump` |
+| **Symfony** | The Doctrine entities of `src/Entity` (attributes or annotations) |
+| **Prisma** | The Prisma schema (`schema.prisma`, a schema folder, `prisma.config.ts`), Prisma ORM 5 to 7 |
+| **Drizzle** | The Drizzle ORM schema files (`drizzle.config.ts`), drizzle-orm 0.x and 1.0 |
+| **SQL** | SQL migrations (Supabase, Flyway, dbmate, golang-migrate, goose, diesel, sqlx...) or a dump (`pg_dump`, `mysqldump`, Rails `structure.sql`) |
+
+PostgreSQL, MySQL, MariaDB and SQLite (and SQL Server and CockroachDB with Prisma, SingleStore with Drizzle). The code is read, never run.
+
 ## About DrawMeDatabase
 
 **DrawMeDatabase** is a free and user-friendly Visual Studio Code extension designed to simplify database visualization. By leveraging reverse engineering techniques, this extension automatically analyzes your codebase to create clear and comprehensive diagrams representing your database structure. It reads the migrations of Laravel, the Doctrine entities of Symfony, the schema of Prisma, the schema files of Drizzle ORM, and plain SQL: the migrations of Supabase, Flyway, dbmate, golang-migrate, goose... or a dump of the schema.

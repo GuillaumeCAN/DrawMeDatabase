@@ -1,4 +1,5 @@
 {
+  "description": "Draw ER diagrams (ERD) of your database from your code: Laravel migrations, Symfony Doctrine entities, Prisma and Drizzle ORM schemas, SQL migrations and dumps (Supabase, Flyway, pg_dump...). No database needed: the diagram follows your code live, with its git status.",
   "command.parseSchema": "Draw Database Schema",
   "command.refresh": "Refresh Diagram",
   "setting.frameworkPath": "Relative path to the framework folder **(leave empty if the framework is at the root of the workspace)** \n\n Example : **`my-project/app/symfony`**",
