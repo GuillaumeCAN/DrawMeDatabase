@@ -23,6 +23,8 @@ const DETAIL_KEYS = ['length', 'precision', 'scale', 'unsigned', 'default', 'def
 // Detection scores: below the frameworks (50 and more), whose SQL files are often an output of theirs
 const SCORE_MIGRATIONS = 45;
 const SCORE_DUMP = 40;
+// The databases of the MySQL server itself (mysqldump --all-databases dumps mysql): not drawn
+const SYSTEM_DATABASES = new Set(['mysql', 'sys', 'information_schema', 'performance_schema']);
 // The tables of the migration tools themselves, not drawn (by name, in any schema)
 const BOOKKEEPING = new Set(['schema_migrations', 'ar_internal_metadata', 'flyway_schema_history', 'schema_version', '_prisma_migrations', 'goose_db_version', '__drizzle_migrations', '__diesel_schema_migrations', '_sqlx_migrations', 'atlas_schema_revisions', 'pgmigrations']);
 // PostgreSQL limits the names to 63 bytes (NAMEDATALEN - 1)
@@ -890,7 +892,8 @@ function createState(dialect, options = {}) {
         // The transaction opened by BEGIN: the search path before it, and the one it keeps at
         // COMMIT (SET LOCAL changes the search path until the end of the transaction only)
         transaction: null,
-        // MySQL: the current database (USE), and the first one, whose tables are not prefixed
+        // MySQL: the current database (USE), and the first one of the user (not a database of the
+        // server: mysql, sys...), whose tables are not prefixed
         database: null,
         home: null,
         warnings: [],
@@ -899,6 +902,8 @@ function createState(dialect, options = {}) {
         names: null,
         // MySQL: MariaDB, which creates the foreign keys written on a column
         mariadb: Boolean(options.mariadb),
+        // The tokens of the statement being applied
+        statement: null,
     };
 }
 
@@ -1104,8 +1109,8 @@ function dropTable(state, table, cascade) {
 }
 
 // SQLite: whether the primary key on this column alone is the rowid, never NULL: its declared type
-// is INTEGER, without arguments (INTEGER(11) is not)
-const isRowidType = (column) => column.typeInfo.base === 'integer' && column.typeInfo.args.length === 0;
+// is INTEGER, in any case and quoted or not, alone (INTEGER(11) and INTEGER UNSIGNED are not)
+const isRowidType = (column) => column.typeInfo.base.toLowerCase() === 'integer' && column.typeInfo.args.length === 0 && column.typeInfo.single;
 
 // Sets the primary key of a table: its columns are NOT NULL (on SQLite, only for an INTEGER PRIMARY
 // KEY, or in a WITHOUT ROWID table)
@@ -1250,6 +1255,7 @@ const SERIAL_TYPE = /^(?:smallserial|serial|bigserial|serial2|serial4|serial8)$/
 // `public.citext`); an enum type of the schema gives its name, and its key in state.types.
 function readType(ctx, c, end) {
     const { state } = ctx;
+    const start = c.i;
     let stop = findWord(c.tokens, c.i, end, TYPE_END);
     // MySQL: varchar(20) CHARACTER SET utf8mb4 (not PostgreSQL's character varying)
     for (let k = c.i + 1; k + 1 < stop; k++) {
@@ -1298,7 +1304,8 @@ function readType(ctx, c, end) {
         name = qualified[2];
     }
     const base = quoted ? name : name.toLowerCase();
-    const type = { name, base, args: args || [], values: null, unsigned, enumKey: null };
+    // single: the type is one word (SQLite: INTEGER, not INTEGER UNSIGNED)
+    const type = { name, base, args: args || [], values: null, unsigned, enumKey: null, single: stop - start === 1 };
     if ((base === 'enum' || base === 'set') && args) {
         type.values = args.filter(arg => arg.length === 1 && arg[0].type === 'string').map(arg => arg[0].value);
     } else if ((parts.length === 1 || (parts.length === 2 && words.includes('.'))) && state.types.size > 0) {
@@ -1649,15 +1656,37 @@ function indexItem(ctx, tokens, from, to) {
     return isName(first) ? columnName(first) : expression(from, to);
 }
 
-// The names of tokens [from, to) of an expression that may be columns, folded: not the functions
-// (a name before '('), the types (after '::' or AS) nor the qualifiers (before '.')
+// The reserved words of an expression, never the name of a column unless quoted (PostgreSQL)
+const EXPRESSION_KEYWORDS = new Set(['ALL', 'AND', 'ANY', 'ARRAY', 'AS', 'ASC', 'ASYMMETRIC', 'BETWEEN', 'BOTH', 'CASE', 'CAST', 'COLLATE', 'CURRENT_CATALOG', 'CURRENT_DATE', 'CURRENT_ROLE', 'CURRENT_SCHEMA', 'CURRENT_TIME', 'CURRENT_TIMESTAMP', 'CURRENT_USER', 'DEFAULT', 'DESC', 'DISTINCT', 'ELSE', 'END', 'FALSE', 'FOR', 'FROM', 'ILIKE', 'IN', 'IS', 'ISNULL', 'LEADING', 'LIKE', 'LOCALTIME', 'LOCALTIMESTAMP', 'NOT', 'NOTNULL', 'NULL', 'ON', 'ONLY', 'OR', 'OVERLAPS', 'PLACING', 'SESSION_USER', 'SIMILAR', 'SOME', 'SYMMETRIC', 'THEN', 'TRAILING', 'TRUE', 'USER', 'USING', 'WHEN', 'WHERE', 'WITH', 'WITHOUT']);
+
+// The names of tokens [from, to) of an expression that may be columns, folded. Not: the functions
+// (a name before '('), the types (after '::' or AS, before a string: date '2024-01-01', their
+// words: character varying, with time zone), the qualifiers (before '.'), the reserved words, the
+// field of EXTRACT(year FROM ...), AT TIME ZONE, the unit of an interval (INTERVAL 1 DAY), a
+// collation, IS UNKNOWN
 function namesIn(state, tokens, from, to) {
     const names = [];
+    const word = (k, ...words) => k >= from && k < to && isWord(tokens[k], ...words);
+    const timeZone = (k) => word(k, 'TIME') && word(k + 1, 'ZONE');
+    // The unit of an interval at k: INTERVAL '1' DAY, INTERVAL 1 DAY, '1-2' YEAR TO MONTH
+    const unitAt = (k) => k - 2 >= from && word(k - 2, 'INTERVAL') && ['string', 'number'].includes(tokens[k - 1].type);
     for (let k = from; k < to; k++) {
         const t = tokens[k];
-        if (isName(t) && !isPunct(tokens[k + 1], '(') && !isPunct(tokens[k + 1], '.') && !isPunct(tokens[k - 1], '::') && !(k > from && isWord(tokens[k - 1], 'AS'))) {
-            names.push(fold(state, { value: t.value, quoted: t.type === 'ident' }));
+        if (!isName(t) || isPunct(tokens[k + 1], '(') || isPunct(tokens[k + 1], '.') || (k > from && (isPunct(tokens[k - 1], '::') || isWord(tokens[k - 1], 'AS', 'COLLATE')))) {
+            continue;
         }
+        if (t.type === 'word' && (EXPRESSION_KEYWORDS.has(t.upper)
+            || (k + 1 < to && (tokens[k + 1].type === 'string' || (t.upper === 'INTERVAL' && tokens[k + 1].type === 'number')))
+            || (word(k + 1, 'WITH', 'WITHOUT') && timeZone(k + 2))
+            || (timeZone(k) && word(k - 1, 'AT', 'WITH', 'WITHOUT')) || (word(k, 'ZONE') && timeZone(k - 1) && word(k - 2, 'AT', 'WITH', 'WITHOUT'))
+            || (word(k, 'AT') && (timeZone(k + 1) || word(k + 1, 'LOCAL'))) || (word(k, 'LOCAL') && word(k - 1, 'AT'))
+            || (word(k + 1, 'FROM') && isPunct(tokens[k - 1], '(') && word(k - 2, 'EXTRACT'))
+            || (word(k, 'VARYING') && word(k - 1, 'CHARACTER', 'CHAR', 'BIT', 'NATIONAL')) || (word(k, 'PRECISION') && word(k - 1, 'DOUBLE'))
+            || unitAt(k) || (word(k - 1, 'TO') && unitAt(k - 2))
+            || (word(k, 'UNKNOWN') && (word(k - 1, 'IS') || (word(k - 1, 'NOT') && word(k - 2, 'IS')))))) {
+            continue;
+        }
+        names.push(fold(state, { value: t.value, quoted: t.type === 'ident' }));
     }
     return names;
 }
@@ -1765,7 +1794,7 @@ function applyConstraint(ctx, table, c, end, origin) {
         if (!fk) {
             return false;
         }
-        addForeignKey(state, table, { ...fk, name, columns });
+        addForeignKey(state, table, { ...fk, name, columns }, c.i);
         return true;
     }
     if (accept(c, 'CHECK')) {
@@ -1829,14 +1858,21 @@ function applyConstraint(ctx, table, c, end, origin) {
 // Copies the columns of a table (CREATE TABLE ... LIKE, INHERITS)
 function copyColumns(state, source, table, origin, { defaults = false, indexes = false, inherited = false } = {}) {
     for (const column of source.columns) {
+        const merged = inherited ? columnOf(state, table, column.name) : null;
+        if (merged) {
+            // INHERITS (a, b): a column of several parents is one column, inherited from each
+            merged.inherited = merged.inherited ? merged.inherited + 1 : merged.inherited;
+            continue;
+        }
         const details = { ...column.details };
         if (!defaults) {
             delete details.default;
             delete details.defaultRaw;
             delete details.autoIncrement;
         }
-        // inherited (INHERITS): dropped with the column of the parent, unless the child declares it
-        table.columns.push({ ...column, details, origin, declaredIn: origin.path, changes: [], inCreate: true, inherited });
+        // inherited (INHERITS): the number of parents it comes from, as PostgreSQL counts them; the
+        // column is dropped with the column of the last one, unless the child declares it (false)
+        table.columns.push({ ...column, details, origin, declaredIn: origin.path, changes: [], inCreate: true, inherited: inherited ? 1 : false });
     }
     if (indexes) {
         if (source.primaryKey) {
@@ -1873,13 +1909,21 @@ function promoteIndex(ctx, table, c, name, kind) {
     return true;
 }
 
-function addForeignKey(state, table, fk) {
-    // MySQL: <table>_ibfk_<n>, n after the highest one of the table
+function addForeignKey(state, table, fk, order = 0) {
+    // MySQL: <table>_ibfk_<n>, numbered in each statement after the highest one the table had
+    // before it (from 1 in a CREATE TABLE, whatever the names it gives)
     const ibfk = `${table.ref.name}_ibfk_`;
-    const highest = Math.max(0, ...table.foreignKeys.map(other => (other.name && other.name.toLowerCase().startsWith(ibfk.toLowerCase()) && /^\d+$/.test(other.name.slice(ibfk.length)) ? Number(other.name.slice(ibfk.length)) : 0)));
-    const name = fk.name || (state.dialect === 'mysql' ? `${ibfk}${highest + 1}` : chooseName(state, table, fk.columns, 'fkey'));
+    if (state.dialect === 'mysql' && (!table.ibfk || table.ibfk.statement !== state.statement)) {
+        const highest = Math.max(0, ...table.foreignKeys.map(other => (other.name && other.name.toLowerCase().startsWith(ibfk.toLowerCase()) && /^\d+$/.test(other.name.slice(ibfk.length)) ? Number(other.name.slice(ibfk.length)) : 0)));
+        table.ibfk = { statement: state.statement, highest, generated: [] };
+    }
+    const name = fk.name || (state.dialect === 'mysql' ? `${ibfk}${table.ibfk.highest + table.ibfk.generated.length + 1}` : chooseName(state, table, fk.columns, 'fkey'));
     table.foreignKeys = table.foreignKeys.filter(other => !(other.name && sameName(state, other.name, name)));
-    table.foreignKeys.push({ ...fk, name });
+    const added = { ...fk, name };
+    table.foreignKeys.push(added);
+    if (state.dialect === 'mysql' && !fk.name) {
+        table.ibfk.generated.push({ fk: added, order });
+    }
     noteName(state, table, name);
 }
 
@@ -1899,7 +1943,7 @@ function applyColumnConstraints(ctx, table, read) {
     if (read.references && state.dialect === 'mysql' && !state.mariadb) {
         warnAt(ctx, read.referencesAt, `${display(state, table.ref)}.${column.name}: MySQL 8.4 ignores a REFERENCES written on the column (MariaDB creates the key), no relation drawn: FOREIGN KEY (${column.name}) REFERENCES ... creates one.`);
     } else if (read.references) {
-        addForeignKey(state, table, { ...read.references, columns: [column.name] });
+        addForeignKey(state, table, { ...read.references, columns: [column.name] }, read.order);
     }
 }
 
@@ -1934,6 +1978,8 @@ function applyStatement(ctx, tokens) {
     if (!isWord(first)) {
         return;
     }
+    // The statement being applied (MySQL numbers the foreign keys of each statement)
+    ctx.state.statement = tokens;
     const c = cursorOf(tokens, 1);
     switch (first.upper) {
         case 'CREATE':
@@ -1972,7 +2018,9 @@ function applyStatement(ctx, tokens) {
         case 'USE':
             if (isName(peek(c))) {
                 ctx.state.database = peek(c).value;
-                ctx.state.home = ctx.state.home === null ? ctx.state.database : ctx.state.home;
+                if (ctx.state.home === null && !SYSTEM_DATABASES.has(ctx.state.database.toLowerCase())) {
+                    ctx.state.home = ctx.state.database;
+                }
             }
             return undefined;
         case 'INSERT':
@@ -2036,7 +2084,8 @@ function createTableStatement(ctx, c, keyword, replace) {
     }
     const ref = refOf(state, parts);
     const key = refKey(state, ref);
-    if (state.skip(ref)) {
+    // The tables of the server's databases (the mysql database of mysqldump --all-databases)
+    if (state.skip(ref) || (state.dialect === 'mysql' && ref.schema !== null && SYSTEM_DATABASES.has(ref.schema.toLowerCase()))) {
         state.skipped.add(key);
         return;
     }
@@ -2122,6 +2171,7 @@ function createTableStatement(ctx, c, keyword, replace) {
             continue;
         }
         read.column.inCreate = true;
+        read.order = from;
         placeColumn(state, table, read.column, null);
         applyColumnConstraints(ctx, table, read);
     }
@@ -2130,6 +2180,13 @@ function createTableStatement(ctx, c, keyword, replace) {
         if (!applyConstraint(ctx, table, cursorOf(tokens, from, to), to, itemRange)) {
             warnAt(ctx, tokens[from], `CREATE TABLE ${display(state, ref)}: constraint not understood, skipped: ${excerpt(textOf(ctx.text, tokens, from, to))}`);
         }
+    }
+    if (table.ibfk && table.ibfk.statement === state.statement) {
+        // MySQL numbers the foreign keys without a name in the order of the statement (MariaDB: a
+        // REFERENCES on a column after a FOREIGN KEY)
+        [...table.ibfk.generated].sort((a, b) => a.order - b.order).forEach((item, i) => {
+            item.fk.name = `${table.ref.name}_ibfk_${table.ibfk.highest + i + 1}`;
+        });
     }
     if (table.withoutRowid && table.primaryKey) {
         for (const name of table.primaryKey.columns) {
@@ -2350,13 +2407,21 @@ function inheritAction(ctx, table, action, c, range, seen = new Set([table])) {
         }
         seen.add(child);
         if (action.kind === 'add') {
-            if (columnOf(state, child, action.column.name)) {
+            const existing = columnOf(state, child, action.column.name);
+            if (existing) {
+                // Merged with the column of the child, now inherited from one more parent
+                existing.inherited = existing.inherited ? existing.inherited + 1 : existing.inherited;
                 continue;
             }
-            child.columns.push({ ...action.column, details: { ...action.column.details }, changes: [], inherited: true });
+            child.columns.push({ ...action.column, details: { ...action.column.details }, changes: [], inherited: 1 });
         } else if (action.kind === 'drop') {
             const column = columnOf(state, child, action.name);
             if (!column || !column.inherited) {
+                continue;
+            }
+            // Still inherited from another parent: kept
+            column.inherited--;
+            if (column.inherited > 0) {
                 continue;
             }
             dropColumn(state, child, action.name);
@@ -2648,13 +2713,17 @@ function alterAction(ctx, table, c, range, done = {}) {
         // PostgreSQL: the table stops or starts inheriting a parent (its columns are then its own)
         const parts = readName(c);
         const parent = parts ? findTable(state, tableRef(state, parts)) : null;
-        if (parent && isWord(first, 'NO')) {
-            parent.children = (parent.children || []).filter(child => child !== table);
-            table.columns.filter(column => columnOf(state, parent, column.name)).forEach(column => {
-                column.inherited = false;
+        if (parent && isWord(first, 'NO') && (parent.children || []).includes(table)) {
+            parent.children = parent.children.filter(child => child !== table);
+            // A column no other parent gives becomes its own
+            table.columns.filter(column => column.inherited && columnOf(state, parent, column.name)).forEach(column => {
+                column.inherited = column.inherited > 1 ? column.inherited - 1 : false;
             });
-        } else if (parent && parent !== table) {
-            parent.children = [...(parent.children || []).filter(child => child !== table), table];
+        } else if (parent && parent !== table && !isWord(first, 'NO') && !(parent.children || []).includes(table)) {
+            parent.children = [...(parent.children || []), table];
+            table.columns.filter(column => column.inherited && columnOf(state, parent, column.name)).forEach(column => {
+                column.inherited++;
+            });
         }
         return 'passive';
     }

@@ -957,6 +957,32 @@ alter table accounts drop column kind cascade;`);
         assert.deepEqual(tableNamed(kept, 't').indexes, [{ columns: ['lower(x::text)'], type: 'index', name: 't_x' }]);
     });
 
+    it('DROP COLUMN keeps the indexes whose SQL words only look like the column: EXTRACT(year FROM ...), AT TIME ZONE, reserved words, types and interval units', () => {
+        const { tables } = replayed(`create table r (id int primary key, year int, day int, epoch int, zone text, "time" int, "at" int, "end" int, "null" int, varying int, "precision" int, unknown int, hour int, "C" int, created_at timestamp, ts timestamp, tz timestamptz, kind text, name text);
+create index r_year on r ((extract(year from created_at)));
+create index r_epoch on r ((extract(epoch from ts)));
+create index r_day on r (kind) where extract(day from ts) = 1;
+create index r_zone on r ((created_at at time zone 'UTC'));
+create index r_case on r ((case when kind = 'a' then 1 else 0 end));
+create index r_null on r (kind) where name is not null and kind is distinct from 'x';
+create index r_cast on r ((kind::character varying));
+create index r_double on r ((id::double precision));
+create index r_with_zone on r ((tz::timestamp with time zone));
+create index r_literal on r (kind) where created_at > timestamp '2020-01-01' + interval '1 day';
+create index r_unit on r (kind) where ts > timestamp '2020-01-01' + interval '1' hour;
+create index r_unknown on r (kind) where (name = 'a') is not unknown;
+create index r_collate on r ((name collate "C"));
+create index r_uses_year on r (kind) where year > 2000;
+create index r_uses_zone on r ((zone || 'x'));
+create index r_uses_end on r (("end" + 1));
+create index r_uses_at on r (("at" + 1));
+create index r_uses_time on r (("time" + hour));
+alter table r drop column year, drop column day, drop column epoch, drop column zone, drop column "time", drop column "at", drop column "end";
+alter table r drop column "null", drop column varying, drop column "precision", drop column unknown, drop column hour, drop column "C";`);
+        // As PostgreSQL 17 keeps them: the r_uses_ ones use the dropped columns
+        assert.deepEqual(tableNamed(tables, 'r').indexes.map(index => index.name), ['r_year', 'r_epoch', 'r_day', 'r_zone', 'r_case', 'r_null', 'r_cast', 'r_double', 'r_with_zone', 'r_literal', 'r_unit', 'r_unknown', 'r_collate']);
+    });
+
     it('the columns added, dropped, renamed or altered on a parent are those of the tables that inherit it (INHERITS), unless ONLY or their own; DROP ... CASCADE drops them', () => {
         const { tables, warnings } = replayed(`create table parent (id int primary key, old text, shared text);
 create table child (extra text, shared text) inherits (parent);
@@ -982,6 +1008,36 @@ drop table droppable cascade;`);
         assert.deepEqual(shape(tables), { parent: 'id* added2?', child: 'id shared? extra? added2? only_drop?', grandchild: 'id shared? extra? g? added2? only_drop?', other_parent: 'id* after_no?', loner: 'id*' });
         assert.deepEqual(tableNamed(tables, 'grandchild').columns.find(c => c.name === 'added2').type, 'bigint');
         assert.deepEqual(relationsOf(tables), ['parent.added2 -> other_parent.id many-to-one']);
+        assert.deepEqual(warnings, []);
+    });
+
+    it('several parents (INHERITS (a, b)): a column of both is one column, kept until the last parent that gives it drops it; INHERIT and NO INHERIT count too', () => {
+        const { tables, warnings } = replayed(`create table p1 (id int, a int);
+create table p2 (id int, b int);
+create table mc (own text) inherits (p1, p2);
+create table mc2 () inherits (mc);
+alter table p1 drop column id;
+alter table p2 add column a int;
+alter table p1 drop column a;
+alter table p2 add column c int;
+alter table p1 add column c int;
+alter table mc no inherit p2;
+alter table p1 drop column c;
+create table q1 (x int, y int);
+create table q2 (x int);
+create table mq () inherits (q1, q2);
+alter table mq no inherit q1;
+alter table q2 drop column x;
+create table s1 (k int);
+create table s2 (k int, z int);
+create table sc () inherits (s1);
+alter table sc add column z int;
+alter table sc inherit s2;
+alter table s1 drop column k;
+alter table s2 drop column z;
+create table own (k int) inherits (s2);`);
+        // As PostgreSQL 17 has them
+        assert.deepEqual(shape(tables), { p1: '', p2: 'id? b? a? c?', mc: 'id? a? b? own?', mc2: 'id? a? b? own?', q1: 'x? y?', q2: '', mq: 'y?', s1: '', s2: 'k?', sc: 'k? z?', own: 'k?' });
         assert.deepEqual(warnings, []);
     });
 });
@@ -1089,6 +1145,27 @@ ALTER TABLE app1.users ADD COLUMN extra int;`, 'mysql');
         assert.deepEqual(warnings, []);
     });
 
+    it('mysqldump --all-databases: the databases of the server (mysql, sys...) are not drawn, and the first database of the user is the one without a name', () => {
+        const { tables, warnings } = replayed(`CREATE DATABASE /*!32312 IF NOT EXISTS*/ \`mysql\`;
+USE \`mysql\`;
+CREATE TABLE \`user\` (\`Host\` char(255) NOT NULL, \`User\` char(32) NOT NULL, PRIMARY KEY (\`Host\`,\`User\`)) ENGINE=InnoDB;
+INSERT INTO \`user\` VALUES ('localhost','root');
+CREATE TABLE IF NOT EXISTS \`general_log\` (\`event_time\` timestamp(6) NOT NULL) ENGINE=CSV;
+ALTER TABLE \`user\` ADD COLUMN \`x\` int;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ \`app1\`;
+USE \`app1\`;
+CREATE TABLE \`users\` (\`id\` int NOT NULL, PRIMARY KEY (\`id\`)) ENGINE=InnoDB;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ \`app2\`;
+USE \`app2\`;
+CREATE TABLE \`orders\` (\`id\` int NOT NULL, \`user_id\` int, PRIMARY KEY (\`id\`), CONSTRAINT \`orders_ibfk_1\` FOREIGN KEY (\`user_id\`) REFERENCES \`app1\`.\`users\` (\`id\`)) ENGINE=InnoDB;
+CREATE TABLE sys.extra (id int) ENGINE=InnoDB;
+CREATE TABLE performance_schema.extra (id int);
+CREATE TABLE \`INFORMATION_SCHEMA\`.extra (id int);`, 'mysql');
+        assert.deepEqual(shape(tables), { users: 'id*', 'app2.orders': 'id* user_id?' });
+        assert.deepEqual(relationsOf(tables), ['app2.orders.user_id -> users.id many-to-one']);
+        assert.deepEqual(warnings, []);
+    });
+
     it('a REFERENCES written on a column is no foreign key on MySQL 8.4 (told), but one on MariaDB; an unnamed foreign key is <table>_ibfk_<n> after the highest one', () => {
         const text = `CREATE TABLE users (id INT PRIMARY KEY, email VARCHAR(100)) ENGINE=InnoDB;
 CREATE TABLE posts (id INT PRIMARY KEY, user_id INT REFERENCES users(id) ON DELETE CASCADE, author_id INT, FOREIGN KEY (author_id) REFERENCES users(id)) ENGINE=InnoDB;
@@ -1111,6 +1188,25 @@ ALTER TABLE t DROP FOREIGN KEY t_ibfk_1;
 ALTER TABLE t ADD FOREIGN KEY (z) REFERENCES a(id);
 ALTER TABLE t DROP FOREIGN KEY t_ibfk_2;`, 'mysql');
         assert.deepEqual(relationsOf(tables), ['t.z -> a.id many-to-one']);
+    });
+
+    it('MySQL and MariaDB number the unnamed foreign keys of each statement from the highest one the table had before it: from 1 in a CREATE TABLE, in the order of the statement', () => {
+        const text = `CREATE TABLE u (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE c3 (a INT, b INT, d INT, CONSTRAINT c3_ibfk_5 FOREIGN KEY (b) REFERENCES u(id), FOREIGN KEY (a) REFERENCES u(id), FOREIGN KEY (d) REFERENCES u(id)) ENGINE=InnoDB;
+CREATE TABLE c4 (a INT, b INT, d INT, FOREIGN KEY (a) REFERENCES u(id), CONSTRAINT c4_ibfk_7 FOREIGN KEY (b) REFERENCES u(id), FOREIGN KEY (d) REFERENCES u(id)) ENGINE=InnoDB;
+ALTER TABLE c4 ADD COLUMN e INT, ADD FOREIGN KEY (e) REFERENCES u(id);
+CREATE TABLE c5 (a INT, b INT, d INT, FOREIGN KEY (a) REFERENCES u(id)) ENGINE=InnoDB;
+ALTER TABLE c5 ADD CONSTRAINT c5_ibfk_9 FOREIGN KEY (b) REFERENCES u(id), ADD FOREIGN KEY (d) REFERENCES u(id);
+CREATE TABLE c9 (a INT, FOREIGN KEY (a) REFERENCES u(id), d INT REFERENCES u(id), e INT, FOREIGN KEY (e) REFERENCES u(id)) ENGINE=InnoDB;
+ALTER TABLE c3 DROP FOREIGN KEY c3_ibfk_1;
+ALTER TABLE c4 DROP FOREIGN KEY c4_ibfk_8;
+ALTER TABLE c4 DROP FOREIGN KEY c4_ibfk_2;
+ALTER TABLE c5 DROP FOREIGN KEY c5_ibfk_2;
+ALTER TABLE c9 DROP FOREIGN KEY c9_ibfk_2;`;
+        const keys = (tables) => tables.flatMap(t => t.relations.map(r => `${t.table}.${r.foreignKey}`));
+        // As MariaDB 11.8 (which creates the REFERENCES of c9.d) and MySQL 8.4 have them
+        assert.deepEqual(keys(replayed(`-- MariaDB dump 10.19  Distrib 11.8.2-MariaDB\n${text}`, 'mysql').tables), ['c3.b', 'c3.d', 'c4.a', 'c4.b', 'c5.a', 'c5.b', 'c9.a', 'c9.e']);
+        assert.deepEqual(keys(replayed(text, 'mysql').tables), ['c3.b', 'c3.d', 'c4.a', 'c4.b', 'c5.a', 'c5.b', 'c9.a']);
     });
 });
 
@@ -1162,9 +1258,14 @@ CREATE TABLE c (id INTEGER PRIMARY KEY DESC, name TEXT);
 CREATE TABLE d (id INTEGER, name TEXT, PRIMARY KEY (id DESC));
 CREATE TABLE e (id INT, name TEXT, PRIMARY KEY (id));
 CREATE TABLE f (a INTEGER, b INTEGER, PRIMARY KEY (a, b));
-CREATE TABLE h (id INTEGER(11) PRIMARY KEY, name TEXT);`, 'sqlite');
-        // As sqlite3 stores a NULL id: the rowid, or NULL
-        assert.deepEqual(shape(tables), { a: 'id* name?', b: 'id* name?', c: 'id?* name?', d: 'id* name?', e: 'id?* name?', f: 'a?* b?*', h: 'id?* name?' });
+CREATE TABLE h (id INTEGER(11) PRIMARY KEY, name TEXT);
+CREATE TABLE i (id INTEGER UNSIGNED PRIMARY KEY, name TEXT);
+CREATE TABLE j (id INTEGER UNSIGNED, name TEXT, PRIMARY KEY (id));
+CREATE TABLE k (id INTEGER SIGNED PRIMARY KEY, name TEXT);
+CREATE TABLE l (id "INTEGER", name TEXT, PRIMARY KEY (id));
+CREATE TABLE m (id integer PRIMARY KEY, name TEXT);`, 'sqlite');
+        // As sqlite3 stores a NULL id: the rowid (a type that is INTEGER alone), or NULL
+        assert.deepEqual(shape(tables), { a: 'id* name?', b: 'id* name?', c: 'id?* name?', d: 'id* name?', e: 'id?* name?', f: 'a?* b?*', h: 'id?* name?', i: 'id?* name?', j: 'id?* name?', k: 'id?* name?', l: 'id* name?', m: 'id* name?' });
     });
 });
 
