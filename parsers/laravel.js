@@ -854,7 +854,8 @@ function applySchemaCall(ctx, method, from, to, index) {
                 warn(ctx, index, `Schema::${method}('${name}') on a table that no migration creates, table added`);
             }
             if (!table) {
-                table = { name, columns: [], relations: [] };
+                // The migration that creates the table, opened by a click in the diagram
+                table = { name, columns: [], relations: [], source: { file: `database/migrations/${ctx.file}`, line: ctx.lineAt(index) } };
                 state.tables.push(table);
             }
             applyBlueprint(ctx, table, from, to, index);
@@ -996,7 +997,7 @@ function applyMigration(state, file, source) {
     applyMethod(ctx, 'up', up, new Set());
 }
 
-// Internal table state to the pivot format of CONTRACT.md
+// Internal table state to the pivot format (docs/pivot-format.md)
 function toPivot(table) {
     const primaryCount = table.columns.filter(c => c.primary).length;
     const isUnique = (name) => table.columns.some(c => c.name === name && (c.unique || (c.primary && primaryCount === 1)));
@@ -1019,6 +1020,7 @@ function toPivot(table) {
             on: r.on,
             type: isUnique(r.foreignKey) ? 'one-to-one' : 'many-to-one',
         })),
+        ...(table.source ? { source: table.source } : {}),
     };
 }
 

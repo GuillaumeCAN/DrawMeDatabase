@@ -19,6 +19,12 @@
 
         <div id="summary" class="summary"></div>
 
+        <div class="search">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+            <input type="search" id="search" placeholder="Filter tables" aria-label="Filter tables by table or column name (Ctrl+F)" title="Tables whose name or columns contain the text, with their neighbours (Ctrl+F)" spellcheck="false" autocomplete="off">
+            <span id="search-count" class="search-count" aria-live="polite"></span>
+        </div>
+
         <div class="actions">
             <div class="group" data-viewer-only="diagram">
                 <select id="layout-select" class="select" title="Layout engine" aria-label="Layout engine">

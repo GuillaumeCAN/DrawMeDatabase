@@ -400,3 +400,11 @@ test('Mermaid applies the highlight classes', { skip }, async () => {
     assert.match(entities.get('users').cssClasses, /\bmatch\b/);
     assert.match(entities.get('posts').cssClasses, /\bdimmed\b/);
 });
+
+// diagram.js finds the table of a clicked node from its DOM id, '<svg id>-' + this entity id
+test('Mermaid names entity nodes "entity-<id>-<n>" (a click on a table opens its file)', { skip }, async () => {
+    const { entities } = await parseWithMermaid(generateMermaidER([USERS, POSTS, { table: 'my table', columns: [], relations: [] }]));
+    assert.match(entities.get('users').id, /^entity-users-\d+$/);
+    assert.match(entities.get('posts').id, /^entity-posts-\d+$/);
+    assert.match(entities.get('my table').id, /^entity-t1-\d+$/);
+});

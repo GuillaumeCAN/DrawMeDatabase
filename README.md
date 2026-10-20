@@ -1,4 +1,4 @@
-**v1.2.0**
+**v1.3.0**
 
 ## About DrawMeDatabase
 
@@ -33,6 +33,9 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 - Zoom and pan: drag to move, Ctrl (Cmd on macOS) + mouse wheel or pinch to zoom, buttons to zoom in, zoom out, fit to window and show at 100 %
 - Two layouts: ELK (compact, right-angled links, the default) or Dagre (curved links), top to bottom or left to right
 - Export as SVG, PNG, Mermaid source (`.mmd`) or Markdown, or copy the Mermaid source
+- Click on a table to open its migration or entity at the right line
+- Search: keep the tables whose name or columns contain a text, with the tables they are linked to
+- Refreshed automatically when you save a migration or an entity
 
 **JSON viewer:** the parsed schema, colored like code, to save or copy.
 
@@ -49,12 +52,15 @@ In the panel:
 - **Diagram** and **JSON** tabs switch between the viewers
 - The toolbar changes the layout and the direction, zooms, exports and refreshes the diagram after you changed your migrations or entities (also `DrawMeDatabase: Refresh Diagram`, or the refresh button in the title bar of the panel)
 - Keyboard, once the diagram has the focus: `+` and `-` to zoom, `0` for 100 %, `F` to fit, arrows to move
+- `Ctrl+F` (`Cmd+F` on macOS) goes to the search box, `Escape` clears it
+- A click on a table opens the file it comes from; the exports and the JSON viewer follow the search
 
 **Settings:**
 
 - `DrawMeDatabase.frameworkPath`: path to the framework folder, relative to the workspace folder. Leave it empty if the framework is at the root of the workspace. Example: `my-project/app/symfony`
 - `DrawMeDatabase.layout`: `elk` (default) or `dagre`
 - `DrawMeDatabase.direction`: `TB` (top to bottom, default) or `LR` (left to right)
+- `DrawMeDatabase.autoRefresh`: draw the open diagram again when a migration or an entity changes (default: on)
 
 Details and warnings (for example a table whose name cannot be read) are written in the **DrawMeDatabase** output panel.
 
@@ -92,5 +98,5 @@ GitHub Actions runs these checks on every pull request and keeps the `.vsix` as 
 
 ## Changelog
 
-Latest release : **v1.2.0**
+Latest release : **v1.3.0**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

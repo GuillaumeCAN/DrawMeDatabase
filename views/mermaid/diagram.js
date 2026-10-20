@@ -79,13 +79,15 @@
         };
     }
 
-    function create({ viewport, stage, message, onViewChange, onRendered }) {
+    function create({ viewport, stage, message, onViewChange, onRendered, onOpenTable }) {
         const zoom = window.DrawMeDatabaseZoom.attach(viewport, stage, onViewChange);
         let renders = 0;
         let queue = Promise.resolve();
         let last = null;
         let size = null;
         let background = '#ffffff';
+        // Table of each drawn entity, by the id Mermaid gives its node ('dmdb-svg-3-entity-users-0')
+        let tablesByNode = new Map();
 
         const report = (result) => {
             if (onRendered) {
@@ -129,7 +131,7 @@
                 return;
             }
             const started = performance.now();
-            const { source } = window.DrawMeDatabaseMermaid.buildDiagram(tables, {
+            const { source, entities } = window.DrawMeDatabaseMermaid.buildDiagram(tables, {
                 direction: settings.direction,
                 highlight: settings.highlight,
             });
@@ -166,8 +168,9 @@
             sandbox.className = 'render-sandbox';
             document.body.appendChild(sandbox);
             let svg;
+            const svgId = `dmdb-svg-${++renders}`;
             try {
-                ({ svg } = await mermaid.render(`dmdb-svg-${++renders}`, source, sandbox));
+                ({ svg } = await mermaid.render(svgId, source, sandbox));
             } catch (err) {
                 showMessage('Mermaid could not draw the diagram.', errorText(err), source);
                 report({ ok: false, error: `Mermaid could not draw the diagram: ${errorText(err)}` });
@@ -185,6 +188,7 @@
             element.setAttribute('width', String(size.width));
             element.setAttribute('height', String(size.height));
             element.style.maxWidth = 'none';
+            markOpenableTables(element, svgId, entities, tables);
             hideMessage();
             last = { tables, settings };
             zoom.setContent(size, view === 'keep' ? zoom.view : view === 'fit' ? null : view);
@@ -196,6 +200,39 @@
             });
         }
 
+        // Entity nodes of tables with a source file: pointer cursor, tooltip, click opens the file.
+        // Mermaid names each node '<svg id>-entity-<entity id>-<n>' (pinned by mermaid.test.js).
+        function markOpenableTables(element, svgId, entities, tables) {
+            const byId = new Map(entities.map(entity => [entity.id, entity.table]));
+            const sources = new Map(tables
+                .filter(table => table && table.source && typeof table.source.file === 'string')
+                .map(table => [String(table.table), table.source]));
+            tablesByNode = new Map();
+            const prefix = `${svgId}-entity-`;
+            element.querySelectorAll('g.node[id]').forEach(node => {
+                if (!node.id.startsWith(prefix)) {
+                    return;
+                }
+                const table = byId.get(node.id.slice(prefix.length).replace(/-\d+$/, ''));
+                const source = table === undefined ? undefined : sources.get(table);
+                if (!source) {
+                    return;
+                }
+                tablesByNode.set(node.id, table);
+                node.classList.add('openable');
+                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = `${table}\n${source.file}:${source.line}\nClick to open`;
+                node.insertBefore(title, node.firstChild);
+            });
+        }
+
+        stage.addEventListener('click', event => {
+            const node = event.target.closest && event.target.closest('g.node.openable');
+            if (node && tablesByNode.has(node.id) && onOpenTable) {
+                onOpenTable(tablesByNode.get(node.id));
+            }
+        });
+
         // The SVG as a standalone file, on the background of the theme it was drawn with
         function exportSvg() {
             const element = stage.querySelector('svg');
@@ -205,6 +242,7 @@
             const clone = element.cloneNode(true);
             clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
             clone.removeAttribute('style');
+            clone.querySelectorAll('g.node > title').forEach(title => title.remove());
             const box = element.viewBox.baseVal;
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             rect.setAttribute('x', String(box.x));

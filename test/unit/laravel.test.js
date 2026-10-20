@@ -4,7 +4,16 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { parse } = require('../../parsers/laravel');
+const parser = require('../../parsers/laravel');
+
+// The tables without their source location (file and line of the table, tested on their own)
+const withoutSource = (table) => {
+    const copy = { ...table };
+    delete copy.source;
+    return copy;
+};
+const withoutSources = (result) => ({ ...result, tables: result.tables.map(withoutSource) });
+const parse = (...args) => withoutSources(parser.parse(...args));
 const { ParserError } = require('../../parsers/errors');
 
 const fixture = (name) => path.join(__dirname, '..', 'fixtures', 'laravel', name);
@@ -1512,5 +1521,29 @@ return new class extends Migration
             relations: [],
         }]);
         assert.equal(result.warnings.length, 4);
+    });
+});
+
+describe('laravel parser: table sources', () => {
+    it('point at the Schema::create() of each table', () => {
+        const { tables } = parser.parse(fixture('blog-app'));
+        assert.deepEqual(tables.find(t => t.table === 'users').source,
+            { file: 'database/migrations/0001_01_01_000000_create_users_table.php', line: 14 });
+        assert.deepEqual(tables.find(t => t.table === 'password_reset_tokens').source,
+            { file: 'database/migrations/0001_01_01_000000_create_users_table.php', line: 24 });
+        assert.ok(tables.every(t => t.source.file.startsWith('database/migrations/') && t.source.line > 0));
+    });
+
+    it('a renamed or altered table keeps its creating migration; Schema::table() on an unknown table points at itself', () => {
+        const dir = project({
+            '2025_01_01_000000_create_notes.php': migration("        Schema::create('notes', function (Blueprint $table) {\n            $table->id();\n        });"),
+            '2025_01_02_000000_rename_notes.php': migration("        Schema::rename('notes', 'memos');\n        Schema::table('memos', function (Blueprint $table) {\n            $table->text('body');\n        });"),
+            '2025_01_03_000000_alter_unknown.php': migration("\n        Schema::table('legacy', function (Blueprint $table) {\n            $table->string('code');\n        });"),
+        });
+        const { tables } = parser.parse(dir);
+        assert.deepEqual(tables.map(t => [t.table, t.source]), [
+            ['memos', { file: 'database/migrations/2025_01_01_000000_create_notes.php', line: 12 }],
+            ['legacy', { file: 'database/migrations/2025_01_03_000000_alter_unknown.php', line: 13 }],
+        ]);
     });
 });

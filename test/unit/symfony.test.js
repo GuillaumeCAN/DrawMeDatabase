@@ -5,7 +5,16 @@ const os = require('os');
 const path = require('path');
 const childProcess = require('child_process');
 
-const { parse } = require('../../parsers/symfony');
+const parser = require('../../parsers/symfony');
+
+// The tables without their source location (file and line of the table, tested on their own)
+const withoutSource = (table) => {
+    const copy = { ...table };
+    delete copy.source;
+    return copy;
+};
+const withoutSources = (result) => ({ ...result, tables: result.tables.map(withoutSource) });
+const parse = (...args) => withoutSources(parser.parse(...args));
 const { ParserError } = require('../../parsers/errors');
 
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'symfony', 'blog');
@@ -1637,5 +1646,14 @@ describe('symfony parser: trait and parent precedence (checked against Doctrine 
         assert.deepEqual(table(result, 'person').relations, [
             { foreignKey: 'office_id', references: 'id', on: 'office', type: 'many-to-one' },
         ]);
+    });
+});
+
+describe('symfony parser: table sources', () => {
+    it('point at the declaration of each entity class', () => {
+        const { tables } = parser.parse(FIXTURE, { git: false });
+        assert.deepEqual(tables.find(t => t.table === 'blog_article').source, { file: 'src/Entity/Blog/BlogArticle.php', line: 12 });
+        assert.deepEqual(tables.find(t => t.table === 'category').source, { file: 'src/Entity/Category.php', line: 9 });
+        assert.ok(tables.every(t => t.source.file.startsWith('src/Entity/') && t.source.line > 0));
     });
 });

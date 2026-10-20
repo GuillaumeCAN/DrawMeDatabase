@@ -48,6 +48,7 @@ const SCRIPTS = [
     ['mermaid', 'generator.js'],
     ['mermaid', 'zoom.js'],
     ['exporters.js'],
+    ['search.js'],
     ['mermaid', 'diagram.js'],
     ['json', 'json.js'],
     ['app.js'],

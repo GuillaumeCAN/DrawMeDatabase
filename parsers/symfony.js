@@ -954,6 +954,8 @@ module.exports.parse = function (basePath, options = {}) {
     for (const entity of entities) {
         const { cls } = entity;
         const table = { table: entity.table, columns: [], relations: [] };
+        // The entity class, opened by a click in the diagram
+        const source = { file: cls.file.rel, line: cls.lines[0] };
 
         const addColumn = (column, property, owner) => {
             if (table.columns.some(c => c.name === column.name)) {
@@ -1057,6 +1059,7 @@ module.exports.parse = function (basePath, options = {}) {
                 });
             }
         }
+        table.source = source;
         entity.output = table;
         entity.columns = table.columns;
     }

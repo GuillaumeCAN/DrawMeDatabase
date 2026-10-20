@@ -52,24 +52,35 @@ function activate(context) {
 
     // Workspace folder of the last run, reused by a refresh from the panel (no active editor then)
     let lastFolder;
+    // The schema on screen: its folder, framework root and tables (source files of the tables)
+    let current = null;
 
-    // Parses the schema of the folder and shows it: returns the parsed tables
-    const draw = (folder) => {
+    // Parses the schema of the folder and shows it: returns the parsed tables. auto: refresh
+    // after a change of the code, without messages and without closing the panel on an error
+    // (the code may be in the middle of an edit), nor bringing the panel to the front.
+    const draw = (folder, { auto = false } = {}) => {
         let schema;
         if (folder) {
             lastFolder = folder;
-            schema = readSchema(folder, output);
-        } else {
+            schema = readSchema(folder, output, { notify: !auto });
+        } else if (!auto) {
             vscode.window.showErrorMessage("No project opened in the current workspace. Unable to draw the schema.");
         }
 
-        // Nothing to draw: close the panel rather than leave the previous schema on screen
         if (!schema || schema.tables.length === 0) {
+            if (auto) {
+                viewer.toast(schema
+                    ? 'No tables found: the diagram shows the previous schema.'
+                    : 'The schema could not be read (see the DrawMeDatabase output): the diagram shows the previous schema.');
+                return schema ? schema.tables : undefined;
+            }
+            // Nothing to draw: close the panel rather than leave the previous schema on screen
             viewer.close();
             return schema ? schema.tables : undefined;
         }
 
         try {
+            current = { folder, basePath: schema.basePath, framework: schema.framework, tables: schema.tables };
             viewer.show({
                 tables: schema.tables,
                 warnings: schema.warnings,
@@ -79,16 +90,51 @@ function activate(context) {
                     framework: schema.framework,
                     frameworkLabel: FRAMEWORK_LABELS[schema.framework] || '',
                 },
-            });
+            }, { reveal: !auto });
+            watcher.watch(current);
         } catch (err) {
             reportUnexpectedError(output, err);
         }
         return schema.tables;
     };
 
+    // Opens the file a table comes from (migration or entity), beside the diagram
+    const openTable = (name) => {
+        const table = current && typeof name === 'string' ? current.tables.find(candidate => candidate.table === name) : undefined;
+        const source = table && table.source;
+        if (!source || typeof source.file !== 'string') {
+            return;
+        }
+        // Only files of the project: the path comes from the parser, never from the page
+        const file = path.resolve(current.basePath, source.file);
+        const relative = path.relative(current.basePath, file);
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+            return;
+        }
+        const line = Math.max(0, (Number(source.line) || 1) - 1);
+        Promise.resolve(vscode.window.showTextDocument(vscode.Uri.file(file), {
+            viewColumn: vscode.ViewColumn.Beside,
+            preview: true,
+            selection: new vscode.Range(line, 0, line, 0),
+        })).catch(err => {
+            output.appendLine(`Unable to open ${file}: ${err && err.message ? err.message : err}`);
+            vscode.window.showErrorMessage(`Unable to open ${source.file}.`);
+        });
+    };
+
+    // Refreshes the open diagram after the migrations or entities change
+    const watcher = createWatcher(() => {
+        if (current && viewer.isOpen()) {
+            draw(current.folder, { auto: true });
+        }
+    });
+    context.subscriptions.push(watcher);
+
     const viewer = createViewer(context, output, {
         refresh: () => draw(getWorkspaceFolder(lastFolder)),
         exportFolder: () => lastFolder,
+        openTable,
+        onClose: () => watcher.stop(),
     });
     context.subscriptions.push(viewer);
 
@@ -114,6 +160,16 @@ function activate(context) {
             if (Object.keys(SETTINGS).some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
                 viewer.settingsChanged();
             }
+            if (!current || !viewer.isOpen()) {
+                return;
+            }
+            if (event.affectsConfiguration('DrawMeDatabase.autoRefresh')) {
+                watcher.watch(current);
+            }
+            // Another framework folder: draw it (after a pause, the setting may be typed)
+            if (event.affectsConfiguration('DrawMeDatabase.frameworkPath')) {
+                watcher.schedule();
+            }
         }),
     );
 
@@ -125,15 +181,19 @@ function activate(context) {
     };
 }
 
-// Detects the framework and parses the schema: returns { tables, warnings (count), framework },
-// or undefined after an error (already shown to the user)
-function readSchema(folder, output) {
+// Detects the framework and parses the schema: returns { tables, warnings (count), framework,
+// basePath }, or undefined after an error (already shown to the user). notify: false writes the
+// messages to the output only (automatic refresh).
+function readSchema(folder, output, { notify = true } = {}) {
+    const tell = (show, text, ...items) => (notify ? show(text, ...items) : output.appendLine(text));
+    const showError = (text) => tell(vscode.window.showErrorMessage, text);
+
     const frameworkPath = getFrameworkPath(folder);
     const basePath = resolveBasePath(folder.uri.fsPath, frameworkPath);
     if (!fs.existsSync(basePath)) {
         // Name the setting as the user wrote it: an absolute path was looked for in both places
         const elsewhere = path.isAbsolute(frameworkPath) ? ', nor as an absolute path' : '';
-        vscode.window.showErrorMessage(frameworkPath
+        showError(frameworkPath
             ? `The DrawMeDatabase.frameworkPath folder "${frameworkPath}" was not found in "${folder.uri.fsPath}"${elsewhere}. Check the setting.`
             : `The folder "${basePath}" does not exist. Unable to draw the schema.`);
         return undefined;
@@ -149,7 +209,7 @@ function readSchema(folder, output) {
             const hint = frameworkPath
                 ? 'Check the DrawMeDatabase.frameworkPath setting.'
                 : 'If the project is in a subfolder, set DrawMeDatabase.frameworkPath.';
-            vscode.window.showErrorMessage(`No Laravel or Symfony project found in "${basePath}". ${hint} Unable to draw the schema.`);
+            showError(`No Laravel or Symfony project found in "${basePath}". ${hint} Unable to draw the schema.`);
             return undefined;
         }
 
@@ -158,9 +218,13 @@ function readSchema(folder, output) {
     } catch (err) {
         if (err instanceof ParserError) {
             output.appendLine(`Error: ${err.message}`);
-            vscode.window.showErrorMessage(err.message);
-        } else {
+            if (notify) {
+                vscode.window.showErrorMessage(err.message);
+            }
+        } else if (notify) {
             reportUnexpectedError(output, err);
+        } else {
+            output.appendLine(`Unexpected error: ${err && err.stack ? err.stack : err}`);
         }
         return undefined;
     }
@@ -170,13 +234,13 @@ function readSchema(folder, output) {
     warnings.forEach(warning => output.appendLine(`Warning: ${warning}`));
     output.appendLine(`${tables.length} table(s) found.`);
 
-    if (warnings.length > 0) {
+    if (warnings.length > 0 && notify) {
         reportWarnings(output, warnings.length);
     }
     if (tables.length === 0) {
-        vscode.window.showInformationMessage(`No tables found in "${basePath}". Nothing to draw.`);
+        tell(vscode.window.showInformationMessage, `No tables found in "${basePath}". Nothing to draw.`);
     }
-    return { tables, warnings: warnings.length, framework };
+    return { tables, warnings: warnings.length, framework, basePath };
 }
 
 // The workspace folder of the active editor, else the one of the last run, else the first one
@@ -233,9 +297,57 @@ function reportWarnings(output, count) {
     });
 }
 
+// Watches the migrations (Laravel) or the entities (Symfony) of the schema on screen, while
+// DrawMeDatabase.autoRefresh is on: onChange runs once the changes pause for half a second
+function createWatcher(onChange) {
+    let watcher;
+    let watched = '';
+    let timer;
+
+    const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(onChange, 500);
+    };
+
+    const stop = () => {
+        clearTimeout(timer);
+        if (watcher) {
+            watcher.dispose();
+        }
+        watcher = undefined;
+        watched = '';
+    };
+
+    return {
+        watch({ basePath, framework }) {
+            const enabled = vscode.workspace.getConfiguration('DrawMeDatabase').get('autoRefresh', true) !== false;
+            const folder = framework === 'laravel' ? path.join(basePath, 'database', 'migrations')
+                : framework === 'symfony' ? path.join(basePath, 'src', 'Entity') : '';
+            const target = enabled && folder ? `${framework}:${folder}` : '';
+            if (target === watched) {
+                return;
+            }
+            stop();
+            if (!target) {
+                return;
+            }
+            watched = target;
+            // Laravel reads the files of database/migrations only, Symfony its sub-folders too
+            watcher = vscode.workspace.createFileSystemWatcher(
+                new vscode.RelativePattern(vscode.Uri.file(folder), framework === 'laravel' ? '*.php' : '**/*.php'));
+            watcher.onDidChange(schedule);
+            watcher.onDidCreate(schedule);
+            watcher.onDidDelete(schedule);
+        },
+        schedule,
+        stop,
+        dispose: stop,
+    };
+}
+
 // A single webview panel. The page is loaded once: the schema and the settings are posted to it
 // (again when it reloads, after being restored), and it asks for refreshes and exports.
-function createViewer(context, output, { refresh, exportFolder }) {
+function createViewer(context, output, { refresh, exportFolder, openTable, onClose }) {
     let panel;
     let ready = false;
     // What the page shows: the last schema, or a message when there is none
@@ -308,6 +420,9 @@ function createViewer(context, output, { refresh, exportFolder }) {
             case 'showOutput':
                 output.show();
                 break;
+            case 'open':
+                openTable(message.table);
+                break;
             case 'rendered':
                 lastRender = {
                     ok: message.ok === true,
@@ -365,6 +480,7 @@ function createViewer(context, output, { refresh, exportFolder }) {
                 subscriptions = [];
                 panel = undefined;
                 ready = false;
+                onClose();
             }),
         ];
         panel.webview.html = getHtmlContent(context, panel.webview);
@@ -377,11 +493,14 @@ function createViewer(context, output, { refresh, exportFolder }) {
     };
 
     return {
-        show(newSchema) {
+        // reveal: bring the panel to the front (not after an automatic refresh)
+        show(newSchema, { reveal = true } = {}) {
             schema = { type: 'schema', ...newSchema };
             emptyText = '';
             if (panel) {
-                panel.reveal();
+                if (reveal) {
+                    panel.reveal();
+                }
                 post(schema);
                 return;
             }
@@ -406,6 +525,8 @@ function createViewer(context, output, { refresh, exportFolder }) {
         settingsChanged() {
             post(settingsMessage());
         },
+        toast,
+        isOpen: () => Boolean(panel),
         get lastRender() {
             return lastRender;
         },
