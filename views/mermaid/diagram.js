@@ -10,76 +10,50 @@
 (function () {
     'use strict';
 
-    const FONT_FAMILY = 'system-ui, -apple-system, "Segoe UI", Ubuntu, Roboto, "Helvetica Neue", Arial, sans-serif';
     // Largest PNG export, in pixels (browsers refuse bigger canvases)
     const MAX_PNG_SIDE = 16384;
     const MAX_PNG_AREA = 120e6;
 
     const errorText = (err) => (err && err.message ? err.message : String(err));
 
-    function themeKind() {
-        const classes = document.body.classList;
-        if (classes.contains('vscode-high-contrast-light')) {
-            return 'hc-light';
-        }
-        if (classes.contains('vscode-high-contrast')) {
-            return 'hc-dark';
-        }
-        return classes.contains('vscode-light') ? 'light' : 'dark';
-    }
-
-    // The first VS Code color variable that is set, else the fallback
-    function color(names, fallback) {
-        const style = getComputedStyle(document.body);
-        for (const name of names) {
-            const value = style.getPropertyValue(name).trim();
-            if (value) {
-                return value;
-            }
-        }
-        return fallback;
-    }
-
-    // Mermaid's "base" theme filled with the colors of the current VS Code theme
+    // Mermaid's "base" theme in the colors and the font of the page: the VS Code theme, or the
+    // theme, palette, colors and font chosen in the settings (appearance.js)
     function mermaidTheme() {
-        const kind = themeKind();
-        const dark = kind === 'dark' || kind === 'hc-dark';
-        const contrast = kind === 'hc-dark' || kind === 'hc-light';
-        const background = color(['--vscode-editor-background'], dark ? '#1f1f1f' : '#ffffff');
-        const foreground = color(['--vscode-editor-foreground', '--vscode-foreground'], dark ? '#cccccc' : '#3b3b3b');
-        const border = contrast
-            ? color(['--vscode-contrastBorder', '--vscode-focusBorder'], foreground)
-            : color(['--vscode-editorWidget-border', '--vscode-widget-border', '--vscode-panel-border'], dark ? '#454545' : '#c8c8c8');
-        const header = color(['--vscode-editorWidget-background', '--vscode-sideBar-background'], dark ? '#252526' : '#f3f3f3');
-        const line = contrast ? foreground : color(['--vscode-descriptionForeground', '--vscode-editorLineNumber-foreground'], dark ? '#9d9d9d' : '#717171');
-        const stripe = contrast ? background : color(['--vscode-list-hoverBackground', '--vscode-editor-lineHighlightBackground'], dark ? '#2a2d2e' : '#f0f0f0');
+        const appearance = window.DrawMeDatabaseAppearance;
+        const palette = appearance.colors();
+        const font = appearance.font();
         return {
             theme: 'base',
-            darkMode: dark,
+            darkMode: palette.dark,
             themeVariables: {
-                fontFamily: FONT_FAMILY,
-                fontSize: '13px',
-                background,
-                primaryColor: header,
-                primaryTextColor: foreground,
-                primaryBorderColor: border,
-                secondaryColor: header,
-                tertiaryColor: background,
-                mainBkg: header,
-                nodeBorder: border,
-                lineColor: line,
-                textColor: foreground,
-                nodeTextColor: foreground,
-                edgeLabelBackground: background,
+                fontFamily: font.family,
+                fontSize: `${font.size}px`,
+                background: palette.background,
+                primaryColor: palette.header,
+                primaryTextColor: palette.text,
+                primaryBorderColor: palette.border,
+                secondaryColor: palette.header,
+                tertiaryColor: palette.background,
+                mainBkg: palette.header,
+                nodeBorder: palette.border,
+                lineColor: palette.line,
+                textColor: palette.text,
+                nodeTextColor: palette.text,
+                edgeLabelBackground: palette.background,
                 // Attribute rows of the tables
-                rowOdd: background,
-                rowEven: stripe,
+                rowOdd: palette.background,
+                rowEven: palette.stripe,
             },
-            background,
+            background: palette.background,
+            fontFamily: font.family,
         };
     }
 
-    function create({ viewport, stage, message, onViewChange, onRendered, onOpenTable }) {
+    // t: the texts of the page (i18n.js), English when it is not given
+    // onSelectTable(table): a click selects a table (double-click or Ctrl+click opens its file);
+    // without it, a click opens the file
+    function create({ viewport, stage, message, onViewChange, onRendered, onOpenTable, onSelectTable, t }) {
+        const tr = t || window.DrawMeDatabaseI18n.translator('en');
         const zoom = window.DrawMeDatabaseZoom.attach(viewport, stage, onViewChange);
         let renders = 0;
         let queue = Promise.resolve();
@@ -91,6 +65,8 @@
         let tablesByNode = new Map();
         // What the stage shows, to skip drawing it again
         let lastKey = '';
+        // The selected table, outlined
+        let selectedTable = null;
 
         const report = (result) => {
             if (onRendered) {
@@ -104,8 +80,8 @@
             heading.className = 'message-title';
             heading.textContent = title;
             message.appendChild(heading);
-            for (const [label, text] of [['', details], ['Generated Mermaid source:', source]]) {
-                if (!text) {
+            for (const [label, content] of [['', details], [tr('diagram.source'), source]]) {
+                if (!content) {
                     continue;
                 }
                 if (label) {
@@ -114,7 +90,7 @@
                     message.appendChild(caption);
                 }
                 const pre = document.createElement('pre');
-                pre.textContent = text;
+                pre.textContent = content;
                 message.appendChild(pre);
             }
             message.hidden = false;
@@ -129,7 +105,7 @@
         async function draw({ tables, settings, view }) {
             const mermaid = window.mermaid;
             if (!mermaid || !window.DrawMeDatabaseMermaid) {
-                showMessage('The Mermaid library could not be loaded.');
+                showMessage(tr('diagram.noMermaid'));
                 report({ ok: false, error: 'The Mermaid library could not be loaded.' });
                 return;
             }
@@ -139,6 +115,9 @@
                 highlight: settings.highlight,
                 git: settings.git,
                 marks: settings.marks,
+                keysOnly: settings.keysOnly,
+                relationLabels: settings.relationLabels,
+                gitLabels: gitLabels(),
             });
             const theme = mermaidTheme();
             background = theme.background;
@@ -164,7 +143,7 @@
                 look: 'classic',
                 layout: settings.layout === 'elk' ? 'elk' : 'dagre',
                 htmlLabels: false,
-                fontFamily: FONT_FAMILY,
+                fontFamily: theme.fontFamily,
                 maxTextSize: 5000000,
                 er: { useMaxWidth: false, htmlLabels: false },
             });
@@ -172,7 +151,7 @@
             try {
                 await mermaid.parse(source);
             } catch (err) {
-                showMessage('Mermaid could not read the generated diagram.', errorText(err), source);
+                showMessage(tr('diagram.parseError'), errorText(err), source);
                 report({ ok: false, error: `Mermaid could not read the generated diagram: ${errorText(err)}` });
                 return;
             }
@@ -187,7 +166,7 @@
             try {
                 ({ svg } = await mermaid.render(svgId, source, sandbox));
             } catch (err) {
-                showMessage('Mermaid could not draw the diagram.', errorText(err), source);
+                showMessage(tr('diagram.renderError'), errorText(err), source);
                 report({ ok: false, error: `Mermaid could not draw the diagram: ${errorText(err)}` });
                 return;
             } finally {
@@ -217,10 +196,11 @@
             });
         }
 
-        // Entity nodes of tables with a source file: pointer cursor, tooltip, click opens the file.
-        // Mermaid names each node '<svg id>-entity-<entity id>-<n>' (pinned by mermaid.test.js).
+        // Entity nodes of tables with a source file (every declared table with onSelectTable):
+        // pointer cursor, tooltip, click. Mermaid names each node '<svg id>-entity-<entity id>-<n>'
+        // (pinned by mermaid.test.js).
         function markOpenableTables(element, svgId, entities, tables) {
-            const byId = new Map(entities.map(entity => [entity.id, entity.table]));
+            const byId = new Map(entities.filter(entity => entity.declared !== false).map(entity => [entity.id, entity.table]));
             const sources = new Map(tables
                 .filter(table => table && table.source && typeof table.source.file === 'string')
                 .map(table => [String(table.table), table.source]));
@@ -232,20 +212,26 @@
                 }
                 const table = byId.get(node.id.slice(prefix.length).replace(/-\d+$/, ''));
                 const source = table === undefined ? undefined : sources.get(table);
-                if (!source) {
+                if (table === undefined || (!source && !onSelectTable)) {
                     return;
                 }
                 tablesByNode.set(node.id, table);
                 node.classList.add('openable');
+                node.classList.toggle('selected', table === selectedTable);
                 const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                title.textContent = `${table}\n${source.file}:${source.line}\nClick to open`;
+                const where = source ? `\n${source.file}:${source.line}` : '';
+                title.textContent = `${table}${where}\n${tr(onSelectTable ? 'diagram.selectTable' : 'diagram.openTable')}`;
                 node.insertBefore(title, node.firstChild);
             });
         }
 
+        // The git status words of the columns, in the language of the page
+        const gitLabels = () => ({ untracked: tr('git.label.untracked'), modified: tr('git.label.modified'), unsaved: tr('git.label.unsaved') });
+
         // Comments of uncommitted columns ('● new'...), colored like the git decorations of VS Code
         function markGitLabels(element) {
-            const labels = new Map(['untracked', 'modified', 'unsaved'].map(status => [window.DrawMeDatabaseMermaid.gitLabel(status), status]));
+            const words = gitLabels();
+            const labels = new Map(['untracked', 'modified', 'unsaved'].map(status => [window.DrawMeDatabaseMermaid.gitLabel(status, words), status]));
             element.querySelectorAll('text').forEach(text => {
                 const status = labels.get(text.textContent.trim());
                 if (status) {
@@ -254,12 +240,65 @@
             });
         }
 
-        stage.addEventListener('click', event => {
+        const tableAt = (event) => {
             const node = event.target.closest && event.target.closest('g.node.openable');
-            if (node && tablesByNode.has(node.id) && onOpenTable) {
-                onOpenTable(tablesByNode.get(node.id));
+            return node && tablesByNode.has(node.id) ? tablesByNode.get(node.id) : undefined;
+        };
+        stage.addEventListener('click', event => {
+            const table = tableAt(event);
+            if (table === undefined) {
+                return;
+            }
+            if (onSelectTable && !event.ctrlKey && !event.metaKey) {
+                onSelectTable(table);
+            } else if (onOpenTable) {
+                onOpenTable(table);
             }
         });
+        stage.addEventListener('dblclick', event => {
+            const table = tableAt(event);
+            if (table !== undefined && onSelectTable && onOpenTable) {
+                onOpenTable(table);
+            }
+        });
+
+        // The node of a table on the stage, or null
+        function nodeOf(table) {
+            for (const [id, name] of tablesByNode) {
+                if (name === table) {
+                    return stage.querySelector(`[id="${CSS.escape(id)}"]`);
+                }
+            }
+            return null;
+        }
+
+        // Outlines a table (null: none)
+        function select(table) {
+            selectedTable = table;
+            stage.querySelectorAll('g.node.selected').forEach(node => node.classList.remove('selected'));
+            const node = table === null ? null : nodeOf(table);
+            if (node) {
+                node.classList.add('selected');
+            }
+        }
+
+        // Moves the view so that a table is in the middle, at the current zoom (at least 60 %);
+        // left, right: the widths hidden on each side (panels over the viewport)
+        function centerOn(table, { left = 0, right = 0 } = {}) {
+            const node = nodeOf(table);
+            const element = stage.querySelector('svg');
+            if (!node || !element || !size) {
+                return;
+            }
+            // Its center in the coordinates of the drawing (the nodes are placed by transforms)
+            const box = node.getBoundingClientRect();
+            const drawing = element.getBoundingClientRect();
+            const current = zoom.view.scale;
+            const scale = Math.max(current, 0.6);
+            const x = ((box.left + box.width / 2 - drawing.left) / current) * scale;
+            const y = ((box.top + box.height / 2 - drawing.top) / current) * scale;
+            zoom.setContent(size, { scale, x: left + Math.max(0, viewport.clientWidth - left - right) / 2 - x, y: viewport.clientHeight / 2 - y });
+        }
 
         // The SVG as a standalone file, on the background of the theme it was drawn with
         function exportSvg() {
@@ -315,7 +354,7 @@
                 try {
                     await draw(job);
                 } catch (err) {
-                    showMessage('The diagram could not be drawn.', errorText(err));
+                    showMessage(tr('diagram.drawError'), errorText(err));
                     report({ ok: false, error: `The diagram could not be drawn: ${errorText(err)}` });
                 }
             }
@@ -340,6 +379,8 @@
             hideMessage,
             exportSvg,
             exportPng,
+            select,
+            centerOn,
             zoom,
         };
     }

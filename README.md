@@ -1,4 +1,4 @@
-**v1.5.0**
+**v1.6.0**
 
 ## About DrawMeDatabase
 
@@ -8,7 +8,7 @@ Whether you're working on a complex project or managing a simple schema, DrawMeD
 
 With its seamless integration into VSCode, DrawMeDatabase empowers developers to focus more on building and less on deciphering. Best of all, it’s entirely free to use—download it today and bring your database to life through intuitive diagrams!
 
-![A migration typed on the left, the diagram on the right following it live: the new column is marked unsaved, then new once the file is saved](images/screenshots/live-diagram.gif)
+![A migration typed on the left, the diagram on the right following it live: the new column appears and its table is marked unsaved, then new once the file is saved](images/screenshots/live-diagram.gif)
 
 ## Features
 
@@ -28,14 +28,26 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 **Diagram viewer:**
 
 - Mermaid 12 entity-relationship diagram: columns with their type (`type?` when nullable), primary and foreign keys, one-to-many / one-to-one / many-to-many relations
-- In the colors of your VS Code theme (light, dark, high contrast or any other)
+- In the colors of your VS Code theme (light, dark, high contrast or any other), or light or dark whatever the VS Code theme
 - Zoom and pan: drag to move, Ctrl (Cmd on macOS) + mouse wheel or pinch to zoom, buttons to zoom in, zoom out, fit to window and show at 100 %
 - Two layouts: ELK (compact, right-angled links, the default) or Dagre (curved links), top to bottom or left to right
 - Export as SVG, PNG, Mermaid source (`.mmd`) or Markdown, or copy the Mermaid source
-- Click on a table to open its migration or entity at the right line
+- Click on a table to inspect it, in a panel of its own: its columns with their keys and types (a click opens the line of a column), the tables it references and the tables that reference it, its git status and the file it comes from. Double-click opens its migration or entity
+
+  ![The inspector of a table: its columns with their keys, types and git status, the tables that reference it, and what DrawMeDatabase Pro adds](images/screenshots/inspector.png)
+
 - Search: keep the tables whose name or columns contain a text, with the tables they are linked to
 - Live: the diagram follows what you type in a migration or an entity, before you save it
-- Git status: new, modified and unsaved tables and columns, in the colors of the git decorations of VS Code (Laravel and Symfony, when the project is a git repository)
+- Git status of the tables: new, modified, and changed in an editor but not saved yet, in the colors of the git decorations of VS Code (Laravel and Symfony, when the project is a git repository)
+
+**Options panel** (the panel button at the right of the toolbar): everything in one place, saved in your settings.
+
+- **Diagram**: layout, direction, git status, keys only (primary and foreign keys), relation names, background grid
+- **Appearance**: like VS Code, light or dark whatever the VS Code theme, and the size of the text. The palettes, your own colors and the fonts come with DrawMeDatabase Pro
+- **Language**: English or French, or the language of VS Code (the diagram, the messages, and the commands and settings of VS Code)
+- **Tools and exports** of DrawMeDatabase Pro, greyed with a PRO badge until it is installed, and the state of its license
+
+![The options panel: the options of the diagram and the theme; the git status of each column, the palettes, the colors, and the tools and exports of DrawMeDatabase Pro, greyed with a PRO badge](images/screenshots/options-panel.png)
 
 **JSON viewer:** the parsed schema, colored like code, to save or copy.
 
@@ -47,13 +59,22 @@ With its seamless integration into VSCode, DrawMeDatabase empowers developers to
 
 DrawMeDatabase is free, and everything it does today stays free. **DrawMeDatabase Pro** is a separate, paid extension that adds tools on top of it:
 
+- **Git status of every column**, live: the new, modified and unsaved columns in the diagram and in the inspector
+- **Inspector of the tables**: the columns in detail (sizes, defaults, enum values, comments), the indexes, the foreign keys with their `ON DELETE`, the history of the table (migrations, commits, authors, dates) and actions
+- **Your colors**: palettes in a light and a dark version, custom colors (background, headers, text, borders, links, highlight, git status) and fonts
+- **Schema time machine**: replay the history of the schema, migration after migration or commit after commit, with what each step added, changed or removed
 - **Schema canvas**: a second view where you move the tables and the links by hand, with the git status of every column; the layout is kept and can be shared with your team
 - **Table designer**: draw a table (columns, types, keys, relations) and get the Laravel migration or the Doctrine entity written for you
 - **Schema comparison**: what changed between two branches or commits, and what a migration does, with a report to paste in a pull request
+- **Database drift**: the code compared with a real MySQL, MariaDB, PostgreSQL or SQLite database — the migrations never run, the columns changed by hand, the indexes and foreign keys that differ (read only)
 - **Exports**: SQL (MySQL, PostgreSQL, SQLite), DBML, PlantUML, TypeScript types, and an HTML documentation of the schema
 - **Schema checks** in the Problems panel: missing primary or foreign keys, mismatched types, naming...
 - **Large schemas**: the path between two tables, saved views shared with your team
 - **Laravel**: Eloquent models with their relationships, generated from the schema
+
+![DrawMeDatabase Pro: the schema time machine replays the migrations one after the other](images/screenshots/pro-time-machine.gif)
+
+![DrawMeDatabase Pro: the git status of every column follows a migration as it is typed](images/screenshots/pro-live-columns.gif)
 
 ![The schema canvas of DrawMeDatabase Pro: tables and links dragged by hand, the git status of every column](images/screenshots/pro-canvas.gif)
 
@@ -81,7 +102,10 @@ In the panel:
 - `DrawMeDatabase.layout`: `elk` (default) or `dagre`
 - `DrawMeDatabase.direction`: `TB` (top to bottom, default) or `LR` (left to right)
 - `DrawMeDatabase.autoRefresh`: draw the open diagram again while you edit a migration or an entity, and when one is saved, created, deleted or committed (default: on)
-- `DrawMeDatabase.showGitStatus`: show the git status of the tables and columns in the diagram (default: on, also the **Git** button of the toolbar)
+- `DrawMeDatabase.showGitStatus`: show the git status of the tables in the diagram (default: on, also the **Git** button of the toolbar)
+- `DrawMeDatabase.keysOnly`, `DrawMeDatabase.relationLabels`: only the keys of each table, the names of the relations (also in the options panel)
+- `DrawMeDatabase.language`: `auto` (the language of VS Code), `en` or `fr`
+- `DrawMeDatabase.theme`, `DrawMeDatabase.palette`, `DrawMeDatabase.colors`, `DrawMeDatabase.font`, `DrawMeDatabase.customFont`, `DrawMeDatabase.fontSize`, `DrawMeDatabase.grid`: the appearance of the diagram, easier to change from the options panel
 
 Details and warnings (for example a table whose name cannot be read) are written in the **DrawMeDatabase** output panel.
 
@@ -120,5 +144,5 @@ GitHub Actions runs these checks on every pull request, the integration tests al
 
 ## Changelog
 
-Latest release : **v1.5.0**
+Latest release : **v1.6.0**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.

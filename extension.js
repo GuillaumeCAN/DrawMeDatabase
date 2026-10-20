@@ -11,6 +11,8 @@ const fs = require('fs');
 const { detectFramework } = require('./parsers/parser');
 const { ParserError } = require('./parsers/errors');
 const html = require('./views/html');
+const i18n = require('./views/i18n');
+const appearance = require('./views/appearance');
 
 const VIEW_TYPE = 'drawMeDatabase';
 
@@ -22,26 +24,71 @@ const PARSERS = {
 
 const FRAMEWORK_LABELS = { laravel: 'Laravel', symfony: 'Symfony' };
 
-// Settings the toolbar of the panel can change, with their allowed values (first = default)
+// Settings the page (toolbar and side panel) can change: their allowed values (first = default),
+// or their default and a function that returns the cleaned value (undefined when it is invalid)
 const SETTINGS = {
-    layout: ['elk', 'dagre'],
-    direction: ['TB', 'LR'],
-    showGitStatus: [true, false],
+    layout: { values: ['elk', 'dagre'] },
+    direction: { values: ['TB', 'LR'] },
+    showGitStatus: { values: [true, false] },
+    // The git status of each column: a feature of DrawMeDatabase Pro
+    showColumnGitStatus: { values: [true, false] },
+    keysOnly: { values: [false, true] },
+    relationLabels: { values: [true, false] },
+    autoRefresh: { values: [true, false] },
+    language: { values: ['auto', ...i18n.LANGUAGES] },
+    theme: { values: appearance.THEMES },
+    palette: { values: Object.keys(appearance.PALETTES) },
+    font: { values: appearance.FONTS },
+    grid: { values: [true, false] },
+    fontSize: { default: appearance.FONT_SIZE.default, clean: (value) => (Number.isFinite(value) ? appearance.sanitize({ fontSize: value }).fontSize : undefined) },
+    customFont: { default: '', clean: (value) => (typeof value === 'string' ? appearance.sanitize({ customFont: value }).customFont : undefined) },
+    colors: { default: {}, clean: (value) => appearance.sanitizeColors(value) },
 };
+const APPEARANCE_SETTINGS = ['theme', 'palette', 'colors', 'font', 'customFont', 'fontSize', 'grid'];
+
+// The cleaned value of a setting, or undefined when it is not allowed
+function settingValue(key, value) {
+    if (!Object.prototype.hasOwnProperty.call(SETTINGS, key)) {
+        return undefined;
+    }
+    const setting = SETTINGS[key];
+    if (setting.values) {
+        return setting.values.includes(value) ? value : undefined;
+    }
+    return setting.clean(value);
+}
+
+function readSetting(config, key) {
+    const setting = SETTINGS[key];
+    const value = settingValue(key, config.get(key));
+    return value === undefined ? (setting.values ? setting.values[0] : setting.default) : value;
+}
+
+// Texts of the messages, in the language of the DrawMeDatabase.language setting (views/i18n.js)
+function tr(key, params) {
+    const setting = vscode.workspace.getConfiguration('DrawMeDatabase').get('language', 'auto');
+    const language = i18n.resolveLanguage(setting, vscode.env && vscode.env.language);
+    return i18n.translator(language)(key, params);
+}
 
 // Files the panel can export
 const EXPORT_FORMATS = {
-    svg: { label: 'SVG image', binary: false },
-    png: { label: 'PNG image', binary: true },
-    mmd: { label: 'Mermaid diagram', binary: false },
-    md: { label: 'Markdown', binary: false },
-    json: { label: 'JSON', binary: false },
+    svg: { label: 'format.svg', binary: false },
+    png: { label: 'format.png', binary: true },
+    mmd: { label: 'format.mmd', binary: false },
+    md: { label: 'format.md', binary: false },
+    json: { label: 'format.json', binary: false },
 };
 const MAX_EXPORT_LENGTH = 200 * 1024 * 1024;
 
 // DrawMeDatabase Pro adds its exports and tools through the API below
 const PRO_EXTENSION_ID = 'GuillaumeCancalon.draw-me-database-pro';
-const API_VERSION = 1;
+const API_VERSION = 2;
+
+// Tools and exports of DrawMeDatabase Pro, shown greyed in the side panel until it adds them
+const PRO_TOOLS = ['pro.canvas', 'pro.timeline', 'pro.designer', 'pro.addColumns', 'pro.compare', 'pro.compareRefs', 'pro.drift', 'pro.migrationChanges', 'pro.checks', 'pro.findPath', 'pro.saveView', 'pro.openView', 'pro.models'];
+const PRO_EXPORTS = ['pro.sql-mysql', 'pro.sql-postgresql', 'pro.sql-sqlite', 'pro.dbml', 'pro.plantuml', 'pro.typescript', 'pro.html'];
+const LICENSE_KINDS = ['licensed', 'trial', 'expired', 'development'];
 
 // A minimal vscode.Event: event(listener, thisArgs, disposables) → Disposable
 function createEmitter() {
@@ -78,7 +125,7 @@ function activate(context) {
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
     statusBarItem.text = "$(database) DrawMeDatabase";
     statusBarItem.command = 'DMDB.parseSchema';
-    statusBarItem.tooltip = 'Draw the database schema';
+    statusBarItem.tooltip = tr('statusBar.tooltip');
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
 
@@ -92,6 +139,95 @@ function activate(context) {
     const schemaChanged = createEmitter();
     context.subscriptions.push(schemaChanged);
     const exporters = new Map();
+    // Tools of other extensions in the side panel (id → { id, label, hint, icon, command, args,
+    // pro, locked }), and the license of DrawMeDatabase Pro ({ kind, daysLeft, commands } or null)
+    const tools = new Map();
+    let license = null;
+    // What other extensions show in the inspector of a table (id → provide(table, schema)), and
+    // the commands of the actions they posted to the page (action id → { command, args })
+    const tableProviders = new Map();
+    let tableActions = new Map();
+    // API: the appearance and the language of the pages, for the panels of other extensions
+    const displayChanged = createEmitter();
+    context.subscriptions.push(displayChanged);
+    const displaySettings = () => {
+        const config = vscode.workspace.getConfiguration('DrawMeDatabase');
+        const settings = {};
+        for (const key of APPEARANCE_SETTINGS) {
+            settings[key] = readSetting(config, key);
+        }
+        settings.language = i18n.resolveLanguage(readSetting(config, 'language'), vscode.env && vscode.env.language);
+        return settings;
+    };
+    const openPro = () => Promise.resolve(vscode.commands.executeCommand('extension.open', PRO_EXTENSION_ID))
+        .catch(err => reportUnexpectedError(output, err));
+
+    // What the side panel lists: the tools and exports of the extensions (the ones of DrawMeDatabase
+    // Pro greyed while it does not add them, locked when its trial has ended) and the license
+    const features = () => {
+        const expired = Boolean(license && license.kind === 'expired');
+        const state = (item) => (!item ? 'missing' : item.locked || (item.pro && expired) ? 'locked' : 'available');
+        const describe = (id, item) => ({
+            id,
+            label: item ? item.label : '',
+            hint: item && item.hint ? item.hint : '',
+            icon: item && item.icon ? item.icon : undefined,
+            pro: item ? item.pro : true,
+            state: state(item),
+        });
+        const others = (registry, catalog) => [...registry.values()].filter(item => !catalog.includes(item.id));
+        const commands = license && license.commands ? license.commands : {};
+        let actions = ['discover'];
+        if (license) {
+            actions = (license.kind === 'licensed' ? ['manage'] : license.kind === 'development' ? [] : ['buy', 'enter']).filter(action => commands[action]);
+        }
+        return {
+            tools: [...PRO_TOOLS.map(id => describe(id, tools.get(id))), ...others(tools, PRO_TOOLS).map(tool => describe(tool.id, tool))],
+            exports: [...PRO_EXPORTS.map(id => describe(id, exporters.get(id))), ...others(exporters, PRO_EXPORTS).map(exporter => describe(exporter.id, exporter))],
+            license: license ? { kind: license.kind, daysLeft: license.daysLeft, actions } : { kind: 'free', actions },
+        };
+    };
+    const runTool = (id) => {
+        const tool = tools.get(id);
+        if (tool) {
+            Promise.resolve(vscode.commands.executeCommand(tool.command, ...tool.args)).catch(err => reportUnexpectedError(output, err));
+        } else if (PRO_TOOLS.includes(id)) {
+            openPro();
+        }
+    };
+    // The sections of the inspector of a table, from the providers (each one at most 10 s), or
+    // the Pro teaser when none is registered
+    const tableInfo = async (name) => {
+        if (tableProviders.size === 0) {
+            return { sections: [], teaser: true };
+        }
+        const schema = publicSchema();
+        const timeout = () => new Promise(resolve => setTimeout(() => resolve([]), 10000));
+        const results = await Promise.all([...tableProviders.values()].map(provide => Promise.race([
+            Promise.resolve().then(() => provide(name, schema)).catch(err => {
+                output.appendLine(`Table info: ${err && err.message ? err.message : err}`);
+                return [];
+            }),
+            timeout(),
+        ])));
+        tableActions = new Map();
+        const sections = results.flat().map(section => cleanSection(section, tableActions)).filter(Boolean);
+        return { sections, teaser: false };
+    };
+    const runTableAction = (id) => {
+        const action = tableActions.get(id);
+        if (action) {
+            Promise.resolve(vscode.commands.executeCommand(action.command, ...action.args)).catch(err => reportUnexpectedError(output, err));
+        }
+    };
+    const runLicenseAction = (action) => {
+        const command = license && license.commands ? license.commands[action] : undefined;
+        if (command) {
+            Promise.resolve(vscode.commands.executeCommand(command)).catch(err => reportUnexpectedError(output, err));
+        } else if (action === 'discover') {
+            openPro();
+        }
+    };
 
     // Parses the schema of the folder and shows it: returns the parsed tables. auto: refresh
     // after a change of the code, without messages and without closing the panel on an error
@@ -111,14 +247,12 @@ function activate(context) {
                 git: vscode.workspace.getConfiguration('DrawMeDatabase').get('showGitStatus', true) !== false,
             });
         } else if (!auto) {
-            vscode.window.showErrorMessage("No project opened in the current workspace. Unable to draw the schema.");
+            vscode.window.showErrorMessage(tr('message.noProject'));
         }
 
         if (!schema || schema.tables.length === 0) {
             if (auto) {
-                viewer.toast(schema
-                    ? 'No tables found: the diagram shows the previous schema.'
-                    : 'The schema could not be read (see the DrawMeDatabase output): the diagram shows the previous schema.');
+                viewer.toast(tr(schema ? 'message.previousNoTables' : 'message.previousError'));
                 return schema ? schema.tables : undefined;
             }
             // Nothing to draw: close the panel rather than leave the previous schema on screen
@@ -147,9 +281,11 @@ function activate(context) {
     };
 
     // Opens the file a table comes from (migration or entity), beside the diagram
-    const openTable = (name) => {
+    // Opens the file of a table, or the line of one of its columns (column: its name)
+    const openTable = (name, columnName) => {
         const table = current && typeof name === 'string' ? current.tables.find(candidate => candidate.table === name) : undefined;
-        const source = table && table.source;
+        const column = table && typeof columnName === 'string' ? (table.columns || []).find(candidate => candidate.name === columnName) : undefined;
+        const source = columnName === undefined ? table && table.source : column && column.source;
         if (!source || typeof source.file !== 'string') {
             return;
         }
@@ -166,7 +302,7 @@ function activate(context) {
             selection: new vscode.Range(line, 0, line, 0),
         })).catch(err => {
             output.appendLine(`Unable to open ${file}: ${err && err.message ? err.message : err}`);
-            vscode.window.showErrorMessage(`Unable to open ${source.file}.`);
+            vscode.window.showErrorMessage(tr('message.openFailed', { file: source.file }));
         });
     };
 
@@ -225,6 +361,13 @@ function activate(context) {
         openTable,
         onClose: () => watcher.stop(),
         exporters: () => [...exporters.values()],
+        features,
+        runTool,
+        runLicenseAction,
+        tableInfo,
+        runTableAction,
+        // Its trial or license is on
+        proUnlocked: () => Boolean(license && license.kind !== 'expired'),
         schemaFor: (names) => {
             const schema = publicSchema();
             if (schema && Array.isArray(names)) {
@@ -250,13 +393,19 @@ function activate(context) {
                 if (folder) {
                     draw(folder);
                 } else {
-                    viewer.empty('Run DrawMeDatabase (or click Refresh) to draw the schema of the project.');
+                    viewer.empty(tr('message.restore'));
                 }
             },
         }),
         vscode.workspace.onDidChangeConfiguration(event => {
             if (Object.keys(SETTINGS).some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
                 viewer.settingsChanged();
+            }
+            if (event.affectsConfiguration('DrawMeDatabase.showColumnGitStatus')) {
+                viewer.schemaDisplayChanged();
+            }
+            if ([...APPEARANCE_SETTINGS, 'language'].some(key => event.affectsConfiguration(`DrawMeDatabase.${key}`))) {
+                displayChanged.fire(displaySettings());
             }
             if (!current || !viewer.isOpen()) {
                 return;
@@ -309,6 +458,8 @@ function activate(context) {
                 label: String(exporter.label || exporter.id),
                 extension: String(exporter.extension || 'txt').replace(/[^A-Za-z0-9]/g, '') || 'txt',
                 export: exporter.export,
+                // A feature of DrawMeDatabase Pro: locked in the side panel once its trial has ended
+                pro: exporter.pro === true || PRO_EXPORTS.includes(exporter.id),
             });
             viewer.exportersChanged();
             return {
@@ -318,6 +469,81 @@ function activate(context) {
                 },
             };
         },
+        // A tool in the side panel: { id, label, command, args, hint, icon, pro }. Returns
+        // { update({ label, hint, locked }), dispose() }
+        registerTool(tool) {
+            if (!tool || typeof tool.id !== 'string' || typeof tool.command !== 'string') {
+                throw new TypeError('A tool needs an id and a command');
+            }
+            const text = (value) => (typeof value === 'string' ? value.slice(0, 200) : '');
+            const entry = {
+                id: tool.id,
+                label: text(tool.label) || tool.id,
+                hint: text(tool.hint),
+                icon: typeof tool.icon === 'string' ? tool.icon : undefined,
+                command: tool.command,
+                args: Array.isArray(tool.args) ? tool.args.filter(arg => ['string', 'number', 'boolean'].includes(typeof arg)) : [],
+                pro: tool.pro === true,
+                locked: tool.locked === true,
+            };
+            tools.set(entry.id, entry);
+            viewer.featuresChanged();
+            return {
+                update(changes) {
+                    if (changes && typeof changes === 'object') {
+                        if (typeof changes.label === 'string') {
+                            entry.label = text(changes.label) || entry.id;
+                        }
+                        if (typeof changes.hint === 'string') {
+                            entry.hint = text(changes.hint);
+                        }
+                        if (typeof changes.locked === 'boolean') {
+                            entry.locked = changes.locked;
+                        }
+                        viewer.featuresChanged();
+                    }
+                },
+                dispose() {
+                    if (tools.get(entry.id) === entry) {
+                        tools.delete(entry.id);
+                        viewer.featuresChanged();
+                    }
+                },
+            };
+        },
+        // Sections of the inspector of a table: provide(table, schema) returns (or resolves to) a list of
+        // { title, items: [{ label, value, hint, tone, badge }], actions: [{ label, command, args }],
+        // note, locked }. Returns a Disposable
+        registerTableInfoProvider(provider) {
+            if (!provider || typeof provider.id !== 'string' || typeof provider.provide !== 'function') {
+                throw new TypeError('A table info provider needs an id and a provide(table, schema) function');
+            }
+            tableProviders.set(provider.id, provider.provide);
+            return {
+                dispose() {
+                    if (tableProviders.get(provider.id) === provider.provide) {
+                        tableProviders.delete(provider.id);
+                    }
+                },
+            };
+        },
+        // The license of DrawMeDatabase Pro, shown at the bottom of the side panel:
+        // { kind: 'licensed' | 'trial' | 'expired' | 'development', daysLeft, commands: { buy, enter, manage } },
+        // or null (not installed)
+        setLicenseStatus(status) {
+            if (status && LICENSE_KINDS.includes(status.kind)) {
+                const commands = {};
+                for (const action of ['buy', 'enter', 'manage']) {
+                    if (status.commands && typeof status.commands[action] === 'string') {
+                        commands[action] = status.commands[action];
+                    }
+                }
+                license = { kind: status.kind, daysLeft: Number.isFinite(status.daysLeft) ? Math.max(0, Math.round(status.daysLeft)) : undefined, commands };
+            } else {
+                license = null;
+            }
+            viewer.licenseChanged();
+        },
         // Shows these tables only (with the relations between them), the highlighted ones standing
         // out, and a label to go back to the whole schema: { tables, highlight, label }
         focusTables(focus) {
@@ -325,6 +551,11 @@ function activate(context) {
         },
         // The diagram on screen as an SVG file (text), or null when none is drawn
         getDiagramSvg: () => viewer.requestSvg(),
+        // The appearance of the pages and their language (version 2): { theme, palette, colors, font,
+        // customFont, fontSize, grid, language ('en', 'fr') }, for DrawMeDatabaseAppearance.apply() and
+        // DrawMeDatabaseI18n.translator() in other panels; the event fires when they change
+        getDisplaySettings: displaySettings,
+        onDidChangeDisplaySettings: displayChanged.event,
     };
 }
 
@@ -339,10 +570,10 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
     const basePath = resolveBasePath(folder.uri.fsPath, frameworkPath);
     if (!fs.existsSync(basePath)) {
         // Name the setting as the user wrote it: an absolute path was looked for in both places
-        const elsewhere = path.isAbsolute(frameworkPath) ? ', nor as an absolute path' : '';
+        const elsewhere = path.isAbsolute(frameworkPath) ? tr('message.frameworkPathElsewhere') : '';
         showError(frameworkPath
-            ? `The DrawMeDatabase.frameworkPath folder "${frameworkPath}" was not found in "${folder.uri.fsPath}"${elsewhere}. Check the setting.`
-            : `The folder "${basePath}" does not exist. Unable to draw the schema.`);
+            ? tr('message.frameworkPathMissing', { path: frameworkPath, folder: folder.uri.fsPath, elsewhere })
+            : tr('message.folderMissing', { path: basePath }));
         return undefined;
     }
 
@@ -353,15 +584,14 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         framework = detectFramework(basePath);
         output.appendLine(`Framework: ${framework} (${basePath})`);
         if (!Object.prototype.hasOwnProperty.call(PARSERS, framework)) {
-            const hint = frameworkPath
-                ? 'Check the DrawMeDatabase.frameworkPath setting.'
-                : 'If the project is in a subfolder, set DrawMeDatabase.frameworkPath.';
-            showError(`No Laravel or Symfony project found in "${basePath}". ${hint} Unable to draw the schema.`);
+            const hint = tr(frameworkPath ? 'message.noFramework.checkSetting' : 'message.noFramework.setSetting');
+            showError(tr('message.noFramework', { path: basePath, hint }));
             return undefined;
         }
 
         // Parsing
-        result = PARSERS[framework]().parse(basePath, { overrides, gitCache, git });
+        // columnSources: the line of each column, opened from the inspector of the page
+        result = PARSERS[framework]().parse(basePath, { overrides, gitCache, git, columnSources: true });
     } catch (err) {
         if (err instanceof ParserError) {
             output.appendLine(`Error: ${err.message}`);
@@ -385,7 +615,7 @@ function readSchema(folder, output, { notify = true, overrides = null, gitCache 
         reportWarnings(output, warnings.length);
     }
     if (tables.length === 0) {
-        tell(vscode.window.showInformationMessage, `No tables found in "${basePath}". Nothing to draw.`);
+        tell(vscode.window.showInformationMessage, tr('message.noTables', { path: basePath }));
     }
     return { tables, warnings: warnings.length, framework, basePath };
 }
@@ -422,10 +652,7 @@ function resolveBasePath(folderPath, frameworkPath) {
 // One generic message for the user, the details in the output channel
 function reportUnexpectedError(output, err) {
     output.appendLine(`Unexpected error: ${err && err.stack ? err.stack : err}`);
-    vscode.window.showErrorMessage(
-        'An unexpected error occurred while drawing the schema. See the "DrawMeDatabase" output for details.',
-        'Show Output'
-    ).then(choice => {
+    vscode.window.showErrorMessage(tr('message.unexpected'), tr('message.showOutput')).then(choice => {
         if (choice) {
             output.show();
         }
@@ -434,10 +661,7 @@ function reportUnexpectedError(output, err) {
 
 // One non-blocking message per run, the warnings themselves are in the output channel
 function reportWarnings(output, count) {
-    vscode.window.showWarningMessage(
-        `${count} warning(s) while reading the schema. See the "DrawMeDatabase" output for details.`,
-        'Show Output'
-    ).then(choice => {
+    vscode.window.showWarningMessage(tr('message.warnings', { count }), tr('message.showOutput')).then(choice => {
         if (choice) {
             output.show();
         }
@@ -540,9 +764,36 @@ function watchGitRepositories(onChange) {
     };
 }
 
+// A section of the inspector from another extension, kept to the known fields and sizes; its
+// actions are stored in `actions` (id → { command, args }) and posted with their id only
+const SECTION_TONES = ['added', 'modified', 'removed', 'muted', 'accent'];
+function cleanSection(section, actions) {
+    if (!section || typeof section !== 'object' || typeof section.title !== 'string' || !section.title.trim()) {
+        return null;
+    }
+    const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : undefined);
+    const items = (Array.isArray(section.items) ? section.items : []).slice(0, 200)
+        .filter(item => item && typeof item.label === 'string')
+        .map(item => ({
+            label: text(item.label, 200),
+            value: text(item.value, 200),
+            hint: text(item.hint, 300),
+            badge: text(item.badge, 40),
+            tone: SECTION_TONES.includes(item.tone) ? item.tone : undefined,
+        }));
+    const sectionActions = (Array.isArray(section.actions) ? section.actions : []).slice(0, 8)
+        .filter(action => action && typeof action.label === 'string' && typeof action.command === 'string')
+        .map(action => {
+            const id = `action-${actions.size + 1}`;
+            actions.set(id, { command: action.command, args: Array.isArray(action.args) ? action.args.filter(arg => ['string', 'number', 'boolean'].includes(typeof arg)) : [] });
+            return { id, label: text(action.label, 80) };
+        });
+    return { title: text(section.title, 80), items, actions: sectionActions, note: text(section.note, 500), locked: section.locked === true };
+}
+
 // A single webview panel. The page is loaded once: the schema and the settings are posted to it
 // (again when it reloads, after being restored), and it asks for refreshes and exports.
-function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor }) {
+function createViewer(context, output, { refresh, exportFolder, openTable, onClose, exporters, schemaFor, features, runTool, runLicenseAction, tableInfo, runTableAction, proUnlocked }) {
     let panel;
     let ready = false;
     // What the page shows: the last schema, or a message when there is none
@@ -581,12 +832,41 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
     const settingsMessage = () => {
         const config = vscode.workspace.getConfiguration('DrawMeDatabase');
         const message = { type: 'settings' };
-        for (const [key, values] of Object.entries(SETTINGS)) {
-            const value = config.get(key, values[0]);
-            message[key] = values.includes(value) ? value : values[0];
+        for (const key of Object.keys(SETTINGS)) {
+            message[key] = readSetting(config, key);
         }
+        message.languageResolved = i18n.resolveLanguage(message.language, vscode.env && vscode.env.language);
+        // The features of DrawMeDatabase Pro (git status of the columns, palettes, colors, fonts)
+        message.pro = proUnlocked();
         return message;
     };
+
+    // The schema as the page gets it: without the git status of the columns unless DrawMeDatabase
+    // Pro is there and the setting shows it (the tables keep theirs)
+    const pageSchema = () => {
+        const showColumns = proUnlocked() && vscode.workspace.getConfiguration('DrawMeDatabase').get('showColumnGitStatus', true) !== false;
+        if (!schema || showColumns) {
+            return schema;
+        }
+        return {
+            ...schema,
+            tables: schema.tables.map(table => ({
+                ...table,
+                columns: (table.columns || []).map(column => {
+                    if (!column || column.git === undefined) {
+                        return column;
+                    }
+                    const copy = { ...column };
+                    delete copy.git;
+                    return copy;
+                }),
+            })),
+        };
+    };
+
+    const updateSetting = (key, value) => Promise.resolve(vscode.workspace.getConfiguration('DrawMeDatabase')
+        .update(key, value, vscode.ConfigurationTarget.Global))
+        .catch(err => reportUnexpectedError(output, err));
 
     const toast = (text) => post({ type: 'toast', text });
 
@@ -599,8 +879,9 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 ready = true;
                 post(settingsMessage());
                 post(exportersMessage());
+                post({ type: 'features', ...features() });
                 if (schema) {
-                    post(schema);
+                    post(pageSchema());
                 } else if (emptyText) {
                     post({ type: 'empty', text: emptyText });
                 }
@@ -640,20 +921,39 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                     }
                 }, 20);
                 break;
-            case 'setting':
-                if (Object.prototype.hasOwnProperty.call(SETTINGS, message.key) && SETTINGS[message.key].includes(message.value)) {
-                    Promise.resolve(vscode.workspace.getConfiguration('DrawMeDatabase')
-                        .update(message.key, message.value, vscode.ConfigurationTarget.Global))
-                        .catch(err => reportUnexpectedError(output, err));
+            case 'setting': {
+                const value = typeof message.key === 'string' ? settingValue(message.key, message.value) : undefined;
+                if (value !== undefined) {
+                    updateSetting(message.key, value);
                 }
                 break;
+            }
+            case 'resetAppearance':
+                APPEARANCE_SETTINGS.forEach(key => updateSetting(key, undefined));
+                break;
+            case 'tool':
+                if (typeof message.id === 'string') {
+                    runTool(message.id);
+                }
+                break;
+            case 'license':
+                if (typeof message.action === 'string') {
+                    runLicenseAction(message.action);
+                }
+                break;
+            case 'openSettings': {
+                const query = message.target === 'frameworkPath' ? 'DrawMeDatabase.frameworkPath' : '@ext:GuillaumeCancalon.draw-me-database';
+                Promise.resolve(vscode.commands.executeCommand('workbench.action.openSettings', query))
+                    .catch(err => reportUnexpectedError(output, err));
+                break;
+            }
             case 'save':
                 saveExport(message).catch(err => reportUnexpectedError(output, err));
                 break;
             case 'copy':
                 if (typeof message.content === 'string' && message.content.length <= MAX_EXPORT_LENGTH) {
                     Promise.resolve(vscode.env.clipboard.writeText(message.content))
-                        .then(() => toast(message.format === 'json' ? 'JSON copied to the clipboard.' : 'Mermaid source copied to the clipboard.'))
+                        .then(() => toast(tr(message.format === 'json' ? 'message.copiedJson' : 'message.copiedMermaid')))
                         .catch(err => reportUnexpectedError(output, err));
                 }
                 break;
@@ -662,6 +962,23 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                 break;
             case 'open':
                 openTable(message.table);
+                break;
+            case 'openColumn':
+                if (typeof message.column === 'string') {
+                    openTable(message.table, message.column);
+                }
+                break;
+            case 'tableInfo':
+                if (typeof message.table === 'string') {
+                    tableInfo(message.table)
+                        .then(info => post({ type: 'tableInfo', table: message.table, request: message.request, ...info }))
+                        .catch(err => reportUnexpectedError(output, err));
+                }
+                break;
+            case 'tableAction':
+                if (typeof message.id === 'string') {
+                    runTableAction(message.id);
+                }
                 break;
             case 'rendered':
                 lastRender = {
@@ -697,7 +1014,7 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
         if (!format || typeof message.content !== 'string' || message.content.length > MAX_EXPORT_LENGTH) {
             return;
         }
-        await saveFile(message.content, { extension: message.format, label: format.label, binary: format.binary }, message.fileName);
+        await saveFile(message.content, { extension: message.format, label: tr(format.label), binary: format.binary }, message.fileName);
     }
 
     async function saveFile(content, { extension, label, binary }, suggestedName) {
@@ -707,15 +1024,16 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
         const uri = await vscode.window.showSaveDialog({
             defaultUri: folder ? vscode.Uri.joinPath(folder.uri, fileName) : undefined,
             filters: { [label]: [extension] },
-            saveLabel: 'Export',
-            title: 'Export the database diagram',
+            saveLabel: tr('save.label'),
+            title: tr('save.title'),
         });
         if (!uri) {
             return;
         }
         await vscode.workspace.fs.writeFile(uri, Buffer.from(content, binary ? 'base64' : 'utf8'));
-        const choice = await vscode.window.showInformationMessage(`Exported to ${path.basename(uri.fsPath)}.`, 'Open');
-        if (choice === 'Open') {
+        const open = tr('message.open');
+        const choice = await vscode.window.showInformationMessage(tr('message.exported', { file: path.basename(uri.fsPath) }), open);
+        if (choice === open) {
             await vscode.commands.executeCommand('vscode.open', uri);
         }
     }
@@ -765,7 +1083,7 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
                     panel.reveal();
                 }
                 if (!same || reveal) {
-                    post(schema);
+                    post(pageSchema());
                 }
                 return;
             }
@@ -790,6 +1108,20 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
         settingsChanged() {
             post(settingsMessage());
         },
+        // DrawMeDatabase Pro was activated, or its trial ended: its features follow
+        licenseChanged() {
+            post(settingsMessage());
+            post({ type: 'features', ...features() });
+            if (schema) {
+                post(pageSchema());
+            }
+        },
+        // The git status of the columns was shown or hidden
+        schemaDisplayChanged() {
+            if (schema) {
+                post(pageSchema());
+            }
+        },
         toast,
         isOpen: () => Boolean(panel),
         get lastRender() {
@@ -797,6 +1129,10 @@ function createViewer(context, output, { refresh, exportFolder, openTable, onClo
         },
         exportersChanged() {
             post(exportersMessage());
+            post({ type: 'features', ...features() });
+        },
+        featuresChanged() {
+            post({ type: 'features', ...features() });
         },
         focus(focus) {
             const message = focusMessage(focus);

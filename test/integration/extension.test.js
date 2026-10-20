@@ -18,9 +18,11 @@ const EXTENSION_ID = 'GuillaumeCancalon.draw-me-database';
 const findTable = (tables, name) => tables.find(table => table.table === name);
 
 // A column without its git status (it depends on the state of the repository the test runs in)
+// and its source line (checked on its own)
 const withoutGit = (column) => {
     const copy = { ...column };
     delete copy.git;
+    delete copy.source;
     return copy;
 };
 const GIT_STATUSES = ['committed', 'modified', 'untracked'];
@@ -78,6 +80,9 @@ suite('DrawMeDatabase extension', () => {
         const users = findTable(tables, 'users');
         assert.deepEqual(withoutGit(users.columns.find(column => column.name === 'id')),
             { name: 'id', type: 'bigIncrements', primary: true });
+        // The line of each column, for the inspector of the page
+        assert.deepEqual(users.columns.find(column => column.name === 'id').source,
+            { file: 'database/migrations/2024_01_01_000000_create_users_table.php', line: 12 });
         // The fixture is in this repository: every table and column has a git status
         assert.ok(GIT_STATUSES.includes(users.git), users.git);
         assert.ok(users.columns.every(column => GIT_STATUSES.includes(column.git)));
@@ -104,6 +109,31 @@ suite('DrawMeDatabase extension', () => {
         await vscode.workspace.getConfiguration('DrawMeDatabase').update('layout', 'dagre', vscode.ConfigurationTarget.Global);
         const dagre = await rendered(extension, render => render.layout === 'dagre');
         assert.ok(dagre && dagre.ok, `Dagre drawing: ${JSON.stringify(dagre)}`);
+    });
+
+    test('the options of the side panel redraw the diagram: language, theme, palette, font, keys only', async function () {
+        this.timeout(60000);
+        const extension = vscode.extensions.getExtension(EXTENSION_ID);
+        const config = vscode.workspace.getConfiguration('DrawMeDatabase');
+        const keys = ['language', 'theme', 'palette', 'colors', 'fontSize', 'keysOnly', 'relationLabels'];
+        try {
+            const before = extension.exports.lastRender;
+            await config.update('language', 'fr', vscode.ConfigurationTarget.Global);
+            await config.update('theme', 'light', vscode.ConfigurationTarget.Global);
+            await config.update('palette', 'forest', vscode.ConfigurationTarget.Global);
+            await config.update('colors', { accent: '#ff0000' }, vscode.ConfigurationTarget.Global);
+            await config.update('fontSize', 16, vscode.ConfigurationTarget.Global);
+            await config.update('keysOnly', true, vscode.ConfigurationTarget.Global);
+            await config.update('relationLabels', false, vscode.ConfigurationTarget.Global);
+            assert.equal(extension.exports.getDisplaySettings().language, 'fr');
+            assert.equal(extension.exports.getDisplaySettings().palette, 'forest');
+            const redrawn = await rendered(extension, render => render !== before && render.ok);
+            assert.ok(redrawn && redrawn.ok && redrawn.entities >= 2, JSON.stringify(redrawn));
+        } finally {
+            for (const key of keys) {
+                await config.update(key, undefined, vscode.ConfigurationTarget.Global);
+            }
+        }
     });
 
     test('running the command again reuses the same panel', async () => {

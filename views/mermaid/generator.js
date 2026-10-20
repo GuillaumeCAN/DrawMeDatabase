@@ -24,7 +24,8 @@
     const GIT_CLASSES = { untracked: 'gitNew', modified: 'gitModified', unsaved: 'gitUnsaved' };
     const GIT_LABELS = { untracked: 'new', modified: 'modified', unsaved: 'unsaved' };
     const DOT = String.fromCharCode(0x25cf);
-    const gitLabel = (status) => `${DOT} ${GIT_LABELS[status]}`;
+    // labels: the words of another language ({ untracked, modified, unsaved }), English by default
+    const gitLabel = (status, labels) => `${DOT} ${quotableText(labels && typeof labels[status] === 'string' && labels[status] ? labels[status] : GIT_LABELS[status])}`;
     const gitStatus = (value) => (Object.prototype.hasOwnProperty.call(GIT_LABELS, value) ? value : null);
     // A mark is a CSS class name of the node: a plain word, so it cannot break the source
     const markClass = (value) => (typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,40}$/.test(value) ? value : null);
@@ -46,18 +47,23 @@
     const asText = (value) => (value === undefined || value === null ? '' : String(value));
     const asArray = (value) => (Array.isArray(value) ? value : []);
 
-    // Text allowed between double quotes (entity and relationship labels): no quote, '%',
-    // backslash or control char. '#' and ':' are written as Mermaid entity codes, which Mermaid
-    // turns back into the character when it draws: otherwise it reads '#word;' as an entity code
-    // ('#1;' would become U+0001) and drops the ';' of 'style...:#...;'. A line holding
-    // "direction LR" is read as a direction statement wherever it is, hence the '_'.
+    // Text allowed between double quotes (entity and relationship labels, attribute comments): no
+    // quote, '%', backslash or control char. Mermaid reads '#word;' as an entity code ('#1;' would
+    // become U+0001) and drops the ';' of 'style...:#...;', but its entity codes ('#58;') are drawn
+    // as is in SVG text labels (htmlLabels off: 'type&#58; text'). So '#' becomes the fullwidth
+    // '\uff03' (U+FF03, '#' once NFKC-normalized) and ':', harmless without '#', stays as it is. A line
+    // holding "direction LR" is read as a direction statement wherever it is, hence the '_'. Two '~' are
+    // read as a generic type (List~T~): in an attribute comment ('~ default: a~b') the lexer takes
+    // the quoted text for a type word and rejects the diagram, and labels draw '~x~' as '<x>'.
+    // One '~' is harmless, so only the following ones become '\u223c' (U+223C, tilde operator).
     function quotableText(value) {
         return asText(value)
             .replace(/"/g, '')
             .replace(/[%\\\u0000-\u001f\u007f\u2028\u2029]/g, '_')
             .trim()
             .replace(/(direction)\s+(TB|BT|RL|LR)/gi, '$1_$2')
-            .replace(/[#:]/g, char => `#${char.charCodeAt(0)};`);
+            .replace(/(?<=~.*)~/g, '\u223c')
+            .replace(/#/g, '\uff03');
     }
 
     // One attribute word, never a key word (PK, FK, UK: also when followed by '-', '.', 'é'...)
@@ -177,12 +183,16 @@
                 .filter(relation => relationType(relation) !== 'many-to-many')
                 .map(relation => asText(relation.foreignKey)));
 
-            if (entry.columns.length === 0) {
+            // keysOnly: the primary and foreign keys only
+            const columns = settings.keysOnly
+                ? entry.columns.filter(column => column.primary || foreignKeys.has(asText(column.name)))
+                : entry.columns;
+            if (columns.length === 0) {
                 lines.push(`  ${entity(entry.name)}`);
                 return;
             }
             lines.push(`  ${entity(entry.name)} {`);
-            entry.columns.forEach(column => {
+            columns.forEach(column => {
                 const keys = [];
                 if (column.primary) {
                     keys.push('PK');
@@ -193,7 +203,7 @@
                 const attribute = `${typeWord(column.type, column.nullable === true)} ${attributeWord(column.name, 'unnamed')}`;
                 const status = settings.git ? gitStatus(column.git) : null;
                 const note = settings.marks && typeof column.note === 'string' ? quotableText(column.note) : '';
-                const comment = note ? ` "${note}"` : status ? ` "${gitLabel(status)}"` : '';
+                const comment = note ? ` "${note}"` : status ? ` "${gitLabel(status, settings.gitLabels)}"` : '';
                 lines.push(`    ${keys.length ? `${attribute} ${keys.join(', ')}` : attribute}${comment}`);
             });
             lines.push('  }');
@@ -211,7 +221,8 @@
                 const type = relationType(relation);
                 const table = entityId(entry.name);
                 const target = entityId(relation.on);
-                const label = quotableText(type === 'many-to-many' ? relation.via || relation.foreignKey : relation.foreignKey);
+                // relationLabels: false draws the links without the name of their foreign key
+                const label = settings.relationLabels === false ? '' : quotableText(type === 'many-to-many' ? relation.via || relation.foreignKey : relation.foreignKey);
                 edges.add(type === 'many-to-many'
                     ? `  ${table} ${EDGES[type]} ${target} : "${label}"`
                     : `  ${target} ${EDGES[type]} ${table} : "${label}"`);

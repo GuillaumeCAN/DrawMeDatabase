@@ -128,11 +128,6 @@
                 return;
             }
             drag = { id: event.pointerId, startX: event.clientX, startY: event.clientY, x: view.x, y: view.y, moved: false };
-            try {
-                viewport.setPointerCapture(event.pointerId);
-            } catch {
-                // No active pointer (synthetic event): the drag still works inside the viewport
-            }
         });
         viewport.addEventListener('pointermove', event => {
             if (!drag || drag.id !== event.pointerId) {
@@ -142,6 +137,15 @@
             const dy = event.clientY - drag.startY;
             if (!drag.moved && Math.hypot(dx, dy) < 4) {
                 return;
+            }
+            // Captured once it is a drag, not on pointerdown: a captured pointer sends the click to
+            // the viewport, and a click on a table would not reach the table
+            if (!drag.moved) {
+                try {
+                    viewport.setPointerCapture(event.pointerId);
+                } catch {
+                    // No active pointer (synthetic event): the drag still works inside the viewport
+                }
             }
             drag.moved = true;
             viewport.classList.add('dragging');

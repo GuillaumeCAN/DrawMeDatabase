@@ -153,3 +153,18 @@ A new diagram viewer: Mermaid 12, zoom and pan, export, and the colors of your V
 ### Changed
 - New animation in the README: the live diagram and its git status
 
+## [v1.6.0] - 2026-10-18
+
+### Added
+- An options panel next to the diagram (the panel button of the toolbar): the options of the diagram, the appearance, the tools and exports of DrawMeDatabase Pro (greyed with a PRO badge until it is installed, locked when its trial has ended), the settings and the license
+- Appearance: light or dark whatever the VS Code theme, seven palettes with a light and a dark version, custom colors (background, table headers, text, borders, links, highlight, git status), the font and the size of the text, the background grid
+- Diagram options: keys only, relation names
+- What DrawMeDatabase Pro adds to the diagram, shown with a PRO badge in the free version: the git status of each column (setting `DrawMeDatabase.showColumnGitStatus`), the palettes, the custom colors and the fonts. The git status of the tables, the theme (auto, light, dark) and the text size stay free
+- The schema time machine and the comparison with a database of DrawMeDatabase Pro in the tools of the options panel
+- An inspector of the tables, in its own panel on the left: a click on a table shows its columns (keys, types, nullable, git status, and the line of each column), the tables it references and the ones that reference it, with buttons to open its file and to show its neighbours; a double-click (or Ctrl+click) opens its file. DrawMeDatabase Pro adds its indexes, defaults, history and actions
+- French: the diagram, the messages, and the commands and settings in VS Code (`DrawMeDatabase.language`: `auto`, `en` or `fr`)
+- API version 2: `registerTool()`, `setLicenseStatus()`, `registerTableInfoProvider()`, `getDisplaySettings()` and `onDidChangeDisplaySettings`, and the page scripts `i18n.js`, `appearance.js` and `sidepanel.js` for the panels of other extensions (`docs/api.md`)
+
+### Fixed
+- A column note or a git label holding two '~' (such as the comparisons of DrawMeDatabase Pro, `~ default: a~b`) no longer makes Mermaid reject the whole diagram, and a table name holding '~x~' is no longer drawn as '<x>': the first '~' is written as is, the next ones as the look-alike '∼'
+- A ':' in a table name, a relation name or a column note (the comparisons of DrawMeDatabase Pro) is drawn as ':' instead of '&#58;', and a '#' as the fullwidth '＃' instead of '&#35;'
