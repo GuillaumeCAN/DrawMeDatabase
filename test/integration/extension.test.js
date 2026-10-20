@@ -71,6 +71,31 @@ suite('DrawMeDatabase extension', () => {
         assert.ok(commands.includes('DMDB.parseSchema'));
     });
 
+    test('the DrawMeDatabase container of the Activity Bar: its Schema view reads the schema without the diagram', async function () {
+        this.timeout(30000);
+        const extension = vscode.extensions.getExtension(EXTENSION_ID);
+        const { viewsContainers, views } = extension.packageJSON.contributes;
+        assert.deepEqual(viewsContainers.activitybar.map(container => container.id), ['drawMeDatabase']);
+        assert.deepEqual(views.drawMeDatabase.map(view => view.id), ['DMDB.schema', 'DMDB.tools', 'DMDB.exports', 'DMDB.license']);
+        // VS Code registered the container and its views
+        const commands = await vscode.commands.getCommands(true);
+        for (const command of ['workbench.view.extension.drawMeDatabase', 'DMDB.schema.focus', 'DMDB.tools.focus', 'DMDB.exports.focus', 'DMDB.refreshSchema', 'DMDB.runTool']) {
+            assert.ok(commands.includes(command), command);
+        }
+
+        assert.equal(extension.exports.getSchema(), null, 'nothing read before the view is shown');
+        await vscode.commands.executeCommand('workbench.view.extension.drawMeDatabase');
+        await vscode.commands.executeCommand('DMDB.schema.focus');
+        for (let i = 0; i < 100 && !extension.exports.getSchema(); i++) {
+            await sleep(100);
+        }
+        const schema = extension.exports.getSchema();
+        assert.ok(schema, 'the Schema view read the schema');
+        assert.deepEqual(schema.tables.map(table => table.table).sort(), ['posts', 'users']);
+        assert.equal(schema.framework, 'laravel');
+        assert.equal(drawMeDatabaseTabs().length, 0, 'without opening the diagram');
+    });
+
     test('DMDB.parseSchema parses the Laravel app of the frameworkPath setting', async () => {
         const tables = await vscode.commands.executeCommand('DMDB.parseSchema');
 
@@ -196,5 +221,33 @@ suite('DrawMeDatabase extension', () => {
         const reverted = await rendered(extension, render => render.ok && render.entities === 2);
         assert.equal(reverted && reverted.entities, 2, `after the revert: ${JSON.stringify(reverted)}`);
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    });
+
+    test('an export of the Exports view runs in the diagram, which is opened when it is closed', async function () {
+        this.timeout(60000);
+        const clipboard = async (matches) => {
+            for (let i = 0; i < 300; i++) {
+                const text = await vscode.env.clipboard.readText();
+                if (matches(text)) {
+                    return text;
+                }
+                await sleep(100);
+            }
+            return vscode.env.clipboard.readText();
+        };
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await sleep(500);
+        assert.equal(drawMeDatabaseTabs().length, 0);
+
+        await vscode.env.clipboard.writeText('');
+        await vscode.commands.executeCommand('DMDB.runExport', 'copyJson');
+        const json = await clipboard(text => text.includes('"table"'));
+        assert.deepEqual(JSON.parse(json).map(table => table.table).sort(), ['posts', 'users']);
+        assert.equal(drawMeDatabaseTabs().length, 1, 'the diagram was opened');
+
+        // Open and drawn: at once
+        await vscode.env.clipboard.writeText('');
+        await vscode.commands.executeCommand('DMDB.runExport', 'copyMermaid');
+        assert.match(await clipboard(text => text.includes('erDiagram')), /erDiagram/);
     });
 });

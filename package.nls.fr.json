@@ -30,5 +30,18 @@
   "setting.customFont": "Police utilisée quand `DrawMeDatabase.font` vaut `custom`, par exemple `Inter`.",
   "setting.fontSize": "Taille du texte du diagramme, en pixels.",
   "setting.grid": "Grille de points derrière le diagramme.",
-  "setting.showColumnGitStatus": "Affiche le statut git de chaque colonne (nouvelle, modifiée, non enregistrée) dans le diagramme. Une fonctionnalité de DrawMeDatabase Pro."
+  "setting.showColumnGitStatus": "Affiche le statut git de chaque colonne (nouvelle, modifiée, non enregistrée) dans le diagramme. Une fonctionnalité de DrawMeDatabase Pro.",
+  "command.refreshSchema": "Relire le schéma",
+  "command.showInDiagram": "Afficher dans le diagramme",
+  "command.openSettings": "Ouvrir les paramètres",
+  "command.showOutput": "Afficher la sortie",
+  "view.schema": "Schéma",
+  "view.tools": "Outils",
+  "view.exports": "Exports",
+  "view.license": "Licence",
+  "welcome.noFolder": "Ouvrez le dossier d'un projet Laravel ou Symfony pour voir le schéma de sa base de données.\n[Ouvrir un dossier](command:vscode.openFolder)",
+  "welcome.loading": "Lecture du schéma du projet…",
+  "welcome.noProject": "Aucun projet Laravel ou Symfony n'a été trouvé dans cet espace de travail. DrawMeDatabase lit les migrations de Laravel et les entités Doctrine de Symfony.\nSi le projet est dans un sous-dossier, indiquez son chemin :\n[Choisir le dossier du framework](command:DMDB.openSettings?%5B%22frameworkPath%22%5D)\n[Relire](command:DMDB.refreshSchema)",
+  "welcome.noTables": "Aucune table trouvée : DrawMeDatabase lit les migrations de Laravel (database/migrations) et les entités de Symfony (src/Entity).\n[Relire](command:DMDB.refreshSchema)",
+  "welcome.error": "Le schéma n'a pas pu être lu. Les détails sont dans la sortie DrawMeDatabase.\n[Afficher la sortie](command:DMDB.showOutput)\n[Relire](command:DMDB.refreshSchema)"
 }
