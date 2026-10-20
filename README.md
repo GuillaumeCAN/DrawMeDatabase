@@ -208,7 +208,7 @@ npm run package        # builds builds/draw-me-database-<version>.vsix
 
 Each framework has a parser in `parsers/`, listed in `parsers/registry.js`: to add one, see [docs/parsers.md](docs/parsers.md) (the parser contract) and [docs/pivot-format.md](docs/pivot-format.md) (what it returns).
 
-GitHub Actions runs these checks on every pull request, the integration tests also on the oldest VS Code version allowed by `engines.vscode`, and keeps the `.vsix` as an artifact. Releases are published from a version tag to GitHub Releases and Open VSX; the VS Code Marketplace is updated by hand. See [docs/publishing.md](docs/publishing.md).
+GitHub Actions runs these checks on every pull request, the integration tests also on the oldest VS Code version allowed by `engines.vscode`, and keeps the `.vsix` as an artifact. Merging a new version into `main` releases it: GitHub Release, Open VSX and the VS Code Marketplace. See [docs/publishing.md](docs/publishing.md).
 
 ## Changelog
 

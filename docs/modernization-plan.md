@@ -19,7 +19,7 @@ Progress (October 18, 2026):
 | # | Status |
 |---|--------|
 | 0 | 1.1.2 merged into `main`; tag and publication pending (Open VSX setup in [publishing.md](publishing.md)) |
-| 1 | Done: CI, Dependabot and tag-driven releases (PR #7) |
+| 1 | Done: CI, Dependabot and tag-driven releases (PR #7). Since 1.8.0 (October 20, 2026): a release when the version changes on `main`, and the Marketplace through Entra ID (decision 2 replaced) |
 | 2 | Done in 1.2.0: Mermaid 12.2.0 full build, ELK by default |
 | 3 | a, b, c done in 1.2.0 (single-page webview, zoom/pan, export, plus PNG export); d, e, f done in 1.3.0 (click → file, auto-refresh, search) |
 | 4 | In reserve (decision 4) |
@@ -178,7 +178,7 @@ Findings in `extension.js`: each render replaces `panel.webview.html`, which rel
 Guillaume delegated the choices; they follow the recommendations, checked against measurements where there were none.
 
 1. **ELK: yes, full Mermaid 12 build.** ELK is also the **default layout**. Benchmark in the webview (Chromium, synthetic schema of 150 tables, 1 to 3 foreign keys each): ELK draws in 4.7 s a 18 540 × 8 939 px diagram (2:1), Dagre in 3.9 s a 29 497 × 6 773 px one (4.4:1). ELK is more compact, with right-angled links and well-placed labels (the label issues mentioned above were fixed in 12.1 and 12.2). Dagre stays available in the toolbar and in the `DrawMeDatabase.layout` setting.
-2. **Marketplace: manual upload** of the .vsix built by the release workflow. The Entra ID job stays commented in `release.yml`; revisit if releases become frequent.
+2. ~~**Marketplace: manual upload** of the .vsix built by the release workflow. The Entra ID job stays commented in `release.yml`; revisit if releases become frequent.~~ *Replaced on October 20, 2026 (1.8.0): `release.yml` releases when the version of `package.json` changes on `main`, and publishes to the Marketplace with `vsce publish --azure-credential`, as a user-assigned managed identity that GitHub Actions signs in to through OIDC (no PAT, no secret). The upload by hand stays the fallback while the Azure setup is not done, or if it fails. Setup and checklist: [publishing.md](publishing.md).*
 3. **Workstream 5: out of scope.** The extension keeps reading the code without running it.
 4. **Workstream 4: in reserve**, until a class of scanner bugs or the need to resolve constants shows up.
 5. **This plan is in the repository** (this file).

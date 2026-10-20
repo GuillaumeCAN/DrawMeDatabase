@@ -2,7 +2,9 @@
 # publish") when that version already has its v<version> tag. Otherwise: checks the CHANGELOG
 # section, builds and tests the .vsix of that commit (ci.yml), creates the tag and the GitHub
 # Release at that commit, then publishes the same .vsix to Open VSX and the VS Code Marketplace.
-# Also runs on a v* tag pushed by hand, and by hand (Run workflow) on main or on a v* tag.
+# Also runs on a v* tag pushed by hand, and by hand (Run workflow) on main or on a v* tag: a tag
+# must be on a commit of main, and a version older than the latest release is only published
+# again when it already has its GitHub Release.
 # One-time setup and the release checklist: docs/publishing.md
 
 name: Release
@@ -17,8 +19,9 @@ on:
 permissions: {}
 
 # One release at a time, never cancelled. GitHub keeps at most one run waiting in the group: a
-# newer run replaces a waiting one (shown as cancelled), and releases the same version, if it is
-# still unreleased, from its newer commit.
+# newer run (a push, a tag or a Run workflow) replaces a waiting one, shown as cancelled. When
+# both are pushes to main, the newer one releases the same version, if it is still unreleased,
+# from its newer commit; a replaced Run workflow has to be started again.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -35,9 +38,11 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       notes: ${{ steps.changelog.outputs.notes }}
     steps:
+      # Every branch and tag (fetch-depth: 0): the tags of the releases, and main for a run on a tag
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       # release=true when the version of package.json is to be released from this commit. On main,
       # a version that already has its tag means "nothing to publish", except in a re-run (Re-run
@@ -61,6 +66,11 @@ jobs:
                 echo "::error::Tag $GITHUB_REF_NAME does not match the version of package.json ($version): expected $tag"
                 exit 1
               fi
+              # Only what main holds is released: not a tag on a branch that was never merged
+              if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+                echo "::error::The commit of $GITHUB_REF_NAME (${GITHUB_SHA:0:7}) is not on main: delete the tag, and merge the version into main instead, its release creates the tag"
+                exit 1
+              fi
               ;;
             *)
               echo "::error::Release runs on main or on a v* tag, not on $GITHUB_REF"
@@ -68,20 +78,8 @@ jobs:
               ;;
           esac
 
-          # Tags of the repository, listed with the read-only token of this job (needed for a
-          # private repository). The header is passed through the environment, not the command line.
-          basic=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
-          remote_tags=$(GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader" \
-            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic" \
-            git ls-remote --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git")
-
-          # Commit of the tag: the peeled line (^{}) of an annotated tag, else the tag itself
-          tag_commit=$(printf '%s\n' "$remote_tags" | awk -v ref="refs/tags/$tag" '
-            $2 == ref { sha = $1 }
-            $2 == ref "^{}" { peeled = $1 }
-            END { print (peeled != "" ? peeled : sha) }
-          ')
+          # Commit of the tag (an annotated tag is peeled to its commit), empty when there is none
+          tag_commit=$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)
 
           if [ "$GITHUB_REF" = refs/heads/main ] && [ -n "$tag_commit" ]; then
             if [ "$tag_commit" = "$GITHUB_SHA" ] && [ "$GITHUB_RUN_ATTEMPT" -gt 1 ]; then
@@ -92,12 +90,19 @@ jobs:
               echo "release=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-          elif [ "$GITHUB_REF" = refs/heads/main ]; then
-            # A version lower than the latest release, on main, is a mistake (package.json reverted?)
-            latest=$(printf '%s\n' "$remote_tags" | awk '{ print $2 }' \
-              | sed -n 's|^refs/tags/v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$|\1|p' \
-              | sort -V | tail -n 1)
-            if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$version" | sort -V | tail -n 1)" != "$version" ]; then
+          fi
+
+          # A version lower than the latest release (package.json reverted, an old tag pushed by
+          # hand) is refused, unless its GitHub Release exists: then it is published again where it
+          # is missing (Run workflow on its tag, or a re-run)
+          latest=$(git tag -l 'v*' \
+            | sed -n 's|^v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$|\1|p' \
+            | awk -v version="$version" '$0 != version' \
+            | sort -V | tail -n 1)
+          if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$version" | sort -V | tail -n 1)" != "$version" ]; then
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json tagName > /dev/null; then
+              echo "::notice::$tag is older than the latest release v$latest and has its GitHub Release: it is published again where it is missing"
+            else
               echo "::error file=package.json::Version $version is lower than the latest release v$latest: raise it"
               exit 1
             fi
@@ -106,43 +111,18 @@ jobs:
           echo "release=true" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      # The "## [vX.Y.Z] - YYYY-MM-DD" section of CHANGELOG.md, up to the next one: the release notes.
-      # A section dated "Unreleased" is refused, so a work-in-progress version is never published.
+      # The "## [vX.Y.Z] - YYYY-MM-DD" section of CHANGELOG.md, up to the next one: the release
+      # notes (.github/scripts/release-notes.sh, also run by ci.yml on the pull request)
       - name: Changelog section
         id: changelog
         if: steps.version.outputs.release == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          header="## [$TAG]"
-          line=$(awk -v header="$header" 'index($0, header) == 1 { print NR; exit }' CHANGELOG.md)
-          if [ -z "$line" ]; then
-            echo "::error file=CHANGELOG.md::CHANGELOG.md has no \"$header - YYYY-MM-DD\" section: add it, it becomes the release notes"
-            exit 1
-          fi
-          heading=$(sed -n "${line}p" CHANGELOG.md | tr -d '\r')
-          date=$(printf '%s\n' "${heading#"$header"}" | sed -E 's/^[[:space:]]*-?[[:space:]]*//; s/[[:space:]]+$//')
-          if printf '%s\n' "$date" | grep -qi 'unreleased'; then
-            echo "::error file=CHANGELOG.md,line=$line::The section of $TAG is dated \"$date\": write the release date instead ($header - YYYY-MM-DD) to release $TAG"
-            exit 1
-          fi
-          if ! printf '%s\n' "$date" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-            echo "::error file=CHANGELOG.md,line=$line::The heading \"$heading\" has no date: write it as $header - YYYY-MM-DD"
-            exit 1
-          fi
-
-          notes=$(awk -v header="$header" '
-            index($0, header) == 1 { found = 1; next }
-            found && /^## \[/ { exit }
-            found { print }
-          ' CHANGELOG.md)
-          if [ -z "$(echo "$notes" | tr -d '[:space:]')" ]; then
-            echo "::error file=CHANGELOG.md,line=$line::The section of $TAG is empty: describe the changes, they become the release notes"
-            exit 1
-          fi
+          bash .github/scripts/release-notes.sh "$TAG" "$RUNNER_TEMP/notes.md"
           delimiter="NOTES_$(openssl rand -hex 16)"
-          { echo "notes<<$delimiter"; echo "$notes"; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
-          echo "Release $TAG of $GITHUB_SHA ($date)." >> "$GITHUB_STEP_SUMMARY"
+          { echo "notes<<$delimiter"; cat "$RUNNER_TEMP/notes.md"; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
+          echo "Release $TAG of $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
 
   # Lint, unit and integration tests, .vsix, on the commit of this run
   build:
@@ -207,6 +187,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    # Limited to main and the version tags, and holds the OVSX_PAT secret (docs/publishing.md):
+    # a workflow of another branch cannot read the token
     environment:
       name: open-vsx
       url: https://open-vsx.org/extension/GuillaumeCancalon/draw-me-database
