@@ -241,3 +241,8 @@ Laravel and Symfony projects are read as before: same tables, warnings and git s
   - A click on a table shows it in the inspector, a double-click (or Ctrl/Cmd+click) opens the file it comes from: the *Usage* section and the SQL section said that a click opens it
   - The settings `DrawMeDatabase.palette`, `colors`, `font` and `customFont` say that they are DrawMeDatabase Pro features, as `showColumnGitStatus` does: without Pro, the diagram keeps the colors of the theme and the default font (also in French)
 - The publishing guide (`docs/publishing.md`): the federated credential of DrawMeDatabase Pro, a repository created after July 15, 2026, uses the immutable subject of GitHub (`repo:GuillaumeCAN@145674412/DrawMeDatabase-Pro@1424346322:environment:marketplace`); the first publication is the latest version of each extension, the core first on both registries, then Pro; a private repository without *Settings → Environments* keeps its credential on the environment
+
+## [v1.8.2] - 2026-10-21
+
+### Changed
+- **A new logo**: the D of DrawMeDatabase built from an ER table (its header, its columns and their git status) and its relation line with a crow's foot, on a blue tile; DrawMeDatabase Pro has the same mark in violet and gold. It reads as one D down to 16 px, in the light and dark themes. The Marketplace icon is 256 px (`images/logo.png`), the tab of the diagram keeps `images/logo_128.png`, and the vector source is `images/logo.svg`
