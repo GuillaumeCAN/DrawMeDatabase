@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- DrawMeDatabase: a D made of a table card (stem) and its own relation line (bowl).
+       The line leaves the header, loops round and comes back into the last row with a crow's foot.
+       Grid: 8 units = 1 px at 32 px. Stem x 48..96, bowl stroke 40; the D is a 160-unit square, x and y 48..208,
+       so its outer edges land on whole pixels at 16 and 32 px. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+  <rect width="256" height="256" rx="56" fill="url(#sheen)"/>
+
+  <!-- table card: header (40, as tall as the top arm), then three 40-unit rows split by thin dividers -->
+  <path d="M64 48 H96 V88 H48 V64 A16 16 0 0 1 64 48 Z" fill="#93c5fd"/>
+  <rect x="64" y="64" width="24" height="8" rx="4" fill="#ffffff"/>
+  <path d="M48 88 H96 V208 H64 A16 16 0 0 1 48 192 Z" fill="#ffffff"/>
+  <rect x="56" y="126" width="32" height="4" fill="#93c5fd"/>
+  <rect x="56" y="166" width="32" height="4" fill="#93c5fd"/>
+  <!-- git status of the rows, as gutter bars: new (green), modified (orange) -->
+  <rect x="48" y="88" width="8" height="38" fill="#22c55e"/>
+  <rect x="48" y="130" width="8" height="36" fill="#f97316"/>
+  <!-- column names -->
+  <rect x="64" y="104" width="24" height="8" rx="4" fill="#93c5fd"/>
+  <rect x="64" y="144" width="16" height="8" rx="4" fill="#93c5fd"/>
+  <rect x="64" y="184" width="16" height="8" rx="4" fill="#93c5fd"/>
+
+  <!-- relation line: an orthogonal connector with rounded corners, 40 thick -->
+  <path d="M96 48 H144 A64 64 0 0 1 208 112 V144 A64 64 0 0 1 144 208 H136 V168 H144 A24 24 0 0 0 168 144 V112 A24 24 0 0 0 144 88 H96 Z" fill="#ffffff"/>
+  <!-- crow's foot ("many" end) touching the last row -->
+  <path d="M100 168 L136 183.5 V192.5 L100 177 Z M100 184 H136 V192 H100 Z M100 199 L136 183.5 V192.5 L100 208 Z" fill="#ffffff"/>
+</svg>

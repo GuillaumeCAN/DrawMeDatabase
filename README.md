@@ -1,4 +1,4 @@
-**v1.8.1**
+**v1.8.2**
 
 **DrawMeDatabase** draws the ER diagram (ERD) of your database from your code, in VS Code: no database connection is needed, and the diagram follows your code as you type, with its git status.
 
@@ -210,5 +210,5 @@ GitHub Actions runs these checks on every pull request, the integration tests al
 
 ## Changelog
 
-Latest release : **v1.8.1**
+Latest release : **v1.8.2**
 For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md) file.
